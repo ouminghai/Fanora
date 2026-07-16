@@ -28,4 +28,4 @@ Fanora/
 3. 编译、测试并部署 Badge 合约。
 4. 将合约地址分别写入前端和后端的本地环境变量。
 
-详细步骤见 [开发需求文档](docs/PRODUCT_REQUIREMENTS.md)、[本地开发说明](docs/DEVELOPMENT.md) 和 [MVP 路线图](docs/MVP_ROADMAP.md)。
+详细内容见 [技术架构文档](docs/ARCHITECTURE.md)、[开发需求文档](docs/PRODUCT_REQUIREMENTS.md)、[本地开发说明](docs/DEVELOPMENT.md) 和 [MVP 路线图](docs/MVP_ROADMAP.md)。
