@@ -1,0 +1,18 @@
+# Fanora Backend
+
+Python 后端负责钱包登录、任务验证、积分与等级、粉丝画像 Agent，以及受控的合约写入。
+
+当前骨架只提供健康检查和 Agent 工作流示例。建议按 MVP 顺序逐步增加功能，不要一次建立全部数据表和接口。
+
+```text
+app/
+├── api/            # HTTP 接口
+├── agents/         # LangGraph 工作流
+├── adapters/       # 区块链、社交平台、外部模型适配器
+├── core/           # 配置和基础设施
+├── models/         # 数据库模型
+├── repositories/   # 数据持久化接口与实现
+├── schemas/        # 请求和响应结构
+└── services/       # 任务、积分、身份等业务模块
+```
+

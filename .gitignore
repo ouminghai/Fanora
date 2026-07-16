@@ -1,0 +1,28 @@
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Frontend / contracts
+node_modules/
+.next/
+out/
+dist/
+coverage/
+artifacts/
+cache/
+typechain-types/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+*.egg-info/
+
+# Editors
+.idea/
+.vscode/
