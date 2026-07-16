@@ -85,7 +85,7 @@ Fanora/
 | 前端 | Next.js 15、React 19、RainbowKit、wagmi、viem | 页面、钱包连接、签名、公开链上读取、业务操作入口 |
 | 后端 | Python、FastAPI、LangGraph、web3.py | 登录验证、任务、积分、Agent、数据库和链上写入编排 |
 | 数据 | Supabase PostgreSQL、Supabase Storage | 用户、社区、任务、积分、画像、交易与文件存储 |
-| AI | LangGraph、OpenAI Platform API | 粉丝画像、解释、任务推荐、运营建议和风险辅助判断 |
+| AI | LangGraph、OpenAI Platform API | 粉丝画像、解释、粉丝任务推荐和 Badge metadata 草案 |
 | 合约 | Solidity、Hardhat、OpenZeppelin、ERC-1155 | 不可转让 Badge、角色权限、身份升级和链上事件 |
 | 区块链 | Monad Testnet / Monad | 身份凭证的可信执行与公开验证 |
 
@@ -159,7 +159,7 @@ flowchart TB
 
 ## 6. AI Agent 架构
 
-Fanora 的 Agent 主要是后台工作流，不要求所有能力都以聊天窗口呈现。
+LangGraph 技术上运行在服务端，但它不是后台管理模块。它通过一个小型“生成粉丝画像”接口提供分析能力，不参与角色、任务审批、积分修改、审计处理或链上交易管理。
 
 ```mermaid
 flowchart LR
@@ -169,7 +169,8 @@ flowchart LR
     LLM --> VALIDATE["结构化 Schema 校验"]
     VALIDATE --> RISK["风险规则检查"]
     RISK --> SAVE["保存画像与运行记录"]
-    SAVE --> RECOMMEND["推荐任务 / 运营建议"]
+    SAVE --> RECOMMEND["粉丝任务推荐"]
+    SAVE --> BADGE["满足规则后生成 Badge 草案"]
     SAVE --> ELIGIBILITY["确定性 Badge 资格判断"]
 ```
 
@@ -189,7 +190,8 @@ flowchart LR
 - 粉丝类型，例如早期支持者、忠诚型、传播型和核心贡献者。
 - 风险等级、异常信号和判断依据。
 - 面向用户的画像解释。
-- 推荐任务与面向创作者的运营建议。
+- 面向粉丝的推荐任务。
+- 在确定性积分条件触发后生成的 Badge 名称、描述和 metadata 草案。
 
 ### 6.3 Agent 安全限制
 
@@ -199,6 +201,20 @@ flowchart LR
 - 大模型输出必须经过 Schema 和业务规则校验。
 - 模型超时或不可用时，系统降级为确定性规则评分。
 - Badge 铸造资格由版本化规则最终决定，Agent 结果只能作为输入之一。
+- Badge 草案必须由创作者确认，Agent 不能自动发布、铸造或升级。
+
+### 6.4 明确排除的后台职责
+
+LangGraph 不用于以下后台管理能力：
+
+- 用户、创作者和管理员角色管理。
+- 任务创建、发布、暂停和人工审批。
+- 积分纠错、等级阈值配置和奖励发放。
+- 合约角色管理、交易重试和链上对账。
+- 审计日志处理、数据导出和系统配置。
+- 创作者运营报告、聊天式运营助手和复杂风控工作台。
+
+这些能力由确定性业务模块和简单受保护界面完成。创作者控制台只保留任务管理、基础统计、粉丝列表和 Badge 草案确认。
 
 ## 7. 数据架构
 
@@ -486,7 +502,7 @@ MVP 阶段优先保持简单，仅在真实需求出现时增加接口或拆分�
 - Worker 负载增长：将 API 与后台 Worker 分为两个部署进程。
 - 社交平台增加：为每个平台实现独立任务验证适配器。
 - 多链需求出现：在区块链适配器后增加链配置，而不是把链判断散落到业务代码。
-- 多 Agent 需求出现：只有画像、推荐和风控单工作流难以维护时再拆分 Agent。
+- Agent 功能扩展：仍优先保持单一粉丝画像工作流，不建设多 Agent 管理平台。
 
 ## 14. 当前实现状态与部署缺口
 
