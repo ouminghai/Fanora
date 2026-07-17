@@ -28,7 +28,15 @@ class Settings(BaseSettings):
     database_url: str = "sqlite+aiosqlite:///./fanora.db"
     database_pool_size: int = 5
     database_max_overflow: int = 10
+    database_pool_timeout_seconds: int = 30
+    database_pool_recycle_seconds: int = 300
+    database_connect_timeout_seconds: int = 15
+    database_keepalive_idle_seconds: int = 30
+    database_keepalive_interval_seconds: int = 10
+    database_keepalive_count: int = 3
     auto_create_schema: bool = True
+    migration_max_attempts: int = 5
+    migration_retry_delay_seconds: float = 2
 
     checkpoint_database_url: str = ""
     checkpoint_pool_size: int = 5
@@ -82,6 +90,16 @@ class Settings(BaseSettings):
     @property
     def llm_enabled(self) -> bool:
         return bool(self.openai_api_key and self.llm_models)
+
+    @property
+    def postgres_connect_args(self) -> dict[str, int]:
+        return {
+            "connect_timeout": self.database_connect_timeout_seconds,
+            "keepalives": 1,
+            "keepalives_idle": self.database_keepalive_idle_seconds,
+            "keepalives_interval": self.database_keepalive_interval_seconds,
+            "keepalives_count": self.database_keepalive_count,
+        }
 
     @model_validator(mode="after")
     def validate_production_secrets(self) -> "Settings":

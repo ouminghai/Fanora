@@ -46,6 +46,7 @@ def run_migrations_online() -> None:
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=settings.postgres_connect_args if settings.database_url.startswith("postgresql") else {},
     )
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata, include_object=include_object)
