@@ -1,11 +1,9 @@
-/* eslint-disable @next/next/no-img-element */
 "use client";
 import React, { useEffect, useState } from "react";
 import Nav from "./component/Nav";
 
 import Profile from "./component/Profile";
 import { handleDarkMode } from "@/utlis/handleDarkMode";
-import Image from "next/image";
 import Link from "next/link";
 import {
   addMobileMenuToggle,
@@ -46,20 +44,9 @@ export default function Header3() {
         <div className="flex items-center px-6 py-6 xl:px-24">
           {/* Logo */}
           <Link href="/" className="shrink-0">
-            <Image
-              width={130}
-              height={28}
-              src="/img/logo.png"
-              className="max-h-7 dark:hidden"
-              alt="Xhibiter | NFT Marketplace"
-            />
-            <Image
-              width={130}
-              height={28}
-              src="/img/logo_white.png"
-              className="hidden max-h-7 dark:block"
-              alt="Xhibiter | NFT Marketplace"
-            />
+            <span className="font-display text-2xl font-bold tracking-tight text-jacarta-700 dark:text-white">
+              Fanor<span className="text-accent">A</span>
+            </span>
           </Link>
 
           {/* Search */}
@@ -70,20 +57,9 @@ export default function Header3() {
             <div className="t-0 fixed left-0 z-10 flex w-full items-center justify-between bg-white p-6 dark:bg-jacarta-800 lg:hidden">
               {/* Mobile Logo */}
               <Link href="/" className="shrink-0">
-                <Image
-                  width={130}
-                  height={28}
-                  src="/img/logo.png"
-                  className="max-h-7 dark:hidden"
-                  alt="Xhibiter | NFT Marketplace"
-                />
-                <Image
-                  width={130}
-                  height={28}
-                  src="/img/logo_white.png"
-                  className="hidden max-h-7 dark:block"
-                  alt="Xhibiter | NFT Marketplace"
-                />
+                <span className="font-display text-2xl font-bold tracking-tight text-jacarta-700 dark:text-white">
+                  Fanor<span className="text-accent">A</span>
+                </span>
               </Link>
 
               {/* Mobile Menu Close */}
@@ -112,7 +88,7 @@ export default function Header3() {
               <input
                 type="search"
                 className="w-full rounded-2xl border border-jacarta-100 py-3 px-4 pl-10 text-jacarta-700 placeholder-jacarta-500 focus:ring-accent dark:border-transparent dark:bg-white/[.15] dark:text-white dark:placeholder-white"
-                placeholder="Search"
+                placeholder="查找粉丝任务"
               />
               <span className="absolute left-0 top-0 flex h-full w-12 items-center justify-center rounded-2xl">
                 <svg

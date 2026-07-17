@@ -1,10 +1,9 @@
-"use client";
-import { process3 } from "@/data/process";
 import Image from "next/image";
+import { fanJourney } from "@/data/fanora";
 
 export default function Process() {
   return (
-    <section className="relative py-24 dark:bg-jacarta-800">
+    <section id="fan-journey" className="relative py-24 dark:bg-jacarta-800">
       <picture className="pointer-events-none absolute inset-0 -z-10 dark:hidden">
         <Image
           width={1920}
@@ -17,53 +16,45 @@ export default function Process() {
       </picture>
       <div className="container">
         <h2 className="mb-16 text-center font-display text-3xl text-jacarta-700 dark:text-white">
-          Create and sell your NFTs
+          从加入社区到拥有链上粉丝身份
         </h2>
         <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
-          {process3.map((elm, i) => (
-            <div key={i} className="text-center">
+          {fanJourney.map((step) => (
+            <div key={step.id} className="text-center">
               <div
-                className={`mb-6 inline-flex rounded-full bg-[${elm.backgroundColor}] p-3`}
+                className="mb-6 inline-flex rounded-full p-3"
+                style={{ backgroundColor: step.ringColor }}
               >
                 <div
-                  className={`inline-flex h-12 w-12 items-center justify-center rounded-full ${elm.bgClass}`}
+                  className={`inline-flex h-12 w-12 items-center justify-center rounded-full ${step.bgClass}`}
                 >
                   <Image
                     width={24}
                     height={24}
-                    src={elm.iconSrc}
-                    alt="process"
+                    src={step.iconSrc}
+                    alt={step.title}
                   />
                 </div>
               </div>
-              <h3
-                dir="ltr"
-                className="mb-4  font-display text-lg text-jacarta-700 dark:text-white"
-              >
-                {elm.title}
+              <h3 className="mb-4 font-display text-lg text-jacarta-700 dark:text-white">
+                {step.title}
               </h3>
-              <p className="dark:text-jacarta-300">{elm.description}</p>
+              <p className="dark:text-jacarta-300">{step.description}</p>
             </div>
           ))}
         </div>
 
         <p className="mx-auto mt-20 max-w-2xl text-center text-lg text-jacarta-700 dark:text-white">
-          Join our mailing list to stay in the loop with our newest feature
-          releases, NFT drops, and tips and tricks for navigating Xhibiter
+          非 Web3 用户无需理解助记词和 Gas。Fanora 会在注册流程中完成钱包创建与身份绑定，需要时你仍然可以完整接管自己的链上账户。
         </p>
 
         <div className="mx-auto mt-7 max-w-md text-center">
-          <form onSubmit={(e) => e.preventDefault()} className="relative">
-            <input
-              type="email"
-              // dir="ltr"
-              placeholder="Email address"
-              className="w-full rounded-full border border-jacarta-100 py-3 px-4 focus:ring-accent dark:border-jacarta-600 dark:bg-jacarta-700 dark:text-white dark:placeholder-white"
-            />
-            <button className="absolute top-2 right-2 rtl:left-2 rtl:right-auto rounded-full bg-accent px-6 py-2 font-display text-sm text-white hover:bg-accent-dark">
-              Subscribe
-            </button>
-          </form>
+          <a
+            href="#proof-of-fandom"
+            className="inline-block w-full rounded-full bg-accent py-3 px-6 font-display text-sm text-white shadow-accent-volume transition-all hover:bg-accent-dark"
+          >
+            了解 Proof of Fandom
+          </a>
         </div>
       </div>
     </section>

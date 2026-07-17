@@ -2,7 +2,6 @@ import Socials from "./Socials";
 import MarketplaceLinks from "./MarketplaceLinks";
 import CompanyLinks from "./CompanyLinks";
 import MyAccountKink from "./MyAccountLink";
-import Image from "next/image";
 import Link from "next/link";
 
 export default function Footer1() {
@@ -12,24 +11,13 @@ export default function Footer1() {
         <div className="grid grid-cols-6 gap-x-7 gap-y-14 pt-24 pb-12 md:grid-cols-12">
           <div className="col-span-full sm:col-span-3 md:col-span-4">
             <Link href="/" className="mb-6 inline-block">
-              <Image
-                width={130}
-                height={28}
-                src="/img/logo.png"
-                className="max-h-7 dark:hidden"
-                alt="Xhibiter | NFT Marketplace"
-              />
-              <Image
-                width={130}
-                height={28}
-                src="/img/logo_white.png"
-                className="hidden max-h-7 dark:block"
-                alt="Xhibiter | NFT Marketplace"
-              />
+              <span className="font-display text-2xl font-bold tracking-tight text-jacarta-700 dark:text-white">
+                Fanor<span className="text-accent">A</span>
+              </span>
             </Link>
             <p className="mb-12 dark:text-jacarta-300">
-              Create, sell and collect truly rare digital artworks. Powered by
-              blockchain technology.
+              用 AI Agent 理解真实粉丝行为，用链上 Badge 记录长期支持，
+              构建可验证的 Proof of Fandom 身份。
             </p>
 
             <div className="flex space-x-5">
@@ -39,7 +27,7 @@ export default function Footer1() {
 
           <div className="col-span-full sm:col-span-3 md:col-span-2 md:col-start-7">
             <h3 className="mb-6 font-display text-sm text-jacarta-700 dark:text-white">
-              Marketplace
+              Fans Club
             </h3>
             <ul className="flex flex-col space-y-1 dark:text-jacarta-300">
               <MarketplaceLinks />
@@ -48,7 +36,7 @@ export default function Footer1() {
 
           <div className="col-span-full sm:col-span-3 md:col-span-2">
             <h3 className="mb-6 font-display text-sm text-jacarta-700 dark:text-white">
-              Company
+              Fanora
             </h3>
             <ul className="flex flex-col space-y-1 dark:text-jacarta-300">
               <CompanyLinks />
@@ -57,7 +45,7 @@ export default function Footer1() {
 
           <div className="col-span-full sm:col-span-3 md:col-span-2">
             <h3 className="mb-6 font-display text-sm text-jacarta-700 dark:text-white">
-              My Account
+              我的身份
             </h3>
             <ul className="flex flex-col space-y-1 dark:text-jacarta-300">
               <MyAccountKink />
@@ -66,23 +54,17 @@ export default function Footer1() {
         </div>
         <div className="flex flex-col items-center justify-between space-y-2 py-8 sm:flex-row sm:space-y-0">
           <span className="text-sm dark:text-jacarta-400">
-            &copy; {new Date().getFullYear()} Xhibiter — Made by{" "}
-            <a
-              href="https://themeforest.net/user/ib-themes/portfolio"
-              className="hover:text-accent"
-            >
-              ib-themes
-            </a>
+            &copy; {new Date().getFullYear()} Fanora Protocol — Proof of Fandom
           </span>
           <ul className="flex flex-wrap space-x-4 text-sm dark:text-jacarta-400">
             <li>
               <a href="#" className="hover:text-accent">
-                Terms and conditions
+                使用条款
               </a>
             </li>
             <li>
               <a href="#" className="hover:text-accent">
-                Privacy policy
+                隐私政策
               </a>
             </li>
           </ul>

@@ -1,86 +1,56 @@
 "use client";
-import Image from "next/image";
 
-const linksData = [
-  {
-    id: 1,
-    href: "#",
-    text: "cryptopunks",
-  },
-  {
-    id: 2,
-    href: "#",
-    text: "bored ape yacht club",
-  },
-  {
-    id: 3,
-    href: "#",
-    text: "moonbirds",
-  },
-];
+import { useState } from "react";
 
 export default function Hero() {
+  const [hasJoined, setHasJoined] = useState(false);
+
   return (
-    <section className="hero relative py-20 md:pt-32">
-      <picture className="pointer-events-none absolute inset-x-0 top-0 -z-10 dark:hidden">
-        <Image
-          width={1920}
-          height={900}
-          src="/img/gradient.jpg"
-          alt="gradient"
-          className="w-full"
-        />
-      </picture>
-      <picture className="pointer-events-none absolute inset-x-0 top-0 -z-10 hidden dark:block">
-        <Image
-          width={1920}
-          height={900}
-          src="/img/gradient_dark.jpg"
-          alt="gradient dark"
-          className="w-full"
-        />
-      </picture>
+    <section className="hero relative overflow-hidden py-20 md:pt-32">
+      <video
+        className="pointer-events-none absolute inset-0 -z-20 h-full w-full object-cover opacity-50"
+        autoPlay
+        muted
+        loop
+        playsInline
+        poster="/img/fanora/eason-concert.webp"
+        aria-hidden="true"
+      >
+        <source src="/img/fanora/eason-hero.mp4" type="video/mp4" />
+      </video>
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-white/30 dark:bg-jacarta-900/55" />
+      <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-white/10 to-white dark:to-jacarta-900" />
 
       <div className="container">
         <div className="mx-auto max-w-2xl pt-24 text-center">
           <h1 className="mb-10 font-display text-5xl text-jacarta-700 dark:text-white lg:text-6xl xl:text-7xl">
-            Discover, Collect & Sell{" "}
-            <span className="animate-gradient">Creative NFTs</span>
+            让每一次支持，都成为可验证的{" "}
+            <span className="animate-gradient">Eason Fans Club 身份</span>
           </h1>
 
-          <form onSubmit={(e) => e.preventDefault()} className="relative mb-4">
-            <input
-              type="search"
-              className="w-full rounded-2xl border border-jacarta-100 py-4 px-4 pl-10 text-md text-jacarta-700 placeholder-jacarta-300 focus:ring-accent dark:border-transparent dark:bg-white/[.15] dark:text-white dark:placeholder-white"
-              placeholder="Search by Collection, NFT or user"
-            />
+          <button
+            type="button"
+            onClick={() => setHasJoined(true)}
+            className="group relative mb-4 flex w-full items-center justify-center rounded-2xl border border-jacarta-100 bg-white py-4 px-4 text-md font-semibold text-jacarta-700 shadow-white-volume transition-all hover:border-accent hover:bg-accent hover:text-white dark:border-transparent dark:bg-white/[.15] dark:text-white dark:hover:bg-accent"
+          >
             <span className="absolute left-0 top-0 flex h-full w-12 items-center justify-center rounded-2xl">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 width="24"
                 height="24"
-                className="h-4 w-4 fill-jacarta-500 dark:fill-white"
+                className="h-4 w-4 fill-jacarta-500 transition-colors group-hover:fill-white dark:fill-white"
               >
                 <path fill="none" d="M0 0h24v24H0z" />
-                <path d="M18.031 16.617l4.283 4.282-1.415 1.415-4.282-4.283A8.96 8.96 0 0 1 11 20c-4.968 0-9-4.032-9-9s4.032-9 9-9 9 4.032 9 9a8.96 8.96 0 0 1-1.969 5.617zm-2.006-.742A6.977 6.977 0 0 0 18 11c0-3.868-3.133-7-7-7-3.868 0-7 3.132-7 7 0 3.867 3.132 7 7 7a6.977 6.977 0 0 0 4.875-1.975l.15-.15z" />
+                <path d="M12 2a10 10 0 1 1-7.07 2.93A9.97 9.97 0 0 1 12 2zm-1 5v4H7v2h4v4h2v-4h4v-2h-4V7h-2z" />
               </svg>
             </span>
-          </form>
+            {hasJoined ? "进入 Eason Fans Club" : "加入 Eason Fans Club"}
+          </button>
 
-          <span className="dark:text-jacarta-300">Popular searches:</span>
-          {linksData.map((elm, i) => (
-            <span key={i}>
-              {" "}
-              <a
-                href={elm.href}
-                className="text-accent hover:text-jacarta-700 dark:hover:text-white"
-              >
-                {elm.text}
-              </a>
-              {i + 1 != linksData.length && <span>,</span>}
-            </span>
-          ))}
+          <span className="text-jacarta-600 dark:text-jacarta-300">
+            参与活动、积累身份积分，并解锁属于你的链上粉丝 Badge
+          </span>
         </div>
       </div>
     </section>

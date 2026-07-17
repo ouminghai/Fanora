@@ -11,7 +11,7 @@ import Hero from "@/components/homes/home-4/Hero";
 import Partners from "@/components/common/Partners";
 
 export const metadata = {
-  title: "Home 4 || Xhibiter | NFT Marketplace Nextjs Template",
+  title: "Fanora Protocol | Proof of Fandom",
 };
 export default function HomePag4() {
   return (

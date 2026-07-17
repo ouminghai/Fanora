@@ -28,3 +28,7 @@ logs/
 # Editors
 .idea/
 .vscode/
+
+# Local reference materials
+xhibiter-ts/
+resources/

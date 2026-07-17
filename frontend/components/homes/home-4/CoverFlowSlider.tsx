@@ -1,8 +1,7 @@
 "use client";
 import { Swiper, SwiperSlide } from "swiper/react";
 import { Navigation, Pagination, EffectCoverflow } from "swiper/modules";
-import { collections4 } from "@/data/item";
-import Link from "next/link";
+import { recentActivities } from "@/data/fanora";
 import Image from "next/image";
 
 export default function CoverFlowSlider() {
@@ -48,42 +47,45 @@ export default function CoverFlowSlider() {
         }}
         className="swiper coverflow-slider !py-5"
       >
-        {collections4.map((elm, i) => (
-          <SwiperSlide key={i}>
+        {recentActivities.map((elm) => (
+          <SwiperSlide key={elm.id}>
             <article>
               <div className="block overflow-hidden rounded-2.5xl bg-white shadow-md transition-shadow hover:shadow-lg dark:bg-jacarta-700">
                 <figure className="relative">
-                  <Link href={`/item/${elm.id}`}>
+                  <a href="#missions">
                     <Image
                       src={elm.imageSrc}
-                      alt="item 1"
+                      alt={elm.title}
                       className="swiper-lazy h-[430px] w-full object-cover"
                       height="430"
                       width="379"
                     />
                     {/* <div className="swiper-lazy-preloader"></div> */}
-                  </Link>
+                  </a>
                 </figure>
                 <div className="p-6">
                   <div className="flex">
-                    <Link href={`/user/${elm.id}`} className="shrink-0">
+                    <span className="shrink-0">
                       <Image
                         width={40}
                         height={40}
                         src={elm.avatarSrc}
-                        alt="avatar"
+                        alt="Eason Fans Club"
                         className="mr-4 h-10 w-10 rounded-full"
                       />
-                    </Link>
+                    </span>
                     <div>
-                      <Link href={`/item/${elm.id}`} className="block">
+                      <a href="#missions" className="block">
                         <span className="font-display text-lg leading-none text-jacarta-700 hover:text-accent dark:text-white">
                           {elm.title}
                         </span>
-                      </Link>
-                      <a href="#" className="text-2xs text-accent">
-                        {elm.subTitle}
                       </a>
+                      <span className="block text-2xs text-accent">
+                        {elm.meta}
+                      </span>
+                      <span className="text-2xs text-jacarta-400 dark:text-jacarta-300">
+                        {elm.reward}
+                      </span>
                     </div>
                   </div>
                 </div>

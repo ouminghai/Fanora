@@ -1,4 +1,4 @@
-import HomePage1 from "./(homes)/home-1/page";
+import HomePage4 from "./(homes)/home-4/page";
 
 export const metadata = {
   title: "Fanora Protocol | Proof of Fandom",
@@ -6,9 +6,5 @@ export const metadata = {
 };
 
 export default function Home() {
-  return (
-    <>
-      <HomePage1 />
-    </>
-  );
+  return <HomePage4 />;
 }
