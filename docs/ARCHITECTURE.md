@@ -28,10 +28,10 @@ Fanora 将链下互动、Agent 分析与链上身份凭证组合为一个完整�
 
 ```mermaid
 flowchart LR
-    USER["粉丝 / 创作者钱包"]
+    USER["粉丝 / 创作者"]
 
     subgraph VERCEL["Vercel"]
-        WEB["Next.js 前端<br/>RainbowKit + wagmi + viem"]
+        WEB["Next.js 前端<br/>嵌入式钱包 SDK + wagmi + viem"]
     end
 
     subgraph BACKEND["Python 后端运行环境"]
@@ -48,6 +48,7 @@ flowchart LR
     end
 
     subgraph EXTERNAL["外部能力"]
+        AUTH["嵌入式钱包提供商<br/>邮箱 / 社交账号 / Passkey"]
         OPENAI["OpenAI API"]
         RPC["Monad RPC"]
         CONTRACT["ProofOfFandomBadge<br/>ERC-1155 SBT"]
@@ -55,8 +56,10 @@ flowchart LR
     end
 
     USER --> WEB
+    WEB -->|"快捷登录 / 自动创建钱包"| AUTH
+    AUTH -->|"身份令牌 + 钱包地址"| API
     WEB -->|"HTTP / JSON"| API
-    WEB -->|"钱包连接、公开读取、用户签名"| RPC
+    WEB -->|"外部钱包连接、公开读取、用户签名"| RPC
     API --> DOMAIN
     DOMAIN --> DB
     DOMAIN --> STORAGE
@@ -82,8 +85,8 @@ Fanora/
 
 | 层级 | 当前技术 | 主要职责 |
 | --- | --- | --- |
-| 前端 | Next.js 15、React 19、RainbowKit、wagmi、viem | 页面、钱包连接、签名、公开链上读取、业务操作入口 |
-| 后端 | Python、FastAPI、LangGraph、web3.py | 登录验证、任务、积分、Agent、数据库和链上写入编排 |
+| 前端 | Next.js 15、React 19、嵌入式钱包 SDK、RainbowKit、wagmi、viem | 无感登录、外部钱包连接、公开链上读取和业务操作入口 |
+| 后端 | Python、FastAPI、LangGraph、web3.py | 身份抽象、登录验证、任务、积分、Agent、数据库和链上写入编排 |
 | 数据 | Supabase PostgreSQL、Supabase Storage | 用户、社区、任务、积分、画像、交易与文件存储 |
 | AI | LangGraph、OpenAI Platform API | 粉丝画像、解释、粉丝任务推荐和 Badge metadata 草案 |
 | 合约 | Solidity、Hardhat、OpenZeppelin、ERC-1155 | 不可转让 Badge、角色权限、身份升级和链上事件 |
@@ -94,9 +97,10 @@ Fanora/
 ### 4.1 前端职责
 
 - 展示官网、社区、任务中心、用户 Dashboard、徽章墙和创作者控制台。
+- 为普通用户提供邮箱、社交账号或 Passkey 快捷登录，并自动创建或恢复嵌入式钱包。
 - 使用 RainbowKit 和 wagmi 管理钱包连接、账户、网络和交易状态。
 - 使用 viem 读取 Badge 余额、合约事件和公开链上状态。
-- 请求登录 nonce，并让用户通过钱包签署登录消息。
+- Web3 用户选择外部钱包时，请求登录 nonce 并让用户签署登录消息。
 - 调用 FastAPI 完成任务、积分、画像和创作者管理操作。
 - 展示链上交易的待签名、待确认、成功和失败状态。
 
@@ -106,7 +110,8 @@ Fanora/
 - 不在浏览器中计算可信积分或等级。
 - 不保存 OpenAI API Key、运营私钥或管理员私钥。
 - 不直接执行需要 `MINTER_ROLE` 的 Badge 铸造与升级。
-- 不把“连接钱包”直接视为“完成服务端登录”。
+- 不把“连接外部钱包”直接视为“完成服务端登录”。
+- 不在应用代码或浏览器存储中直接处理嵌入式钱包明文私钥。
 
 ### 4.3 前端接口位置
 
@@ -115,6 +120,46 @@ Fanora/
 - `lib/web3/abi/`：合约 ABI。
 - `hooks/`：钱包和合约读取 Hook。
 - 后续新增 `lib/api/`：统一后端请求、认证和错误处理。
+
+### 4.4 身份抽象与双入口登录
+
+Fanora 的业务身份不等同于某一种登录方式。每个已激活用户必须拥有一个主钱包，但创建钱包的过程可以对普通用户完全无感。
+
+```mermaid
+flowchart LR
+    USER["用户进入 Fanora"] --> CHOICE{"选择登录方式"}
+    CHOICE -->|"快捷登录"| EMBEDDED["邮箱 / 社交账号 / Passkey"]
+    EMBEDDED --> PROVIDER["嵌入式钱包提供商"]
+    PROVIDER -->|"自动创建或恢复钱包"| VERIFY["FastAPI 验证提供商令牌"]
+
+    CHOICE -->|"已有 Web3 钱包"| EXTERNAL["MetaMask / WalletConnect"]
+    EXTERNAL --> SIGN["Nonce + 钱包签名"]
+    SIGN --> VERIFY
+
+    VERIFY --> IDENTITY["统一身份结果<br/>user_id + primary_wallet"]
+    IDENTITY --> PRODUCT["任务 / 积分 / Agent / Badge"]
+```
+
+身份模块提供一个小型统一接口：
+
+```text
+authenticate(credential)
+    → user_id
+    → primary_wallet
+    → wallet_type: embedded | external
+    → session
+```
+
+业务模块只使用 `user_id` 和 `primary_wallet`。具体登录提供商位于身份模块内部，通过嵌入式钱包适配器或外部钱包签名适配器实现。
+
+### 4.5 用户体验原则
+
+- 默认按钮使用“登录 / 注册”，不要求普通用户先理解“连接钱包”。
+- 快捷登录成功后自动完成嵌入式钱包创建和 Monad 地址绑定。
+- 普通用户默认不看到助记词、RPC、Gas、切链和复杂签名术语。
+- 钱包地址、网络和外部钱包关联放在“账户 → Web3 设置”中。
+- Web3 用户仍可直接连接外部钱包，并选择将其设为主钱包。
+- 如果主钱包用于不可转让 Badge，切换主钱包前必须明确提示历史 Badge 不能自动迁移。
 
 ## 5. 后端架构
 
@@ -125,11 +170,14 @@ flowchart TB
     ROUTES["FastAPI Routes"] --> SERVICES["业务模块 Interface"]
     SERVICES --> REPOS["Repository Interface"]
     SERVICES --> PROFILE["Fan Profile Agent Interface"]
+    SERVICES --> IDENTITY["Identity Interface"]
     SERVICES --> BLOCKCHAIN["Blockchain Adapter Interface"]
     SERVICES --> VERIFY["Task Verifier Interface"]
 
     REPOS --> POSTGRES["Supabase PostgreSQL Adapter"]
     PROFILE --> GRAPH["LangGraph Implementation"]
+    IDENTITY --> EMBEDDED_AUTH["Embedded Wallet Auth Adapter"]
+    IDENTITY --> WALLET_AUTH["External Wallet Signature Adapter"]
     BLOCKCHAIN --> WEB3["web3.py Monad Adapter"]
     VERIFY --> INTERNAL["签到 / 平台行为验证器"]
     VERIFY --> ONCHAIN["链上资产 / 交易验证器"]
@@ -144,7 +192,7 @@ flowchart TB
 | `app/services` | 任务、积分、等级、身份与 Badge 业务规则 |
 | `app/agents` | LangGraph 状态、节点、工作流和结构化输出 |
 | `app/repositories` | 数据持久化接口及 Supabase/PostgreSQL 实现 |
-| `app/adapters` | Monad、OpenAI、Storage、X、Discord 等外部适配器 |
+| `app/adapters` | 嵌入式钱包、Monad、OpenAI、Storage、X、Discord 等外部适配器 |
 | `app/models` | 数据库模型 |
 | `app/schemas` | 请求、响应和 Agent 输出 Schema |
 | `app/core` | 配置、日志、安全和共享基础设施 |
@@ -156,6 +204,7 @@ flowchart TB
 - 业务模块不直接散落调用 web3.py，所有链上操作集中在 Monad 适配器。
 - 业务模块只调用“生成粉丝画像”高层接口，不依赖 LangGraph 内部节点。
 - 调用方和测试通过同一接口使用模块，方便替换为内存假实现。
+- 任务、积分和 Badge 模块只依赖统一身份结果，不依赖具体嵌入式钱包厂商。
 
 ## 6. AI Agent 架构
 
@@ -224,7 +273,7 @@ LangGraph 不用于以下后台管理能力：
 | --- | --- | --- |
 | Badge 类型、持有状态、升级事件 | Monad 合约 | 公开验证、不可篡改和可组合 |
 | 关键凭证摘要 | Monad 或 Badge metadata | 证明身份结论，不暴露完整隐私数据 |
-| 用户资料、社区、任务和任务进度 | Supabase PostgreSQL | 需要频繁查询和更新 |
+| 用户、登录身份、钱包、社区、任务和任务进度 | Supabase PostgreSQL | 需要唯一约束、频繁查询和更新 |
 | 积分流水和等级 | Supabase PostgreSQL | 成本低、支持审计和复杂查询 |
 | Agent 输入摘要、输出与版本 | Supabase PostgreSQL | 支持追踪、评测和重新计算 |
 | 头像、Badge 图片和 metadata | Supabase Storage，后续可迁移 IPFS | MVP 部署简单，便于管理 |
@@ -232,7 +281,9 @@ LangGraph 不用于以下后台管理能力：
 
 ### 7.2 MVP 核心数据表
 
-- `users`：钱包用户资料和状态。
+- `users`：与具体登录方式解耦的用户资料和状态。
+- `auth_identities`：邮箱、社交账号、Passkey 或外部钱包等登录身份。
+- `wallets`：嵌入式钱包、外部钱包和主钱包状态。
 - `wallet_nonces`：一次性登录 nonce。
 - `sessions`：服务端登录会话。
 - `communities`：创作者社区。
@@ -284,28 +335,39 @@ MVP 使用 `ProofOfFandomBadge` ERC-1155 合约表达多等级粉丝身份。
 
 ## 9. 核心业务数据流
 
-### 9.1 钱包签名登录
+### 9.1 无感登录与外部钱包登录
 
 ```mermaid
 sequenceDiagram
-    participant U as 用户钱包
+    participant U as 用户
     participant F as Next.js
+    participant P as 嵌入式钱包提供商
     participant B as FastAPI
     participant D as Supabase PostgreSQL
 
-    F->>B: 请求登录 nonce
-    B->>D: 保存 nonce 与过期时间
-    B-->>F: 返回签名消息
-    F->>U: 请求钱包签名
-    U-->>F: 返回签名
-    F->>B: 提交消息与签名
-    B->>D: 校验并消费 nonce
-    B->>B: 恢复签名地址
-    B->>D: 创建用户或读取用户
-    B-->>F: 创建安全会话
+    alt 普通用户快捷登录
+        F->>P: 邮箱 / 社交账号 / Passkey 登录
+        P->>P: 创建或恢复嵌入式钱包
+        P-->>F: 身份令牌与钱包地址
+        F->>B: 提交提供商身份令牌
+        B->>P: 验证令牌签名与声明
+    else Web3 用户外部钱包登录
+        F->>B: 请求登录 nonce
+        B->>D: 保存 nonce 与过期时间
+        B-->>F: 返回签名消息
+        F->>U: 请求外部钱包签名
+        U-->>F: 返回签名
+        F->>B: 提交消息与签名
+        B->>D: 校验并消费 nonce
+        B->>B: 恢复签名地址
+    end
+
+    B->>D: 创建或读取用户、登录身份和钱包
+    B->>D: 确保存在唯一主钱包
+    B-->>F: 创建统一安全会话
 ```
 
-连接钱包只证明前端知道当前地址，只有服务端验证签名后才视为完成登录。
+快捷登录令牌或外部钱包签名都必须由服务端验证。前端传入的钱包地址本身不能作为可信身份依据。
 
 ### 9.2 任务、积分与 Agent
 
@@ -447,6 +509,7 @@ NEXT_PUBLIC_APP_NAME
 NEXT_PUBLIC_APP_URL
 NEXT_PUBLIC_API_URL
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
+NEXT_PUBLIC_EMBEDDED_WALLET_APP_ID
 NEXT_PUBLIC_MONAD_TESTNET_RPC_URL
 NEXT_PUBLIC_BADGE_CONTRACT_ADDRESS_MONAD_TESTNET
 ```
@@ -466,9 +529,12 @@ OPENAI_API_KEY
 OPENAI_MODEL
 SUPABASE_URL
 SUPABASE_SERVICE_ROLE_KEY
+EMBEDDED_WALLET_PROVIDER
+EMBEDDED_WALLET_ISSUER
+EMBEDDED_WALLET_AUDIENCE
 ```
 
-`OPERATOR_PRIVATE_KEY`、`OPENAI_API_KEY` 和 `SUPABASE_SERVICE_ROLE_KEY` 只能配置在服务端。
+`OPERATOR_PRIVATE_KEY`、`OPENAI_API_KEY` 和 `SUPABASE_SERVICE_ROLE_KEY` 只能配置在服务端。嵌入式钱包用户私钥不属于 Fanora 服务端环境变量，必须由专业钱包提供商安全管理。
 
 ### 11.3 Hardhat 部署环境变量
 
@@ -484,6 +550,9 @@ BADGE_BASE_URI
 ## 12. 安全架构
 
 - 钱包登录使用一次性 nonce、域名、链 ID、签发时间和过期时间防止重放。
+- 嵌入式登录令牌必须校验签名、签发者、受众、过期时间、用户标识和钱包地址。
+- Fanora 后端不得生成、存储、记录或向 Agent 传递用户嵌入式钱包私钥。
+- 钱包关联、解绑和主钱包切换属于高风险操作，需要重新认证和审计。
 - FastAPI 对角色、社区归属和资源权限进行服务端校验。
 - 积分使用追加式流水，修正积分时增加调整记录，不删除历史记录。
 - Badge 合约将管理员、铸造者和 URI 管理者权限分离。
@@ -518,8 +587,10 @@ MVP 阶段优先保持简单，仅在真实需求出现时增加接口或拆分�
 ### 14.2 部署前仍需完成
 
 - 接入 Supabase PostgreSQL。
+- 选择并接入一种嵌入式钱包提供商，完成快捷登录和服务端令牌验证。
+- 建立用户、登录身份、钱包与主钱包的数据模型。
 - 增加 SQLAlchemy、数据库迁移和仓储实现。
-- 完成钱包 nonce、签名验证和安全会话。
+- 完成外部钱包 nonce、签名验证和两种登录方式的统一安全会话。
 - 完成任务、积分与等级业务模块。
 - 接入 OpenAI Platform API 并实现 Agent 降级。
 - 部署 Badge 合约至 Monad Testnet。
