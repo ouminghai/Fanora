@@ -1,0 +1,81 @@
+services:
+  db:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-fanora}
+      POSTGRES_USER: ${POSTGRES_USER:-fanora}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-fanora-local-password}
+    ports:
+      - "5432:5432"
+    volumes:
+      - fanora-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-fanora} -d ${POSTGRES_DB:-fanora}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - fanora-valkey:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build: .
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-fanora}:${POSTGRES_PASSWORD:-fanora-local-password}@db:5432/${POSTGRES_DB:-fanora}
+      CHECKPOINT_DATABASE_URL: postgresql://${POSTGRES_USER:-fanora}:${POSTGRES_PASSWORD:-fanora-local-password}@db:5432/${POSTGRES_DB:-fanora}
+      CHECKPOINT_AUTO_SETUP: "true"
+      CACHE_URL: redis://valkey:6379/0
+      AUTO_CREATE_SCHEMA: "false"
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+
+  prometheus:
+    image: prom/prometheus:latest
+    profiles: ["observability"]
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - app
+
+  grafana:
+    image: grafana/grafana:latest
+    profiles: ["observability"]
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-fanora-local-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - fanora-grafana:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+
+volumes:
+  fanora-postgres:
+  fanora-valkey:
+  fanora-grafana:

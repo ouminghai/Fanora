@@ -1,2 +1,1 @@
 """Fanora backend package."""
-

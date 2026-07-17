@@ -17,7 +17,7 @@ Fanora/
 ## 模块职责
 
 - `frontend`：钱包连接、用户 Dashboard、任务中心、徽章墙和创作者控制台。
-- `backend`：钱包登录、任务验证、积分计算、Agent 工作流、数据库和链上写入编排。
+- `backend`：生产级 FastAPI、统一身份接口、任务验证、积分计算、LangGraph 粉丝画像、数据库和链上写入编排。
 - `contracts`：Proof of Fandom Badge、身份等级以及受权限控制的链上状态。
 - `docs`：跨模块的架构、接口约定和 MVP 开发顺序。
 

@@ -13,18 +13,24 @@ npm run dev
 
 ## 后端
 
-推荐 Python 3.11 或更高版本。
+推荐 Python 3.13，并使用 uv 管理依赖。
 
 ```bash
 cd backend
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
+curl -LsSf https://astral.sh/uv/install.sh | sh
 cp .env.example .env
-uvicorn app.main:app --reload
+make install
+make migrate
+make dev
 ```
 
 健康检查：`http://localhost:8000/api/v1/health`。
+
+也可以使用 Docker 启动 FastAPI、PostgreSQL 和 Valkey：
+
+```bash
+make docker-up
+```
 
 ## 合约
 
@@ -45,4 +51,3 @@ npm run deploy:testnet
 ```
 
 私钥只能放在本地 `.env`，不能提交到代码仓库，也不能使用存有真实资产的主钱包。
-

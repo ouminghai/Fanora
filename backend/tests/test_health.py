@@ -1,11 +1,12 @@
 from fastapi.testclient import TestClient
 
-from app.main import app
 
-
-def test_health() -> None:
-    response = TestClient(app).get("/api/v1/health")
+def test_health(client: TestClient) -> None:
+    response = client.get("/api/v1/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "service": "fanora-api"}
-
+    payload = response.json()
+    assert payload["status"] == "healthy"
+    assert payload["service"] == "fanora-api"
+    assert payload["components"]["database"] == "healthy"
+    assert payload["components"]["fan_profile_agent"] == "ready"

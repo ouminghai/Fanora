@@ -580,7 +580,13 @@ MVP 阶段优先保持简单，仅在真实需求出现时增加接口或拆分�
 - Next.js 前端模板和生产构建能力。
 - RainbowKit、wagmi、viem 与 Monad 网络基础配置。
 - FastAPI 应用入口和健康检查。
-- LangGraph 规则评分与分类示例。
+- FastAPI 请求追踪、结构化日志、限流、Prometheus 指标与依赖健康检查。
+- SQLModel 异步数据库层、Alembic 迁移和本地 SQLite / 生产 PostgreSQL 配置。
+- 可选 Redis / Valkey 缓存与 PostgreSQL LangGraph checkpoint。
+- LangGraph 确定性评分、粉丝分类、模型解释、失败降级与 Badge 草案工作流。
+- OpenAI-compatible 第三方模型 API、超时、有限重试和模型 fallback。
+- 用户、认证身份、钱包和 Agent 运行记录的基础数据模型。
+- Docker、Compose、uv、CI、Prometheus 与 Grafana 工程配置。
 - ERC-1155 SBT 合约、权限、铸造、升级和基础测试。
 - 前端、后端和合约独立环境变量示例。
 
@@ -588,15 +594,13 @@ MVP 阶段优先保持简单，仅在真实需求出现时增加接口或拆分�
 
 - 接入 Supabase PostgreSQL。
 - 选择并接入一种嵌入式钱包提供商，完成快捷登录和服务端令牌验证。
-- 建立用户、登录身份、钱包与主钱包的数据模型。
-- 增加 SQLAlchemy、数据库迁移和仓储实现。
+- 补齐社区、任务、积分、当前画像和 Badge 交易的数据模型与仓储实现。
 - 完成外部钱包 nonce、签名验证和两种登录方式的统一安全会话。
 - 完成任务、积分与等级业务模块。
-- 接入 OpenAI Platform API 并实现 Agent 降级。
+- 配置实际使用的 OpenAI-compatible 模型 API，并建立 Agent 评测数据集。
 - 部署 Badge 合约至 Monad Testnet。
 - 将合约 ABI、地址和 Badge ID 同步到前后端。
 - 实现链上交易状态追踪和事件同步。
-- 增加 FastAPI 部署配置与生产日志。
 - 配置 Vercel、Supabase 和 Python 服务端环境变量。
 
 ## 15. 架构结论

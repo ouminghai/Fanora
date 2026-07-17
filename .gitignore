@@ -22,6 +22,8 @@ __pycache__/
 .venv/
 venv/
 *.egg-info/
+*.db
+logs/
 
 # Editors
 .idea/
