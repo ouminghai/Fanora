@@ -2,6 +2,10 @@
 
 Fanora 是一个由 AI Agent 驱动的 Web3 链上粉丝身份与互动协议。系统结合用户互动数据、链上行为和 Agent 分析，生成可验证的粉丝画像，并通过 Monad 上的动态 Badge / SBT 记录粉丝身份。
 
+## 阶段交付摘要
+
+如果只想快速了解项目目标、当前真实完成度和 Week 3 可承担的开发角色，请直接阅读 [Fanora 阶段开发汇总与 Week 3 角色](docs/WEEK2_DELIVERY_SUMMARY.md)。
+
 ## 项目结构
 
 ```text
