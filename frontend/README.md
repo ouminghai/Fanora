@@ -2,11 +2,11 @@
 
 该模块由原 `xhibiter-ts` 模板整理而来，使用 Next.js、Web3Auth、Axios、RainbowKit、wagmi 和 viem。
 
-当前前端包含 Fanora 首页、`/login` Web3Auth 快捷登录页和 `/profile` 用户身份维护页。登录成功后会自动创建或恢复嵌入式钱包，再通过 Axios 与本地 FastAPI 建立统一会话。Profile 支持维护用户资料、查看主钱包和社区身份，并为 Web3Auth 嵌入式钱包提供高风险私钥导出入口。未上传头像时，前端使用 Boring Avatars 根据用户 ID 生成稳定的默认头像。
+当前前端包含 Fanora 首页、`/login` Web3Auth 快捷登录页、`/profile` 用户身份维护页和 `/membership/join` 正式会员缴纳页。注册用户默认为待入会，首页与任务入口根据后端 `is_official_member` 显示缴纳 1 MON 按钮；缴纳页通过当前钱包发送交易，再交由 FastAPI 验证链上结果。Profile 支持维护用户资料、查看主钱包和社区身份，并为 Web3Auth 嵌入式钱包提供高风险私钥导出入口。未上传头像时，前端使用 Boring Avatars 根据用户 ID 生成稳定的默认头像。首页会员等级与 Badge 成长模块通过 Axios 读取 `GET /api/v1/membership-levels`，不再使用本地 Badge mock 数据，并以动态彩色描边 Coverflow 自动轮播展示。
 
 后续需要新的组件或样式时，从仓库根目录的 `xhibiter-ts` 素材工程中按需复制，不重新把整套模板依赖引入 `frontend`。
 
-`public/img` 只保留当前 `home-4` 页面、导航、页脚和样式实际引用的资源；后续复制新组件时，需要同步复制该组件依赖的图片。
+`public/img` 只保留当前首页、导航、页脚和样式实际引用的资源；后续复制新组件时，需要同步复制该组件依赖的图片。热门粉丝任务使用 `nft-game/crypto_icons.png` 漂浮素材，会员等级区块使用 `gradient_creative.jpg` 背景。
 
 ## 启动
 
@@ -32,7 +32,7 @@ npm run dev
 ## 目录建议
 
 - `app/`：主页、登录、资料维护和 404。
-- `components/homes/home-4/`：Hero 与动态 Badge Cover Flow。
+- `components/homes/home/`：Hero 与动态 Badge Cover Flow。
 - `components/homes/common/`：协议能力、Agent、工作流程和用户价值区块。
 - `lib/web3/`：Monad 网络、合约地址和 ABI。
 - `lib/api/`：Axios 客户端和前后端共享数据类型。
@@ -49,6 +49,8 @@ npm run test:avatar
 npm run test:header
 npm run test:hero-animation
 npm run test:fan-token
+npm run test:membership
+npm run test:official-membership
 npm run test:video-sound
 npm run test:key-export
 npm run typecheck

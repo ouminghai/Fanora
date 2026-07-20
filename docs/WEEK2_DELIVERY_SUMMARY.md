@@ -1,9 +1,14 @@
-# Fanora 阶段开发汇总与 Week 3 角色
+# 历史归档：Fanora 阶段开发汇总与 Week 3 角色
 
 > 更新日期：2026-07-17
-> 当前结论：已经完成可运行的技术骨架和产品展示 Demo，但“登录 → 任务 → 积分 → Agent 画像 → Monad Badge”端到端 MVP 尚未打通。
+> 文档状态：历史阶段快照，不作为当前需求或架构基线。\
+> 当时结论：已经完成可运行的技术骨架和产品展示 Demo，但“登录 → 任务 → 积分 → Agent 画像 → Monad Badge”端到端 MVP 尚未打通。
 
-## 1. 我想做什么
+当前文档入口见 [README.md](./README.md)。当前需求、架构和执行顺序分别以 [PRODUCT_REQUIREMENTS.md](./PRODUCT_REQUIREMENTS.md)、[ARCHITECTURE.md](./ARCHITECTURE.md) 和 [MVP_ROADMAP.md](./MVP_ROADMAP.md) 为准。
+
+2026-07-20 后续架构已调整为：MVP 只运营一个 Fanora 官方社区并使用全局 Fan Token/等级；不可转让 ERC-721 表达唯一会员身份，ERC-1155 表达演唱会纪念卡、自定义纪念徽章和任务限定 Badge，最终 NFT metadata 使用 Pinata IPFS。下文保留 2026-07-17 当时的单 ERC-1155 Badge 和多社区设想，不回写成当前事实。
+
+## 1. 当时的目标
 
 Fanora 是一个 AI Agent 驱动的 Web3 粉丝身份与互动协议。我希望把粉丝的签到、活动参与、内容贡献和链上行为转化为可解释的身份积分与粉丝画像，并最终在 Monad 上铸造成不可转让、可公开验证的 Proof of Fandom Badge。
 
@@ -20,7 +25,7 @@ Fanora 是一个 AI Agent 驱动的 Web3 粉丝身份与互动协议。我希望
 
 项目采用 Next.js 前端、FastAPI + LangGraph 后端、PostgreSQL/Supabase 数据层，以及 Solidity + Hardhat 合约。AI 只负责画像分析、解释、推荐和 Badge 草案，不直接修改积分、授予权限或控制合约私钥。
 
-## 2. 我实际做到了哪一步
+## 2. 截至 2026-07-17 的完成度
 
 ### 总体进度
 
@@ -103,7 +108,7 @@ AI 主要用于需求拆解、架构讨论、代码草拟、模板改造、测�
 7. 本机直接执行 `make check` 需要先把 `uv` 安装到 shell PATH；本次使用项目 `.venv` 完成了等价的 Ruff、Pyright 和 Pytest 验证。
 8. 若本地 `DATABASE_URL` 指向未启动或不可达的 PostgreSQL，健康检查会等待连接超时；SQLite Demo 环境已验证可正常运行。
 
-## 3. Week 3 我能继续承担什么开发角色
+## 3. 当时规划的 Week 3 开发角色
 
 ### 主要角色：AI Agent + Backend Integration Developer
 

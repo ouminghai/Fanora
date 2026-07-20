@@ -15,12 +15,12 @@ ALLOWED_AVATAR_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
 MAX_AVATAR_BYTES = 1024 * 1024
 
 
-def validate_avatar_url(value: str | None) -> str | None:
+def validate_image_url(value: str | None, *, label: str = "Image", max_bytes: int = MAX_AVATAR_BYTES) -> str | None:
     if value is None or value == "":
         return None
     if value.startswith(("https://", "http://")):
         if len(value) > 2048:
-            raise ValueError("Avatar URL is too long")
+            raise ValueError(f"{label} URL is too long")
         return value
     if value.startswith("data:image/"):
         try:
@@ -28,14 +28,18 @@ def validate_avatar_url(value: str | None) -> str | None:
             mime_type = header[5:].split(";", 1)[0]
             if mime_type not in ALLOWED_AVATAR_TYPES or ";base64" not in header:
                 raise ValueError
-            if len(base64.b64decode(encoded, validate=True)) > MAX_AVATAR_BYTES:
-                raise ValueError("Avatar must be no larger than 1 MB")
+            if len(base64.b64decode(encoded, validate=True)) > max_bytes:
+                raise ValueError(f"{label} must be no larger than 1 MB")
         except (ValueError, binascii.Error) as error:
-            if str(error) == "Avatar must be no larger than 1 MB":
+            if str(error) == f"{label} must be no larger than 1 MB":
                 raise
-            raise ValueError("Avatar must be a JPEG, PNG, WebP, or GIF image") from error
+            raise ValueError(f"{label} must be a JPEG, PNG, WebP, or GIF image") from error
         return value
-    raise ValueError("Avatar must be an HTTP image URL or uploaded image")
+    raise ValueError(f"{label} must be an HTTP image URL or uploaded image")
+
+
+def validate_avatar_url(value: str | None) -> str | None:
+    return validate_image_url(value, label="Avatar")
 
 
 class AuthChallengeRequest(BaseModel):
@@ -105,6 +109,8 @@ class UserResponse(BaseModel):
     bio: str | None
     locale: str
     level: str
+    is_official_member: bool
+    official_member_since: datetime | None
     fan_token_balance: int
     fan_type: str
     profile_visibility: str

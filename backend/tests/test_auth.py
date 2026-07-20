@@ -40,6 +40,8 @@ def test_web3auth_register_login_profile_and_logout(client, monkeypatch):
     assert login["user"]["roles"] == ["fan"]
     assert login["user"]["email"] == "fan@example.com"
     assert login["user"]["fan_token_balance"] == 0
+    assert login["user"]["is_official_member"] is False
+    assert login["user"]["level"] == "待入会"
     assert "points" not in login["user"]
 
     replay_response = client.post("/api/v1/auth/web3auth", json=login_payload)

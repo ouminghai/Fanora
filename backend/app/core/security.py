@@ -10,7 +10,7 @@ from sqlmodel import col, select
 
 from app.core.config import Environment, settings
 from app.core.database import get_database_session
-from app.models.user import User, UserSession, Wallet
+from app.models.user import User, UserProfile, UserSession, Wallet
 from app.services.auth import as_utc, hash_session_token
 from app.services.identity import AuthenticatedIdentity
 
@@ -28,12 +28,12 @@ async def require_internal_api_key(x_internal_api_key: str | None = Header(defau
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid internal API key")
 
 
-async def get_current_identity(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
-    session: AsyncSession = Depends(get_database_session),
-) -> AuthenticatedIdentity:
-    if credentials is None or credentials.scheme.lower() != "bearer":
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+async def _resolve_identity(
+    credentials: HTTPAuthorizationCredentials,
+    session: AsyncSession,
+) -> AuthenticatedIdentity | None:
+    if credentials.scheme.lower() != "bearer":
+        return None
     user_session = (
         await session.execute(
             select(UserSession).where(UserSession.token_hash == hash_session_token(credentials.credentials))
@@ -44,7 +44,7 @@ async def get_current_identity(
         or user_session.revoked_at is not None
         or as_utc(user_session.expires_at) <= datetime.now(UTC)
     ):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session is invalid or expired")
+        return None
     user = await session.get(User, user_session.user_id)
     wallet = (
         await session.execute(
@@ -52,10 +52,46 @@ async def get_current_identity(
         )
     ).scalar_one_or_none()
     if user is None or user.status != "active" or wallet is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Active account with primary wallet required")
+        return None
     return AuthenticatedIdentity(
         user_id=user.id,
         primary_wallet=wallet.address,
         wallet_type=wallet.wallet_type,  # type: ignore[arg-type]
         provider=wallet.provider or "web3auth",
     )
+
+
+async def get_optional_identity(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    session: AsyncSession = Depends(get_database_session),
+) -> AuthenticatedIdentity | None:
+    if credentials is None:
+        return None
+    return await _resolve_identity(credentials, session)
+
+
+async def get_current_identity(
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    session: AsyncSession = Depends(get_database_session),
+) -> AuthenticatedIdentity:
+    if credentials is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Authentication required")
+    identity = await _resolve_identity(credentials, session)
+    if identity is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Session is invalid or expired")
+    return identity
+
+
+async def require_official_member(
+    identity: AuthenticatedIdentity = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_database_session),
+) -> AuthenticatedIdentity:
+    """Require the signed-in user to have a verified 1 MON membership payment."""
+
+    profile = await session.get(UserProfile, identity.user_id)
+    if profile is None or not profile.is_official_member:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Official membership required. Pay 1 MON before joining check-ins or tasks.",
+        )
+    return identity

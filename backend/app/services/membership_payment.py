@@ -1,0 +1,171 @@
+"""Monad payment verification for becoming an official Fanora member."""
+
+import asyncio
+from dataclasses import dataclass
+
+from fastapi import HTTPException, status
+from hexbytes import HexBytes
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlmodel import select
+from web3 import Web3
+from web3.exceptions import TimeExhausted, TransactionNotFound
+
+from app.core.config import settings
+from app.models.base import utc_now
+from app.models.user import OfficialMembershipPayment, UserProfile
+from app.services.identity import AuthenticatedIdentity
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmedChainPayment:
+    transaction_hash: str
+    from_address: str
+    to_address: str
+    value_wei: int
+    chain_id: int
+    block_number: int
+    confirmations: int
+
+
+class OfficialMembershipPaymentService:
+    def configured_treasury(self) -> str:
+        if not settings.membership_treasury_address or not Web3.is_address(settings.membership_treasury_address):
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Official membership payment address is not configured",
+            )
+        return Web3.to_checksum_address(settings.membership_treasury_address)
+
+    async def _load_chain_payment(self, transaction_hash: str) -> ConfirmedChainPayment:
+        def load() -> ConfirmedChainPayment:
+            web3 = Web3(Web3.HTTPProvider(settings.monad_rpc_url, request_kwargs={"timeout": 50}))
+            if not web3.is_connected():
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Monad RPC is temporarily unavailable",
+                )
+            try:
+                transaction_hash_bytes = HexBytes(transaction_hash)
+                receipt = web3.eth.wait_for_transaction_receipt(
+                    transaction_hash_bytes,
+                    timeout=45,
+                    poll_latency=2,
+                )
+                transaction = web3.eth.get_transaction(transaction_hash_bytes)
+            except TimeExhausted as error:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Membership payment is still waiting for confirmation",
+                ) from error
+            except TransactionNotFound as error:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Membership payment transaction was not found",
+                ) from error
+
+            if int(receipt["status"]) != 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Membership payment transaction failed onchain",
+                )
+            block_number = int(receipt["blockNumber"])
+            confirmations = max(int(web3.eth.block_number) - block_number + 1, 0)
+            from_address = transaction.get("from")
+            to_address = transaction.get("to")
+            value_wei = transaction.get("value")
+            if from_address is None or to_address is None or value_wei is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Membership payment transaction is missing transfer fields",
+                )
+            return ConfirmedChainPayment(
+                transaction_hash=transaction_hash.lower(),
+                from_address=Web3.to_checksum_address(from_address),
+                to_address=Web3.to_checksum_address(to_address),
+                value_wei=int(value_wei),
+                chain_id=int(web3.eth.chain_id),
+                block_number=block_number,
+                confirmations=confirmations,
+            )
+
+        return await asyncio.to_thread(load)
+
+    async def verify_and_activate(
+        self,
+        session: AsyncSession,
+        identity: AuthenticatedIdentity,
+        transaction_hash: str,
+    ) -> OfficialMembershipPayment:
+        treasury_address = self.configured_treasury()
+        profile = await session.get(UserProfile, identity.user_id)
+        if profile is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found")
+
+        existing_payment = (
+            await session.execute(
+                select(OfficialMembershipPayment).where(OfficialMembershipPayment.user_id == identity.user_id)
+            )
+        ).scalar_one_or_none()
+        if profile.is_official_member and existing_payment is not None:
+            return existing_payment
+
+        reused_payment = (
+            await session.execute(
+                select(OfficialMembershipPayment).where(
+                    OfficialMembershipPayment.transaction_hash == transaction_hash.lower()
+                )
+            )
+        ).scalar_one_or_none()
+        if reused_payment is not None:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="This transaction was already used for another membership",
+            )
+
+        payment = await self._load_chain_payment(transaction_hash)
+        if payment.chain_id != settings.monad_chain_id:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment was sent on the wrong chain")
+        if payment.from_address != Web3.to_checksum_address(identity.primary_wallet):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Payment sender does not match the signed-in primary wallet",
+            )
+        if payment.to_address != treasury_address:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment recipient is incorrect")
+        if payment.value_wei < settings.membership_fee_wei:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Membership payment is less than 1 MON")
+        if payment.confirmations < settings.membership_min_confirmations:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Membership payment does not have enough confirmations yet",
+            )
+
+        now = utc_now()
+        record = OfficialMembershipPayment(
+            user_id=identity.user_id,
+            wallet_address=payment.from_address,
+            treasury_address=payment.to_address,
+            transaction_hash=payment.transaction_hash,
+            chain_id=payment.chain_id,
+            amount_wei=payment.value_wei,
+            block_number=payment.block_number,
+            confirmed_at=now,
+        )
+        session.add(record)
+        profile.is_official_member = True
+        profile.official_member_since = now
+        profile.updated_at = now
+        try:
+            await session.commit()
+        except IntegrityError as error:
+            await session.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Membership payment was activated by another request",
+            ) from error
+        await session.refresh(record)
+        return record
+
+
+official_membership_payment_service = OfficialMembershipPaymentService()

@@ -71,9 +71,29 @@ export function ProfileMenuPanel({ user, onClose, onLogout }: ProfileMenuPanelPr
             <p className="mt-1 truncate font-display text-sm font-semibold text-accent-lighter">{user.level}</p>
           </div>
         </div>
+        {!user.is_official_member && (
+          <Link
+            href="/membership/join"
+            onClick={onClose}
+            className="mt-3 flex items-center justify-center rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-dark"
+          >
+            缴纳 1 MON 正式加入
+          </Link>
+        )}
       </div>
 
       <div className="mt-2 space-y-1">
+        <Link
+          href="/community"
+          role="menuitem"
+          onClick={onClose}
+          className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-semibold transition-colors hover:bg-white/[.07]"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current text-white/70" aria-hidden="true">
+            <path d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-5l-3 3-3-3H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 5v2h12V8H6Zm0 4v2h8v-2H6Z" />
+          </svg>
+          官方社区
+        </Link>
         <Link
           href="/profile"
           role="menuitem"

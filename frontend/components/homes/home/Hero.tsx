@@ -12,17 +12,29 @@ import {
 export default function Hero() {
   const { user, status } = useAuth();
 
-  return <HeroView status={status} hasUser={Boolean(user)} />;
+  return (
+    <HeroView
+      status={status}
+      hasUser={Boolean(user)}
+      isOfficialMember={Boolean(user?.is_official_member)}
+    />
+  );
 }
 
 type HeroViewProps = {
   status: string;
   hasUser: boolean;
+  isOfficialMember?: boolean;
 };
 
-export function HeroView({ status, hasUser }: HeroViewProps) {
+export function HeroView({ status, hasUser, isOfficialMember = false }: HeroViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const showJoinButton = shouldShowHeroJoinButton(status, hasUser);
+  const showMembershipButton = shouldShowOfficialMembershipButton(
+    status,
+    hasUser,
+    isOfficialMember,
+  );
 
   useEffect(() => {
     const video = videoRef.current;
@@ -120,6 +132,7 @@ export function HeroView({ status, hasUser }: HeroViewProps) {
             </h2>
 
             {showJoinButton && <HeroJoinButton />}
+            {showMembershipButton && <OfficialMembershipJoinButton />}
 
             <span
               data-hero-reveal
@@ -139,6 +152,14 @@ export function shouldShowHeroJoinButton(status: string, hasUser: boolean) {
   return !hasUser && (status === "anonymous" || status === "error");
 }
 
+export function shouldShowOfficialMembershipButton(
+  status: string,
+  hasUser: boolean,
+  isOfficialMember: boolean,
+) {
+  return status === "authenticated" && hasUser && !isOfficialMember;
+}
+
 export function HeroJoinButton() {
   return (
     <Link
@@ -147,6 +168,18 @@ export function HeroJoinButton() {
       className="hero-reveal hero-reveal--4 group relative mb-4 flex w-full items-center justify-center rounded-full bg-accent py-3 px-8 text-center font-semibold text-white shadow-accent-volume transition-all hover:-translate-y-0.5 hover:bg-accent-dark"
     >
       加入 Eason Fans Club
+    </Link>
+  );
+}
+
+export function OfficialMembershipJoinButton() {
+  return (
+    <Link
+      href="/membership/join"
+      data-hero-reveal
+      className="hero-reveal hero-reveal--4 group relative mb-4 flex w-full items-center justify-center rounded-full bg-accent py-3 px-8 text-center font-semibold text-white shadow-accent-volume transition-all hover:-translate-y-0.5 hover:bg-accent-dark"
+    >
+      缴纳 1 MON 正式加入
     </Link>
   );
 }

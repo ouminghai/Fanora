@@ -2,6 +2,93 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes communityReveal {
+  from { opacity: 0; transform: translateY(22px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes web3OrbFloat {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50% { transform: translate3d(0, 18px, 0) scale(1.08); }
+}
+
+.web3-page-shell {
+  background:
+    radial-gradient(circle at 12% 12%, rgba(131, 88, 255, .13), transparent 26rem),
+    radial-gradient(circle at 88% 38%, rgba(69, 191, 239, .08), transparent 30rem),
+    #0d102d;
+}
+
+.community-reveal {
+  animation: communityReveal .62s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.web3-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(44px);
+  animation: web3OrbFloat 7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.web3-interactive-card {
+  position: relative;
+  transition: transform .35s cubic-bezier(.22, 1, .36, 1), border-color .35s ease, box-shadow .35s ease;
+}
+
+.web3-interactive-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(131, 88, 255, .12), transparent 42%, rgba(69, 191, 239, .06));
+  opacity: 0;
+  transition: opacity .35s ease;
+  pointer-events: none;
+}
+
+.web3-interactive-card:hover {
+  transform: translateY(-7px);
+  border-color: rgba(131, 88, 255, .42);
+  box-shadow: 0 24px 70px rgba(5, 6, 25, .42), 0 0 36px rgba(131, 88, 255, .1);
+}
+
+.web3-interactive-card:hover::before { opacity: 1; }
+
+.web3-action-button {
+  background: linear-gradient(110deg, #7444ff, #925fff, #5f74ff);
+  background-size: 180% 100%;
+  box-shadow: 0 12px 28px rgba(116, 68, 255, .25);
+  transition: transform .25s ease, box-shadow .25s ease, background-position .5s ease;
+}
+
+.web3-action-button:hover {
+  transform: translateY(-2px);
+  background-position: 100% 0;
+  box-shadow: 0 16px 36px rgba(116, 68, 255, .38);
+}
+
+.creation-action,
+.post-action,
+.comment-action {
+  display: inline-flex;
+  align-items: center;
+  gap: .35rem;
+  color: rgba(255,255,255,.45);
+  transition: color .2s ease, transform .2s ease, background-color .2s ease;
+}
+
+.creation-action { min-height: 2rem; padding: .35rem .5rem; border-radius: .7rem; font-size: .75rem; }
+.post-action { padding: .65rem .9rem; border-radius: 9999px; background: rgba(255,255,255,.045); font-size: .8rem; }
+.comment-action { font-weight: 600; }
+.creation-action:hover, .post-action:hover, .comment-action:hover, .creation-action.is-active, .post-action.is-active, .comment-action.is-active { color: #b9a0ff; }
+.creation-action:hover, .post-action:hover { background: rgba(131,88,255,.11); transform: translateY(-1px); }
+
+@media (prefers-reduced-motion: reduce) {
+  .community-reveal, .web3-orb { animation: none; }
+  .web3-interactive-card, .web3-action-button { transition: none; }
+}
+
 @layer utilities {
   .visible {
     visibility: visible;
@@ -441,6 +528,42 @@ input[type="search"]::-webkit-search-results-decoration {
 
 .animate-gradient--no-text-fill {
   -webkit-text-fill-color: initial;
+}
+
+.badge-slider-reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition:
+    opacity 700ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 700ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.badge-slider-reveal.is-ready {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.badge-level-card-reveal {
+  opacity: 0;
+  transform: translateY(24px) scale(0.97);
+  transition:
+    opacity 600ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform 600ms cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--badge-reveal-delay, 0ms);
+}
+
+.badge-level-card-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .badge-slider-reveal,
+  .badge-level-card-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 /* .swiper-slide-fully-visible {
   display: none;

@@ -31,7 +31,7 @@ export default function LoginExperience() {
             One identity · one wallet
           </span>
           <h1 className="mt-6 max-w-2xl font-display text-5xl font-semibold leading-[1.05] text-jacarta-700 dark:text-white md:text-7xl">
-            登录像 Web2 一样简单，身份从钱包开始。
+           Fanora — Every Interaction Builds Your Identity.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-8 text-jacarta-500 dark:text-jacarta-200">
             Fanora 使用 Web3Auth 把邮箱与社交登录转换成安全的嵌入式钱包。你无需理解助记词、Gas 或切链，也能拥有可验证的粉丝身份。

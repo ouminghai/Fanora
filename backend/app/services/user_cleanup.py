@@ -6,12 +6,25 @@ from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
+from app.models.community import (
+    CommunityPost,
+    CommunityPostReaction,
+    CommunityReply,
+    CommunityReplyLike,
+    DailyCheckIn,
+    FanTask,
+    FanTokenLedger,
+    TaskAuditLog,
+    TaskParticipation,
+)
 from app.models.fan_profile import FanProfileRun
 from app.models.user import (
     AuthIdentity,
+    AuthSecurityEvent,
     Community,
     CommunityMember,
     LoginChallenge,
+    OfficialMembershipPayment,
     User,
     UserProfile,
     UserRole,
@@ -68,11 +81,7 @@ async def delete_user_by_id(
         raise UserNotFoundError(f"User not found: {user_id}")
 
     owned_community_ids = list(
-        (
-            await session.execute(
-                select(Community.id).where(Community.owner_user_id == user_id).order_by(Community.id)
-            )
-        )
+        (await session.execute(select(Community.id).where(Community.owner_user_id == user_id).order_by(Community.id)))
         .scalars()
         .all()
     )
@@ -85,6 +94,96 @@ async def delete_user_by_id(
     deleted_rows: dict[str, int] = {}
 
     try:
+        post_ids = list(
+            (
+                await session.execute(
+                    select(CommunityPost.id).where(
+                        (col(CommunityPost.author_user_id) == user_id)
+                        | (col(CommunityPost.community_id).in_(owned_community_ids))
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        task_ids = list(
+            (
+                await session.execute(
+                    select(FanTask.id).where(
+                        (col(FanTask.created_by_user_id) == user_id)
+                        | (col(FanTask.community_id).in_(owned_community_ids))
+                        | (col(FanTask.target_post_id).in_(post_ids))
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        reply_ids = list(
+            (
+                await session.execute(
+                    select(CommunityReply.id).where(
+                        (col(CommunityReply.author_user_id) == user_id) | (col(CommunityReply.post_id).in_(post_ids))
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        participation_ids = list(
+            (
+                await session.execute(
+                    select(TaskParticipation.id).where(
+                        (col(TaskParticipation.user_id) == user_id) | (col(TaskParticipation.task_id).in_(task_ids))
+                    )
+                )
+            )
+            .scalars()
+            .all()
+        )
+        result = await session.execute(
+            delete(TaskAuditLog).where(
+                (col(TaskAuditLog.actor_user_id) == user_id)
+                | (col(TaskAuditLog.task_id).in_(task_ids))
+                | (col(TaskAuditLog.participation_id).in_(participation_ids))
+            )
+        )
+        deleted_rows["task_audit_logs"] = _row_count(result)
+        result = await session.execute(
+            delete(FanTokenLedger).where(
+                (col(FanTokenLedger.user_id) == user_id) | (col(FanTokenLedger.task_id).in_(task_ids))
+            )
+        )
+        deleted_rows["fan_token_ledger"] = _row_count(result)
+        result = await session.execute(
+            delete(TaskParticipation).where(col(TaskParticipation.id).in_(participation_ids))
+        )
+        deleted_rows["task_participations"] = _row_count(result)
+        result = await session.execute(delete(DailyCheckIn).where(col(DailyCheckIn.user_id) == user_id))
+        deleted_rows["daily_check_ins"] = _row_count(result)
+        result = await session.execute(
+            delete(CommunityReplyLike).where(
+                (col(CommunityReplyLike.user_id) == user_id) | (col(CommunityReplyLike.reply_id).in_(reply_ids))
+            )
+        )
+        deleted_rows["community_reply_likes"] = _row_count(result)
+        result = await session.execute(
+            delete(CommunityPostReaction).where(
+                (col(CommunityPostReaction.user_id) == user_id) | (col(CommunityPostReaction.post_id).in_(post_ids))
+            )
+        )
+        deleted_rows["community_post_reactions"] = _row_count(result)
+        result = await session.execute(delete(FanTask).where(col(FanTask.id).in_(task_ids)))
+        deleted_rows["fan_tasks"] = _row_count(result)
+        result = await session.execute(
+            delete(CommunityReply).where(
+                (col(CommunityReply.author_user_id) == user_id) | (col(CommunityReply.post_id).in_(post_ids))
+            )
+        )
+        deleted_rows["community_replies"] = _row_count(result)
+        result = await session.execute(delete(CommunityPost).where(col(CommunityPost.id).in_(post_ids)))
+        deleted_rows["community_posts"] = _row_count(result)
+
         if owned_community_ids:
             result = await session.execute(
                 delete(CommunityMember).where(col(CommunityMember.community_id).in_(owned_community_ids))
@@ -103,7 +202,15 @@ async def delete_user_by_id(
             deleted_rows["login_challenges"] = _row_count(result)
 
         for name, statement in (
+            (
+                "auth_security_events",
+                delete(AuthSecurityEvent).where(col(AuthSecurityEvent.user_id) == user_id),
+            ),
             ("fan_profile_runs", delete(FanProfileRun).where(col(FanProfileRun.user_id) == user_id)),
+            (
+                "official_membership_payments",
+                delete(OfficialMembershipPayment).where(col(OfficialMembershipPayment.user_id) == user_id),
+            ),
             ("user_sessions", delete(UserSession).where(col(UserSession.user_id) == user_id)),
             ("user_roles", delete(UserRole).where(col(UserRole.user_id) == user_id)),
             ("user_profiles", delete(UserProfile).where(col(UserProfile.user_id) == user_id)),

@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from sqlalchemy import UniqueConstraint
+from sqlalchemy import BigInteger, CheckConstraint, Column, UniqueConstraint
 from sqlmodel import Field, SQLModel
 
 from app.models.base import new_id, utc_now
@@ -56,8 +56,31 @@ class UserProfile(SQLModel, table=True):
     fan_type: str = Field(default="Newcomer", max_length=50)
     profile_visibility: str = Field(default="public", max_length=20)
     onboarding_completed: bool = Field(default=False)
+    is_official_member: bool = Field(default=False, index=True)
+    official_member_since: datetime | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class OfficialMembershipPayment(SQLModel, table=True):
+    __tablename__ = "official_membership_payments"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (
+        UniqueConstraint("user_id", name="uq_official_membership_payment_user"),
+        UniqueConstraint("transaction_hash", name="uq_official_membership_payment_transaction"),
+        CheckConstraint("amount_wei > 0", name="ck_official_membership_payment_amount_positive"),
+    )
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    wallet_address: str = Field(max_length=42, index=True)
+    treasury_address: str = Field(max_length=42)
+    transaction_hash: str = Field(max_length=66, index=True)
+    chain_id: int = Field(index=True)
+    amount_wei: int = Field(sa_column=Column(BigInteger, nullable=False))
+    block_number: int = Field(sa_column=Column(BigInteger, nullable=False))
+    status: str = Field(default="confirmed", max_length=20, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    confirmed_at: datetime = Field(default_factory=utc_now)
 
 
 class UserRole(SQLModel, table=True):
@@ -90,6 +113,19 @@ class UserSession(SQLModel, table=True):
     expires_at: datetime = Field(index=True)
     revoked_at: datetime | None = Field(default=None)
     created_at: datetime = Field(default_factory=utc_now)
+
+
+class AuthSecurityEvent(SQLModel, table=True):
+    __tablename__ = "auth_security_events"  # pyright: ignore[reportAssignmentType]
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
+    wallet_address: str | None = Field(default=None, max_length=42, index=True)
+    event: str = Field(max_length=40, index=True)
+    outcome: str = Field(max_length=20, index=True)
+    ip_address: str | None = Field(default=None, max_length=64)
+    detail: str | None = Field(default=None, max_length=300)
+    created_at: datetime = Field(default_factory=utc_now, index=True)
 
 
 class Community(SQLModel, table=True):

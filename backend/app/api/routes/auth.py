@@ -11,7 +11,7 @@ from app.core.database import get_database_session
 from app.core.limiter import limiter
 from app.core.security import bearer_scheme, get_current_identity
 from app.models.base import utc_now
-from app.models.user import User, UserProfile, UserSession
+from app.models.user import AuthSecurityEvent, User, UserProfile, UserSession
 from app.schemas.auth import (
     AuthChallengeRequest,
     AuthChallengeResponse,
@@ -27,6 +27,11 @@ router = APIRouter(prefix="/auth")
 user_router = APIRouter(prefix="/users")
 
 
+def client_ip(request: Request) -> str | None:
+    forwarded = request.headers.get("x-forwarded-for", "").split(",", 1)[0].strip()
+    return forwarded or (request.client.host if request.client else None)
+
+
 @router.post("/challenge", response_model=AuthChallengeResponse)
 @limiter.limit(settings.rate_limit_auth)
 async def create_challenge(
@@ -35,6 +40,15 @@ async def create_challenge(
     session: AsyncSession = Depends(get_database_session),
 ) -> AuthChallengeResponse:
     challenge = await web3auth_service.create_challenge(session, payload.wallet_address)
+    session.add(
+        AuthSecurityEvent(
+            wallet_address=challenge.wallet_address,
+            event="challenge_created",
+            outcome="success",
+            ip_address=client_ip(request),
+        )
+    )
+    await session.commit()
     return AuthChallengeResponse(
         challenge_id=challenge.id,
         message=challenge.message,
@@ -49,7 +63,30 @@ async def web3auth_login(
     payload: Web3AuthLoginRequest,
     session: AsyncSession = Depends(get_database_session),
 ) -> AuthSessionResponse:
-    token, expires_at, is_new_user, user = await web3auth_service.login(session, payload)
+    try:
+        token, expires_at, is_new_user, user = await web3auth_service.login(session, payload)
+    except HTTPException as error:
+        session.add(
+            AuthSecurityEvent(
+                wallet_address=payload.wallet_address,
+                event="login",
+                outcome="rejected",
+                ip_address=client_ip(request),
+                detail=f"HTTP {error.status_code}",
+            )
+        )
+        await session.commit()
+        raise
+    session.add(
+        AuthSecurityEvent(
+            user_id=user.id,
+            wallet_address=user.primary_wallet.address,
+            event="login",
+            outcome="success",
+            ip_address=client_ip(request),
+        )
+    )
+    await session.commit()
     return AuthSessionResponse(
         access_token=token,
         expires_at=expires_at,
@@ -60,6 +97,7 @@ async def web3auth_login(
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(
+    request: Request,
     identity: AuthenticatedIdentity = Depends(get_current_identity),
     credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
     session: AsyncSession = Depends(get_database_session),
@@ -74,6 +112,15 @@ async def logout(
     ).scalar_one_or_none()
     if user_session is not None:
         user_session.revoked_at = utc_now()
+        session.add(
+            AuthSecurityEvent(
+                user_id=identity.user_id,
+                wallet_address=identity.primary_wallet,
+                event="logout",
+                outcome="success",
+                ip_address=client_ip(request),
+            )
+        )
         await session.commit()
 
 

@@ -254,14 +254,14 @@ export default function ProfileDashboard() {
             <section className="rounded-[2rem] bg-white p-7 shadow-sm dark:bg-jacarta-800">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[.18em] text-accent">Communities</p>
-                  <h2 className="mt-2 font-display text-xl font-semibold text-jacarta-700 dark:text-white">发现社区</h2>
+                  <p className="text-xs font-bold uppercase tracking-[.18em] text-accent">Official community</p>
+                  <h2 className="mt-2 font-display text-xl font-semibold text-jacarta-700 dark:text-white">Fanora 官方社区</h2>
                 </div>
                 <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold text-accent">已加入 {joinedIds.size}</span>
               </div>
               <div className="mt-5 space-y-3">
                 {communities.length === 0 ? (
-                  <p className="rounded-xl bg-jacarta-50 p-4 text-sm leading-6 text-jacarta-500 dark:bg-white/[.04] dark:text-jacarta-300">社区接口已就绪；创作者创建公开社区后会显示在这里。</p>
+                  <p className="rounded-xl bg-jacarta-50 p-4 text-sm leading-6 text-jacarta-500 dark:bg-white/[.04] dark:text-jacarta-300">官方社区正在初始化，请稍后刷新。</p>
                 ) : communities.map((community) => {
                   const joined = joinedIds.has(community.id);
                   return (
@@ -278,6 +278,9 @@ export default function ProfileDashboard() {
                   );
                 })}
               </div>
+              <Link href="/community" className="mt-4 block rounded-xl border border-jacarta-100 py-3 text-center text-sm font-semibold text-jacarta-500 transition-colors hover:border-accent hover:text-accent dark:border-white/10 dark:text-white">
+                进入签到、任务与创作社区
+              </Link>
             </section>
           </aside>
         </div>

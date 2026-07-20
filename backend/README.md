@@ -145,11 +145,15 @@ OPENAI_FALLBACK_MODELS=provider/fallback-model,provider/another-model
 - `POST /api/v1/auth/logout`
 - `POST /api/v1/communities/{community_id}/join`
 
+无需登录即可调用 `GET /api/v1/membership-levels`，按 `rank` 返回所有启用的会员等级、Fan Token 门槛、管理身份标记和 Badge 图片地址，供首页成长模块读取。
+
+注册用户默认为待入会状态，不会对外显示神经萌新等级。配置 `MEMBERSHIP_TREASURY_ADDRESS` 后，用户可通过 `GET /api/v1/membership/me` 获取 1 MON 入会参数，并向 `POST /api/v1/membership/verify` 提交交易哈希。后端会验证 Monad 链 ID、交易成功状态、确认数、发送主钱包、收款地址和金额，再写入 `official_membership_payments` 并激活 `user_profiles.is_official_member`。签到和任务接口应使用 `require_official_member` 依赖。
+
 创作者社区创建和编辑接口要求数据库中已有 `creator` 或 `admin` 角色，普通用户不能自行提升权限。
 
 ## 会员等级与积分规则
 
-会员等级和 Fan Token 规则保存在 `membership_levels` 与 `fan_token_rules` 表中。普通会员按 Fan Token 余额自动升级：新生儿（0–99）、轻度神经（100–499）、中度神经（500–1,499）、重度神经（1,500–3,999）、病入膏肓（4,000–9,999）、无药可救（10,000+）。神经领袖属于管理员或版主管理身份，不通过 Token 自动获得。
+会员等级和 Fan Token 规则保存在 `membership_levels` 与 `fan_token_rules` 表中。`membership_levels.badge_image_url` 保存前端可访问的 Badge 图片地址。普通会员按 Fan Token 余额自动升级：新生儿（0–99）、轻度神经（100–499）、中度神经（500–1,499）、重度神经（1,500–3,999）、病入膏肓（4,000–9,999）、无药可救（10,000+）。神经领袖属于管理员或版主管理身份，不通过 Token 自动获得。
 
 Fan Token 规则包含注册、资料完善、每日签到、连续签到、内容互动、活动打卡、社区共创、邀请和链上行为，并为高价值操作设置每日/月度上限或人工审核。违规内容、刷屏骚扰、任务作弊通过负 Token 规则处理。PostgreSQL 触发器会在 `user_profiles.fan_token_balance` 变化时自动重新计算普通会员等级。
 

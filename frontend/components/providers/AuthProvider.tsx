@@ -31,6 +31,11 @@ type AuthContextValue = {
   login: () => Promise<void>;
   logout: () => Promise<void>;
   exportPrivateKey: () => Promise<string>;
+  sendMembershipPayment: (payment: {
+    treasuryAddress: string;
+    feeWei: string;
+    chainId: number;
+  }) => Promise<string>;
   refreshUser: () => Promise<FanoraUser | null>;
   clearError: () => void;
 };
@@ -235,6 +240,49 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     return requestEmbeddedPrivateKey(instance.provider);
   }, [user]);
 
+  const sendMembershipPayment = useCallback(
+    async ({
+      treasuryAddress,
+      feeWei,
+      chainId,
+    }: {
+      treasuryAddress: string;
+      feeWei: string;
+      chainId: number;
+    }) => {
+      const instance = web3AuthRef.current;
+      if (!user || !instance?.connected || !instance.provider) {
+        throw new Error("钱包会话尚未准备好，请重新登录后再缴纳会费。");
+      }
+      const provider = instance.provider;
+      const expectedChainId = `0x${chainId.toString(16)}`;
+      const currentChainId = await provider.request<never, string>({ method: "eth_chainId" });
+      if (currentChainId.toLowerCase() !== expectedChainId.toLowerCase()) {
+        try {
+          await provider.request<unknown[], null>({
+            method: "wallet_switchEthereumChain",
+            params: [{ chainId: expectedChainId }],
+          });
+        } catch (switchError) {
+          throw new Error("请先将钱包切换到 Monad Testnet 后再缴纳会费。", {
+            cause: switchError,
+          });
+        }
+      }
+      return provider.request<unknown[], string>({
+        method: "eth_sendTransaction",
+        params: [
+          {
+            from: user.primary_wallet.address,
+            to: treasuryAddress,
+            value: `0x${BigInt(feeWei).toString(16)}`,
+          },
+        ],
+      });
+    },
+    [user],
+  );
+
   const value = useMemo(
     () => ({
       user,
@@ -243,10 +291,20 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       login,
       logout,
       exportPrivateKey,
+      sendMembershipPayment,
       refreshUser,
       clearError: () => setError(null),
     }),
-    [user, status, error, login, logout, exportPrivateKey, refreshUser],
+    [
+      user,
+      status,
+      error,
+      login,
+      logout,
+      exportPrivateKey,
+      sendMembershipPayment,
+      refreshUser,
+    ],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

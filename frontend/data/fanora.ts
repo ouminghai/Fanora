@@ -1,156 +1,118 @@
-export const recentActivities = [
+export type FanTaskMode =
+  | "daily_check_in"
+  | "post_reply"
+  | "content_publish"
+  | "page_action"
+  | "streak"
+  | "event_check_in"
+  | "future";
+
+export type FanTaskCatalogItem = {
+  key: string;
+  order: number;
+  imageSrc: string;
+  title: string;
+  summary: string;
+  meta: string;
+  category: "daily" | "discussion" | "music" | "creation" | "event" | "identity" | "special";
+  mode: FanTaskMode;
+  fanTokenReward: number;
+  rewardLabel: string | null;
+  interactionPrompt: string;
+  actionHref: string;
+  actionLabel: string;
+  missionDetail: string;
+  missionStatus: "进行中" | "即将开始";
+  featuredActivity?: boolean;
+  featuredMission?: boolean;
+  special?: boolean;
+};
+
+export const fanTaskCatalog: FanTaskCatalogItem[] = [
   {
-    id: "fear-and-dreams",
-    imageSrc: "/img/fanora/activity-concert.jpg",
-    avatarSrc: "/img/fanora/activity-concert.jpg",
-    title: "FEAR and DREAMS 巡回演唱会",
-    meta: "近期活动 · 演唱会打卡",
-    fanTokenReward: 500,
-    rewardLabel: null,
+    key: "daily-check-in", order: 1, imageSrc: "/img/fanora/activity-checkin.jpg", title: "每日 Fans Club 签到",
+    summary: "每天完成一次社区签到，连续活跃还能触发七日奖励。", meta: "每日互动 · 连续签到", category: "daily", mode: "daily_check_in",
+    fanTokenReward: 20, rewardLabel: null, interactionPrompt: "每天回来签到，连续 7 天还有额外奖励", actionHref: "/community#check-in", actionLabel: "去签到",
+    missionDetail: "每日互动", missionStatus: "进行中", featuredMission: true,
   },
   {
-    id: "new-song-listening",
-    imageSrc: "/img/fanora/activity-music.jpg",
-    avatarSrc: "/img/fanora/activity-music.jpg",
-    title: "新歌共听计划",
-    meta: "线上活动 · 每周更新",
-    fanTokenReward: 120,
-    rewardLabel: null,
+    key: "fear-and-dreams", order: 2, imageSrc: "/img/fanora/activity-concert.jpg", title: "FEAR and DREAMS 纪念票任务",
+    summary: "进入专属纪念页完成演唱会打卡，为后续 NFT 纪念票领取积累资格。", meta: "近期活动 · 演唱会纪念", category: "event", mode: "page_action",
+    fanTokenReward: 500, rewardLabel: null, interactionPrompt: "留下你的现场记忆，激活纪念票收藏资格", actionHref: "/community/tasks/fear-and-dreams", actionLabel: "进入纪念票页面",
+    missionDetail: "特别任务", missionStatus: "进行中", featuredActivity: true, featuredMission: true, special: true,
   },
   {
-    id: "city-checkin",
-    imageSrc: "/img/fanora/activity-checkin.jpg",
-    avatarSrc: "/img/fanora/activity-checkin.jpg",
-    title: "城市粉丝见面打卡",
-    meta: "线下活动 · 名额有限",
-    fanTokenReward: 300,
-    rewardLabel: null,
+    key: "new-song-listening", order: 3, imageSrc: "/img/fanora/activity-music.jpg", title: "新歌连续收听 7 天",
+    summary: "连续参与共听并记录每日感受，让歌单讨论持续发生。", meta: "线上活动 · 七日共听", category: "music", mode: "streak",
+    fanTokenReward: 120, rewardLabel: null, interactionPrompt: "连续记录收听感受，让歌单讨论持续发生", actionHref: "/community/creations?category=music", actionLabel: "查看共听计划",
+    missionDetail: "连续任务", missionStatus: "即将开始", featuredActivity: true, featuredMission: true,
   },
   {
-    id: "fan-story",
-    imageSrc: "/img/fanora/activity-community.jpg",
-    avatarSrc: "/img/fanora/activity-community.jpg",
-    title: "我的 Eason 故事征集",
-    meta: "社区共创 · 投稿进行中",
-    fanTokenReward: 180,
-    rewardLabel: null,
+    key: "share-your-song", order: 4, imageSrc: "/img/fanora/activity-community.jpg", title: "分享你的入坑歌曲",
+    summary: "回复最初打动你的歌曲和故事，用音乐认识拥有相似记忆的粉丝。", meta: "社区互动 · 故事回复", category: "discussion", mode: "post_reply",
+    fanTokenReward: 80, rewardLabel: null, interactionPrompt: "用一首歌开启交流，认识拥有相似记忆的粉丝", actionHref: "/community/posts/00000000-0000-0000-0000-000000000003", actionLabel: "去分享歌曲",
+    missionDetail: "社区互动", missionStatus: "进行中", featuredMission: true,
   },
   {
-    id: "anniversary-badge",
-    imageSrc: "/img/fanora/activity-badge.jpg",
-    avatarSrc: "/img/fanora/activity-badge.jpg",
-    title: "周年限定 Badge 解锁",
-    meta: "链上纪念 · 即将开放",
-    fanTokenReward: null,
-    rewardLabel: "限量 10,000 枚",
+    key: "fan-story", order: 5, imageSrc: "/img/fanora/activity-community.jpg", title: "粉丝故事图文征集",
+    summary: "发布故事或共创内容，把长期陪伴中的真实片段沉淀在社区。", meta: "社区共创 · 投稿进行中", category: "creation", mode: "content_publish",
+    fanTokenReward: 180, rewardLabel: null, interactionPrompt: "用图文沉淀粉丝记忆，也为社区贡献优质内容", actionHref: "/community/creations?composer=1", actionLabel: "发布粉丝故事",
+    missionDetail: "优质内容加成", missionStatus: "进行中", featuredActivity: true, featuredMission: true,
+  },
+  {
+    key: "anniversary-wishes", order: 6, imageSrc: "/img/fanora/activity-badge.jpg", title: "周年祝福共创",
+    summary: "发布周年祝福或视觉灵感，与社区共同完成一份纪念作品。", meta: "限时活动 · 周年共创", category: "creation", mode: "content_publish",
+    fanTokenReward: 150, rewardLabel: null, interactionPrompt: "共同创作周年内容，让每一份祝福被看见", actionHref: "/community/creations?composer=1", actionLabel: "参与周年共创",
+    missionDetail: "限时共创", missionStatus: "进行中", featuredMission: true,
+  },
+  {
+    key: "classic-lyrics-chain", order: 7, imageSrc: "/img/fanora/activity-music.jpg", title: "经典歌词接龙",
+    summary: "回复一句歌词或下一句联想，邀请更多粉丝接力完成讨论。", meta: "社区挑战 · 歌词互动", category: "music", mode: "post_reply",
+    fanTokenReward: 60, rewardLabel: null, interactionPrompt: "回复歌词并邀请下一位粉丝接龙", actionHref: "/community/posts/00000000-0000-0000-0000-000000000004", actionLabel: "去歌词接龙",
+    missionDetail: "社区挑战", missionStatus: "进行中", featuredMission: true,
+  },
+  {
+    key: "core-fan-identity", order: 8, imageSrc: "/img/fanora/activity-badge.jpg", title: "核心粉丝身份画像",
+    summary: "完善粉丝资料并连接互动记录，为后续自动身份验证做准备。", meta: "身份成长 · 即将开放", category: "identity", mode: "future",
+    fanTokenReward: 300, rewardLabel: null, interactionPrompt: "完善真实粉丝画像，为身份成长积累可验证记录", actionHref: "/profile", actionLabel: "查看身份画像",
+    missionDetail: "身份成长", missionStatus: "即将开始", featuredMission: true,
+  },
+  {
+    key: "city-checkin", order: 9, imageSrc: "/img/fanora/activity-checkin.jpg", title: "城市粉丝见面打卡",
+    summary: "为线下活动预留定位与现场凭证验证，开放后可领取活动积分。", meta: "线下活动 · 名额有限", category: "event", mode: "event_check_in",
+    fanTokenReward: 300, rewardLabel: null, interactionPrompt: "在线下相遇并留下城市粉丝活动记录", actionHref: "/community/tasks", actionLabel: "等待活动开放",
+    missionDetail: "线下活动", missionStatus: "即将开始", featuredActivity: true,
+  },
+  {
+    key: "anniversary-badge", order: 10, imageSrc: "/img/fanora/activity-badge.jpg", title: "周年限定 Badge 解锁",
+    summary: "为周年链上收藏预留资格任务，当前先展示未来领取入口。", meta: "链上纪念 · 即将开放", category: "special", mode: "future",
+    fanTokenReward: 100, rewardLabel: "限量 10,000 枚", interactionPrompt: "持续参与社区，为未来周年纪念收藏积累资格", actionHref: "/community/tasks", actionLabel: "查看开放进度",
+    missionDetail: "限量收藏", missionStatus: "即将开始", featuredActivity: true, special: true,
   },
 ];
 
-export const fanMissions = [
-  {
-    id: 1,
-    avatar: "/img/fanora/activity-concert.jpg",
-    name: "每日 Fans Club 签到",
-    fanTokenReward: 20,
-    detail: "2,846 人参与",
-    status: "进行中",
-  },
-  {
-    id: 2,
-    avatar: "/img/fanora/activity-checkin.jpg",
-    name: "FEAR and DREAMS 打卡",
-    fanTokenReward: 500,
-    detail: "演唱会任务",
-    status: "进行中",
-  },
-  {
-    id: 3,
-    avatar: "/img/fanora/activity-music.jpg",
-    name: "新歌连续收听 7 天",
-    fanTokenReward: 120,
-    detail: "连续任务",
-    status: "进行中",
-  },
-  {
-    id: 4,
-    avatar: "/img/fanora/activity-community.jpg",
-    name: "分享你的入坑歌曲",
-    fanTokenReward: 80,
-    detail: "社区互动",
-    status: "进行中",
-  },
-  {
-    id: 5,
-    avatar: "/img/fanora/activity-badge.jpg",
-    name: "粉丝故事图文征集",
-    fanTokenReward: 180,
-    detail: "优质内容加成",
-    status: "进行中",
-  },
-  {
-    id: 6,
-    avatar: "/img/fanora/activity-concert.jpg",
-    name: "周年祝福共创",
-    fanTokenReward: 150,
-    detail: "7 月 20 日开启",
-    status: "即将开始",
-  },
-  {
-    id: 7,
-    avatar: "/img/fanora/activity-music.jpg",
-    name: "经典歌词接龙",
-    fanTokenReward: 60,
-    detail: "社区挑战",
-    status: "进行中",
-  },
-  {
-    id: 8,
-    avatar: "/img/fanora/activity-checkin.jpg",
-    name: "核心粉丝身份认证",
-    fanTokenReward: 300,
-    detail: "Agent 审核",
-    status: "进行中",
-  },
-];
+export const fanTaskCatalogByKey = new Map(fanTaskCatalog.map((task) => [task.key, task]));
 
-export const badgeLevels = [
-  {
-    id: "bronze",
-    imageSrc: "/img/fanora/badge-bronze.svg",
-    title: "Bronze Fan Badge",
-    level: "Lv.1 新晋粉丝",
-    fanTokenRange: "0 - 999",
-    benefit: "加入社区 · 基础任务",
-    progress: "已解锁",
-  },
-  {
-    id: "silver",
-    imageSrc: "/img/fanora/badge-silver.svg",
-    title: "Silver Fan Badge",
-    level: "Lv.2 活跃粉丝",
-    fanTokenRange: "1,000 - 2,999",
-    benefit: "活动优先报名 · 专属内容",
-    progress: "还差 360 FAN",
-  },
-  {
-    id: "gold",
-    imageSrc: "/img/fanora/badge-gold.svg",
-    title: "Gold Fan Badge",
-    level: "Lv.3 核心粉丝",
-    fanTokenRange: "3,000 - 7,999",
-    benefit: "限定 Badge · 白名单权益",
-    progress: "待解锁",
-  },
-  {
-    id: "core",
-    imageSrc: "/img/fanora/badge-core.svg",
-    title: "Core Fan Badge",
-    level: "Lv.4 超级粉丝",
-    fanTokenRange: "8,000+",
-    benefit: "核心活动 · 社区共创资格",
-    progress: "待解锁",
-  },
-];
+export const recentActivities = fanTaskCatalog.filter((task) => task.featuredActivity).map((task) => ({
+  id: task.key,
+  imageSrc: task.imageSrc,
+  avatarSrc: task.imageSrc,
+  title: task.title,
+  meta: task.meta,
+  fanTokenReward: task.rewardLabel ? null : task.fanTokenReward,
+  rewardLabel: task.rewardLabel,
+  actionHref: task.actionHref,
+}));
+
+export const fanMissions = fanTaskCatalog.filter((task) => task.featuredMission).map((task, index) => ({
+  id: index + 1,
+  avatar: task.imageSrc,
+  name: task.title,
+  fanTokenReward: task.fanTokenReward,
+  detail: task.missionDetail,
+  status: task.missionStatus,
+  actionHref: task.actionHref,
+}));
 
 export const fanJourney = [
   {

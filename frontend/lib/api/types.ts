@@ -25,6 +25,8 @@ export type FanoraUser = {
   bio: string | null;
   locale: string;
   level: string;
+  is_official_member: boolean;
+  official_member_since: string | null;
   fan_token_balance: number;
   fan_type: string;
   profile_visibility: "public" | "private";
@@ -42,4 +44,153 @@ export type AuthSession = {
   expires_at: string;
   is_new_user: boolean;
   user: FanoraUser;
+};
+
+export type MembershipLevel = {
+  code: string;
+  name: string;
+  description: string;
+  rank: number;
+  min_token_balance: number | null;
+  max_token_balance: number | null;
+  badge_image_url: string;
+  is_management: boolean;
+};
+
+export type OfficialMembershipStatus = {
+  status: "pending_payment" | "active";
+  is_official_member: boolean;
+  fee_mon: string;
+  fee_wei: string;
+  treasury_address: string | null;
+  chain_id: number;
+  transaction_hash: string | null;
+  joined_at: string | null;
+};
+
+export type OfficialCommunity = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string;
+  logo_url: string;
+  joined: boolean;
+  member_count: number;
+  post_count: number;
+};
+
+export type CommunityAuthor = {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  level: string;
+};
+
+export type CommunityPostSummary = {
+  id: string;
+  title: string;
+  body_preview: string;
+  cover_url: string | null;
+  category: string;
+  reply_count: number;
+  like_count: number;
+  bookmark_count: number;
+  liked: boolean;
+  bookmarked: boolean;
+  author: CommunityAuthor;
+  created_at: string;
+  updated_at: string;
+};
+
+export type CommunityReply = {
+  id: string;
+  post_id: string;
+  author: CommunityAuthor;
+  body: string;
+  parent_reply_id: string | null;
+  like_count: number;
+  liked: boolean;
+  children: CommunityReply[];
+  created_at: string;
+};
+
+export type CommunityPostDetail = {
+  id: string;
+  title: string;
+  body: string;
+  cover_url: string | null;
+  category: string;
+  reply_count: number;
+  like_count: number;
+  bookmark_count: number;
+  liked: boolean;
+  bookmarked: boolean;
+  author: CommunityAuthor;
+  replies: CommunityReply[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type PostEngagement = {
+  post_id: string;
+  liked: boolean;
+  bookmarked: boolean;
+  like_count: number;
+  bookmark_count: number;
+};
+
+export type ReplyEngagement = {
+  reply_id: string;
+  liked: boolean;
+  like_count: number;
+};
+
+export type FanTask = {
+  id: string;
+  title: string;
+  description: string;
+  task_type: string;
+  status: string;
+  start_at: string | null;
+  end_at: string | null;
+  reward_fan_tokens: number;
+  target_post_id: string | null;
+  target_post_title: string | null;
+  presentation: {
+    catalog_key: string | null;
+    image_url: string | null;
+    category: string;
+    interaction_prompt: string;
+    action_url: string;
+    action_label: string;
+    badge_label: string | null;
+    special: boolean;
+  };
+  participation_limit: number | null;
+  participant_count: number;
+  participation_status: "claimed" | "rewarded" | null;
+  eligible: boolean;
+  unavailable_reason: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type DailyCheckInStatus = {
+  check_in_date: string;
+  checked_in: boolean;
+  already_checked_in: boolean;
+  streak_days: number;
+  reward_fan_tokens: number;
+  fan_token_balance: number;
+};
+
+export type FanTokenLedgerEntry = {
+  id: string;
+  delta: number;
+  balance_after: number;
+  source_type: string;
+  source_id: string | null;
+  task_id: string | null;
+  description: string;
+  created_at: string;
 };

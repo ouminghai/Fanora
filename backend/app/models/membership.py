@@ -31,6 +31,7 @@ class MembershipLevel(SQLModel, table=True):
     rank: int = Field(index=True)
     min_token_balance: int | None = Field(default=None, index=True)
     max_token_balance: int | None = Field(default=None)
+    badge_image_url: str = Field(max_length=2048)
     is_management: bool = Field(default=False, index=True)
     is_active: bool = Field(default=True, index=True)
     created_at: datetime = Field(default_factory=utc_now)

@@ -16,6 +16,8 @@ const user: FanoraUser = {
   bio: null,
   locale: "zh-CN",
   level: "Silver",
+  is_official_member: true,
+  official_member_since: "2026-07-20T00:00:00Z",
   fan_token_balance: 1280,
   fan_type: "Loyal Fan",
   profile_visibility: "public",

@@ -1,9 +1,9 @@
-"""Creator-owned community browsing and membership endpoints."""
+"""Compatibility routes constrained to Fanora's single official community."""
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import col, func, select
+from sqlmodel import col, select
 
 from app.core.database import get_database_session
 from app.core.security import get_current_identity
@@ -40,18 +40,14 @@ def to_summary(community: Community, *, joined: bool = False) -> CommunitySummar
 
 @router.get("", response_model=list[CommunitySummary])
 async def list_communities(
-    search: str = Query(default="", max_length=80),
-    offset: int = Query(default=0, ge=0),
-    limit: int = Query(default=20, ge=1, le=50),
     session: AsyncSession = Depends(get_database_session),
 ) -> list[CommunitySummary]:
-    query = select(Community).where(col(Community.is_public).is_(True))
-    if search.strip():
-        query = query.where(func.lower(col(Community.name)).contains(search.strip().lower()))
-    communities = list(
-        (await session.execute(query.order_by(col(Community.created_at).desc()).offset(offset).limit(limit))).scalars().all()
-    )
-    return [to_summary(community) for community in communities]
+    community = (
+        await session.execute(
+            select(Community).where(Community.slug == "fanora-official", col(Community.is_public).is_(True))
+        )
+    ).scalar_one_or_none()
+    return [to_summary(community)] if community else []
 
 
 @router.post("", response_model=CommunitySummary, status_code=status.HTTP_201_CREATED)
@@ -60,18 +56,11 @@ async def create_community(
     identity: AuthenticatedIdentity = Depends(get_current_identity),
     session: AsyncSession = Depends(get_database_session),
 ) -> CommunitySummary:
-    await require_creator(session, identity.user_id)
-    community = Community(owner_user_id=identity.user_id, **payload.model_dump())
-    session.add(community)
-    await session.flush()
-    session.add(CommunityMember(community_id=community.id, user_id=identity.user_id, role="owner"))
-    try:
-        await session.commit()
-    except IntegrityError as error:
-        await session.rollback()
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Community slug is already in use") from error
-    await session.refresh(community)
-    return to_summary(community, joined=True)
+    del payload, identity, session
+    raise HTTPException(
+        status_code=status.HTTP_409_CONFLICT,
+        detail="Fanora MVP only supports the existing official community",
+    )
 
 
 @router.patch("/{community_id}", response_model=CommunitySummary)
@@ -82,10 +71,9 @@ async def update_community(
     session: AsyncSession = Depends(get_database_session),
 ) -> CommunitySummary:
     community = await session.get(Community, community_id)
-    if community is None:
+    if community is None or community.slug != "fanora-official":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Community not found")
-    if community.owner_user_id != identity.user_id:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only the community owner can edit it")
+    await require_creator(session, identity.user_id)
     for field, value in payload.model_dump().items():
         setattr(community, field, value)
     community.updated_at = utc_now()
@@ -101,7 +89,7 @@ async def join_community(
     session: AsyncSession = Depends(get_database_session),
 ) -> CommunitySummary:
     community = await session.get(Community, community_id)
-    if community is None or not community.is_public:
+    if community is None or community.slug != "fanora-official" or not community.is_public:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Community not found")
     membership = (
         await session.execute(

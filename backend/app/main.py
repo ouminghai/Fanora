@@ -51,6 +51,11 @@ app.state.limiter = limiter
 async def rate_limit_error_handler(request: Request, error: Exception):
     if not isinstance(error, RateLimitExceeded):
         raise error
+    logger.warning(
+        "security_rate_limit_exceeded",
+        path=request.url.path,
+        client_ip=request.client.host if request.client else None,
+    )
     return _rate_limit_exceeded_handler(request, error)
 
 

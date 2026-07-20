@@ -5,6 +5,7 @@ import { Autoplay, EffectCoverflow } from "swiper/modules";
 import FanTokenAmount from "@/components/common/FanTokenAmount";
 import { recentActivities } from "@/data/fanora";
 import Image from "next/image";
+import Link from "next/link";
 
 const carouselActivities =
   recentActivities.length > 5
@@ -62,7 +63,7 @@ export default function CoverFlowSlider() {
             <article>
               <div className="block overflow-hidden rounded-2.5xl bg-white shadow-md transition-shadow hover:shadow-lg dark:bg-jacarta-700">
                 <figure className="relative">
-                  <a href="#missions">
+                  <Link href={elm.actionHref}>
                     <Image
                       src={elm.imageSrc}
                       alt={elm.title}
@@ -71,7 +72,7 @@ export default function CoverFlowSlider() {
                       width="379"
                     />
                     {/* <div className="swiper-lazy-preloader"></div> */}
-                  </a>
+                  </Link>
                 </figure>
                 <div className="p-6">
                   <div className="flex">
@@ -85,11 +86,11 @@ export default function CoverFlowSlider() {
                       />
                     </span>
                     <div>
-                      <a href="#missions" className="block">
+                      <Link href={elm.actionHref} className="block">
                         <span className="font-display text-lg leading-none text-jacarta-700 hover:text-accent dark:text-white">
                           {elm.title}
                         </span>
-                      </a>
+                      </Link>
                       <span className="block text-2xs text-accent">
                         {elm.meta}
                       </span>

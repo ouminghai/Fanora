@@ -9,6 +9,7 @@ from app.models.user import (
     Community,
     CommunityMember,
     LoginChallenge,
+    OfficialMembershipPayment,
     User,
     UserProfile,
     UserRole,
@@ -42,6 +43,15 @@ async def test_delete_user_cleans_current_foreign_key_dependants(client):
                 UserRole(user_id=user.id, role="fan"),
                 UserSession(user_id=user.id, token_hash=user.id.replace("-", "").ljust(64, "0"), expires_at=user.created_at),
                 LoginChallenge(wallet_address=wallet_address, message="test", expires_at=user.created_at),
+                OfficialMembershipPayment(
+                    user_id=user.id,
+                    wallet_address=wallet_address,
+                    treasury_address=Account.create().address,
+                    transaction_hash="0x" + "cd" * 32,
+                    chain_id=10143,
+                    amount_wei=10**18,
+                    block_number=123,
+                ),
                 CommunityMember(community_id=community.id, user_id=user.id),
                 FanProfileRun(
                     user_id=user.id,
@@ -59,6 +69,7 @@ async def test_delete_user_cleans_current_foreign_key_dependants(client):
 
         result = await delete_user_by_id(session, user_id)
         assert result.deleted_rows["users"] == 1
+        assert result.deleted_rows["official_membership_payments"] == 1
 
     async with database_service.session() as session:
         assert await session.get(User, user_id) is None

@@ -12,6 +12,9 @@
     "test:header": "tsx --test tests/header-profile.test.tsx",
     "test:hero-animation": "tsx --test tests/hero-animation.test.tsx",
     "test:fan-token": "tsx --test tests/fan-token.test.tsx",
+    "test:membership": "tsx --test tests/membership-levels.test.ts",
+    "test:official-membership": "tsx --test tests/official-membership.test.ts",
+    "test:community": "tsx --test tests/community-flow.test.ts",
     "test:video-sound": "tsx --test tests/video-sound-toggle.test.tsx",
     "test:key-export": "node --no-warnings --test tests/private-key-export.test.mjs",
     "typecheck": "tsc --noEmit"
@@ -29,6 +32,8 @@
     "react": "19.1.0",
     "react-countdown": "^2.3.6",
     "react-dom": "19.1.0",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1",
     "swiper": "^12.1.2",
     "tailwindcss-custom-groups": "^1.1.3",
     "tippy.js": "^6.3.7",
