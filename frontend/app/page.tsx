@@ -1,4 +1,4 @@
-import HomePage4 from "./(homes)/home-4/page";
+import HomePage4 from "./(homes)/home/page";
 
 export const metadata = {
   title: "Fanora Protocol | Proof of Fandom",

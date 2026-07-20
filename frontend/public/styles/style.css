@@ -458,6 +458,163 @@ input[type="search"]::-webkit-search-results-decoration {
   background-size: 200% auto;
 }
 
+/* Home hero parallax */
+.hero-parallax {
+  isolation: isolate;
+}
+
+.hero-parallax__media {
+  top: -6%;
+  bottom: auto;
+  height: 112%;
+  transform: translate3d(0, -4%, 0) scale(1.1);
+  transform-origin: center center;
+  will-change: transform;
+}
+
+@supports (animation-timeline: scroll()) {
+  .hero-parallax__media {
+    animation: hero-parallax-media linear both;
+    animation-timeline: scroll(root block);
+    animation-range: 0 100vh;
+  }
+}
+
+@keyframes hero-parallax-media {
+  from {
+    transform: translate3d(0, -5%, 0) scale(1.12);
+  }
+
+  to {
+    transform: translate3d(0, 9%, 0) scale(1.12);
+  }
+}
+
+/* Home hero typewriter title */
+.hero-typewriter {
+  --hero-typewriter-delay: 0s;
+  --hero-typewriter-duration: 1s;
+  --hero-typewriter-steps: 24;
+  position: relative;
+  display: inline-block;
+  white-space: nowrap;
+  clip-path: inset(0 100% 0 0);
+  animation: hero-typewriter-reveal var(--hero-typewriter-duration)
+    steps(var(--hero-typewriter-steps), end) var(--hero-typewriter-delay) forwards;
+  will-change: clip-path;
+}
+
+.hero-typewriter::after {
+  position: absolute;
+  top: 0.08em;
+  bottom: 0.08em;
+  left: 0;
+  width: 0.055em;
+  min-width: 2px;
+  content: "";
+  background: currentColor;
+  transform: translateX(-50%);
+  animation:
+    hero-typewriter-caret-move var(--hero-typewriter-duration)
+      steps(var(--hero-typewriter-steps), end) var(--hero-typewriter-delay) forwards,
+    hero-typewriter-caret-blink 0.65s step-end var(--hero-typewriter-delay) infinite;
+}
+
+.hero-typewriter--1 {
+  --hero-typewriter-delay: 0.1s;
+  --hero-typewriter-duration: 0.95s;
+  --hero-typewriter-steps: 24;
+}
+
+.hero-typewriter--2 {
+  --hero-typewriter-delay: 1.15s;
+  --hero-typewriter-duration: 1.1s;
+  --hero-typewriter-steps: 28;
+}
+
+@keyframes hero-typewriter-reveal {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@keyframes hero-typewriter-caret-move {
+  to {
+    left: 100%;
+  }
+}
+
+@keyframes hero-typewriter-caret-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+
+/* Home hero staggered content entrance */
+.hero-reveal {
+  opacity: 0;
+  filter: blur(3px);
+  transform: translate3d(0, 32px, 0);
+  animation: hero-fade-up 0.85s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  will-change: opacity, filter, transform;
+}
+
+.hero-reveal--3 {
+  animation-delay: 2.3s;
+}
+
+.hero-reveal--4 {
+  animation-delay: 2.47s;
+}
+
+.hero-reveal--5 {
+  animation-delay: 2.64s;
+}
+
+@keyframes hero-fade-up {
+  0% {
+    opacity: 0;
+    filter: blur(3px);
+    transform: translate3d(0, 32px, 0);
+  }
+
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-parallax__media {
+    animation: none;
+    transform: translate3d(0, 0, 0) scale(1.06);
+  }
+
+  .hero-reveal {
+    opacity: 1;
+    filter: none;
+    transform: none;
+    animation: none;
+  }
+
+  .hero-typewriter {
+    clip-path: none;
+    animation: none;
+  }
+
+  .hero-typewriter::after {
+    display: none;
+    animation: none;
+  }
+}
+
 /* RTL */
 html[dir="rtl"] .h-rotate,
 html[dir="rtl"] .swiper-button-next,

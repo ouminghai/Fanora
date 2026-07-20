@@ -7,7 +7,7 @@ def test_analyze_fan_profile_endpoint(client: TestClient) -> None:
         json={
             "wallet_address": "0x0000000000000000000000000000000000000003",
             "community_id": "fanora",
-            "points": 600,
+            "fan_token_balance": 600,
             "completed_tasks": 8,
             "active_days": 15,
             "referrals": 2,

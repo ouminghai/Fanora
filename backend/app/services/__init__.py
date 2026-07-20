@@ -1,1 +1,1 @@
-"""Task, points, identity, and badge business modules will live here."""
+"""Task, Fan Token, identity, and badge business modules will live here."""

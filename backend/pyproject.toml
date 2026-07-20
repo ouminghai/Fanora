@@ -19,6 +19,7 @@ dependencies = [
   "langchain-openai>=1.0",
   "langgraph>=1.0",
   "langgraph-checkpoint-postgres>=3.0",
+  "pyjwt[crypto]>=2.10",
   "prometheus-client>=0.22",
   "psycopg[binary,pool]>=3.2",
   "pydantic-settings>=2.8",
@@ -38,7 +39,7 @@ observability = ["langfuse>=3.9"]
 dev = [
   "detect-secrets>=1.5",
   "pyright>=1.1.390",
-  "pytest>=8.3",
+  "pytest>=8.3,<9",
   "pytest-asyncio>=0.25",
   "ruff>=0.11",
 ]

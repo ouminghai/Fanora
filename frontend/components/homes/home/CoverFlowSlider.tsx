@@ -1,12 +1,21 @@
 "use client";
+import { useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import { Navigation, Pagination, EffectCoverflow } from "swiper/modules";
+import { Autoplay, EffectCoverflow } from "swiper/modules";
+import FanTokenAmount from "@/components/common/FanTokenAmount";
 import { recentActivities } from "@/data/fanora";
 import Image from "next/image";
 
+const carouselActivities =
+  recentActivities.length > 5
+    ? recentActivities
+    : [...recentActivities, ...recentActivities];
+
 export default function CoverFlowSlider() {
+  const [isReady, setIsReady] = useState(false);
+
   return (
-    <div className="relative px-6 pb-16 sm:px-0">
+    <div className="relative px-6 pb-10 sm:px-0">
       <Swiper
         breakpoints={{
           // when window width is >= 640px
@@ -24,12 +33,17 @@ export default function CoverFlowSlider() {
             slidesPerView: 5,
           },
         }}
-        slidesPerGroupAuto
         effect={"coverflow"}
         grabCursor={true}
         centeredSlides={true}
-        // slidesPerView={70}
         loop={true}
+        speed={900}
+        autoplay={{
+          delay: 1200,
+          disableOnInteraction: false,
+          pauseOnMouseEnter: true,
+          waitForTransition: true,
+        }}
         coverflowEffect={{
           rotate: 30,
           stretch: 0,
@@ -37,18 +51,14 @@ export default function CoverFlowSlider() {
           modifier: 1,
           slideShadows: true,
         }}
-        pagination={{
-          clickable: true,
-        }}
-        modules={[EffectCoverflow, Navigation]}
-        navigation={{
-          nextEl: ".snbn7",
-          prevEl: ".snbp7",
-        }}
-        className="swiper coverflow-slider !py-5"
+        modules={[Autoplay, EffectCoverflow]}
+        onAfterInit={() => setIsReady(true)}
+        className={`swiper coverflow-slider !py-5 transition-opacity duration-500 ${
+          isReady ? "opacity-100" : "opacity-0"
+        }`}
       >
-        {recentActivities.map((elm) => (
-          <SwiperSlide key={elm.id}>
+        {carouselActivities.map((elm, index) => (
+          <SwiperSlide key={`${elm.id}-${index}`}>
             <article>
               <div className="block overflow-hidden rounded-2.5xl bg-white shadow-md transition-shadow hover:shadow-lg dark:bg-jacarta-700">
                 <figure className="relative">
@@ -83,9 +93,17 @@ export default function CoverFlowSlider() {
                       <span className="block text-2xs text-accent">
                         {elm.meta}
                       </span>
-                      <span className="text-2xs text-jacarta-400 dark:text-jacarta-300">
-                        {elm.reward}
-                      </span>
+                      {elm.fanTokenReward !== null ? (
+                        <FanTokenAmount
+                          amount={elm.fanTokenReward}
+                          prefix="+"
+                          className="text-2xs text-jacarta-400 dark:text-jacarta-300"
+                        />
+                      ) : (
+                        <span className="text-2xs text-jacarta-400 dark:text-jacarta-300">
+                          {elm.rewardLabel}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -94,31 +112,6 @@ export default function CoverFlowSlider() {
           </SwiperSlide>
         ))}
       </Swiper>
-
-      <div className=" snbp7 swiper-button-prev swiper-button-prev-4 group absolute top-1/2 left-4 z-10 -mt-6 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-white p-3 text-base shadow-white-volume">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          width="24"
-          height="24"
-          className="fill-jacarta-700 group-hover:fill-accent"
-        >
-          <path fill="none" d="M0 0h24v24H0z" />
-          <path d="M10.828 12l4.95 4.95-1.414 1.414L8 12l6.364-6.364 1.414 1.414z" />
-        </svg>
-      </div>
-      <div className="snbn7 swiper-button-next swiper-button-next-4 group absolute top-1/2 right-4 z-10 -mt-6 flex h-12 w-12 cursor-pointer items-center justify-center rounded-full bg-white p-3 text-base shadow-white-volume">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          width="24"
-          height="24"
-          className="fill-jacarta-700 group-hover:fill-accent"
-        >
-          <path fill="none" d="M0 0h24v24H0z" />
-          <path d="M13.172 12l-4.95-4.95 1.414-1.414L16 12l-6.364 6.364-1.414-1.414z" />
-        </svg>
-      </div>
     </div>
   );
 }

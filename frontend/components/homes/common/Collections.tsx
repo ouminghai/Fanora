@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import FanTokenAmount from "@/components/common/FanTokenAmount";
 import { fanMissions } from "@/data/fanora";
 
 const labels = ["进行中", "即将开始", "已完成"];
@@ -89,8 +90,9 @@ export default function Collections() {
                     {mission.name}
                   </span>
                 </a>
-                <span className="text-sm dark:text-jacarta-300">
-                  {mission.detail}
+                <span className="flex flex-wrap items-center gap-1 text-sm dark:text-jacarta-300">
+                  <FanTokenAmount amount={mission.fanTokenReward} prefix="+" />
+                  <span>· {mission.detail}</span>
                 </span>
               </div>
             </div>

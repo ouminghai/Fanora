@@ -27,7 +27,7 @@ from app.services.llm.service import LLMUnavailable
 class FanProfileState(TypedDict, total=False):
     wallet_address: Required[str]
     community_id: Required[str]
-    points: Required[int]
+    fan_token_balance: Required[int]
     completed_tasks: Required[int]
     active_days: Required[int]
     referrals: Required[int]
@@ -42,9 +42,9 @@ class FanProfileState(TypedDict, total=False):
 
 def calculate_scores(state: FanProfileState) -> dict[str, Any]:
     activity = min(state.get("completed_tasks", 0) * 8 + state.get("active_days", 0) * 2, 100)
-    loyalty = min(state.get("active_days", 0) * 5 + state.get("points", 0) // 20, 100)
+    loyalty = min(state.get("active_days", 0) * 5 + state.get("fan_token_balance", 0) // 20, 100)
     influence = min(state.get("referrals", 0) * 20 + state.get("onchain_actions", 0) * 3, 100)
-    contribution = min(state.get("points", 0) // 10 + state.get("completed_tasks", 0) * 5, 100)
+    contribution = min(state.get("fan_token_balance", 0) // 10 + state.get("completed_tasks", 0) * 5, 100)
     total = round(activity * 0.3 + loyalty * 0.3 + influence * 0.15 + contribution * 0.25)
     return {
         "scores": {
@@ -54,7 +54,7 @@ def calculate_scores(state: FanProfileState) -> dict[str, Any]:
             "contribution": contribution,
             "total": total,
         },
-        "badge_eligible": state.get("points", 0) >= settings.badge_draft_min_points,
+        "badge_eligible": state.get("fan_token_balance", 0) >= settings.badge_draft_min_tokens,
     }
 
 
@@ -83,7 +83,7 @@ def _rule_badge_draft(state: FanProfileState) -> dict[str, str] | None:
         return None
     return {
         "name": f"{state['fan_type'].replace('_', ' ').title()} Badge",
-        "description": "Proof of Fandom badge generated from verified Fanora points and activity.",
+        "description": "Proof of Fandom badge generated from verified Fan Token activity.",
         "level": state["fan_type"],
     }
 
@@ -110,7 +110,7 @@ def build_fan_profile_graph(
             ),
             HumanMessage(
                 content=(
-                    f"Community: {state['community_id']}\nPoints: {state['points']}\n"
+                    f"Community: {state['community_id']}\nFan Token balance: {state['fan_token_balance']}\n"
                     f"Completed tasks: {state['completed_tasks']}\nActive days: {state['active_days']}\n"
                     f"Referrals: {state['referrals']}\nOnchain actions: {state['onchain_actions']}\n"
                     f"Verified scores: {state['scores']}\nRule classification: {state['fan_type']}\n"

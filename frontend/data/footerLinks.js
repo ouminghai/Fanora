@@ -1,6 +1,6 @@
 export const links = [
   { id: 1, name: "身份画像", href: "#proof-of-fandom" },
-  { id: 2, name: "身份积分", href: "#missions" },
+  { id: 2, name: "Fan Token", href: "#missions" },
   { id: 3, name: "Badge 成长", href: "#badges" },
   { id: 4, name: "连接钱包", href: "#fan-journey" },
 ];

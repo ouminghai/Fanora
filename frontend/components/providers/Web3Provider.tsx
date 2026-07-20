@@ -8,6 +8,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { WagmiProvider } from "wagmi";
 import { wagmiConfig } from "@/lib/web3/config";
+import AuthProvider from "./AuthProvider";
 
 type Web3ProviderProps = { children: ReactNode };
 
@@ -36,7 +37,7 @@ export default function Web3Provider({ children }: Web3ProviderProps) {
           modalSize="compact"
           theme={darkTheme({ accentColor: "#8358ff" })}
         >
-          {children}
+          <AuthProvider>{children}</AuthProvider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

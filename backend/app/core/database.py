@@ -3,7 +3,7 @@
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
-from sqlalchemy import text
+from sqlalchemy import event, text
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
@@ -27,9 +27,17 @@ def _engine_options(url: str) -> dict:
     }
 
 
+def _enable_sqlite_foreign_keys(dbapi_connection, _) -> None:
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.close()
+
+
 class DatabaseService:
     def __init__(self) -> None:
         self.engine: AsyncEngine = create_async_engine(settings.database_url, **_engine_options(settings.database_url))
+        if settings.database_url.startswith("sqlite"):
+            event.listen(self.engine.sync_engine, "connect", _enable_sqlite_foreign_keys)
         self.session_factory = async_sessionmaker(self.engine, expire_on_commit=False, class_=AsyncSession)
 
     async def initialize(self) -> None:

@@ -7,6 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint .",
+    "test:api-timeout": "tsx --test tests/api-timeout.test.ts",
+    "test:avatar": "tsx --test tests/user-avatar.test.tsx",
+    "test:header": "tsx --test tests/header-profile.test.tsx",
+    "test:hero-animation": "tsx --test tests/hero-animation.test.tsx",
+    "test:fan-token": "tsx --test tests/fan-token.test.tsx",
+    "test:video-sound": "tsx --test tests/video-sound-toggle.test.tsx",
+    "test:key-export": "node --no-warnings --test tests/private-key-export.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -14,7 +21,10 @@
     "@rainbow-me/rainbowkit": "^2.2.11",
     "@tailwindcss/forms": "^0.5.10",
     "@tanstack/react-query": "^5.101.2",
+    "@web3auth/modal": "^10.16.0",
+    "axios": "^1.18.1",
     "bootstrap": "^5.3.6",
+    "boring-avatars": "^2.0.4",
     "next": "^15.5.20",
     "react": "19.1.0",
     "react-countdown": "^2.3.6",
@@ -34,6 +44,7 @@
     "eslint-config-next": "^15.5.20",
     "postcss": "^8",
     "tailwindcss": "^3.2.7",
+    "tsx": "^4.23.1",
     "typescript": "^5"
   }
 }

@@ -1,4 +1,5 @@
 import Image from "next/image";
+import FanTokenAmount from "@/components/common/FanTokenAmount";
 import { badgeLevels } from "@/data/fanora";
 
 export default function Auction() {
@@ -49,7 +50,7 @@ export default function Auction() {
                 <div className="mt-2 text-sm">
                   <span className="dark:text-jacarta-300">升级门槛：</span>{" "}
                   <span className="text-jacarta-700 dark:text-jacarta-100">
-                    {badge.points}
+                    <FanTokenAmount amount={badge.fanTokenRange} showSymbol />
                   </span>
                 </div>
 

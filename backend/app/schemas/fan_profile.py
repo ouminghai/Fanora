@@ -10,7 +10,7 @@ FanType = Literal["emerging_fan", "loyal_fan", "advocate", "core_contributor"]
 class FanProfileRequest(BaseModel):
     wallet_address: str
     community_id: str = Field(min_length=1, max_length=100)
-    points: int = Field(default=0, ge=0)
+    fan_token_balance: int = Field(default=0, ge=0)
     completed_tasks: int = Field(default=0, ge=0)
     active_days: int = Field(default=0, ge=0)
     referrals: int = Field(default=0, ge=0)

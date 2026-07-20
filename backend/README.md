@@ -66,6 +66,24 @@ make dev
 
 ## Docker 启动
 
+只启动本地 PostgreSQL，并继续用本机命令运行 FastAPI：
+
+```bash
+make db-up
+make migrate
+make dev
+```
+
+本地数据库连接地址为：
+
+```env
+DATABASE_URL=postgresql+psycopg://fanora:fanora-local-password@127.0.0.1:5432/fanora
+```
+
+推荐将该地址放在不会提交到 Git 的 `.env.local` 中。停止数据库使用 `make db-down`，查看状态使用 `make db-status`。删除 `.env.local` 后，后端会重新读取 `.env` 中的 Railway 或其他远程数据库连接。
+
+启动包含 FastAPI、PostgreSQL 和 Valkey 的完整 Docker 开发环境：
+
 ```bash
 cp .env.example .env
 make docker-up
@@ -93,7 +111,7 @@ POST /api/v1/agent/fan-profile/analyze
 {
   "wallet_address": "0x0000000000000000000000000000000000000001",
   "community_id": "fanora",
-  "points": 600,
+  "fan_token_balance": 600,
   "completed_tasks": 8,
   "active_days": 15,
   "referrals": 2,
@@ -113,3 +131,47 @@ OPENAI_FALLBACK_MODELS=provider/fallback-model,provider/another-model
 ```
 
 模型只能生成画像解释和 Badge 草案，不能直接修改积分、授予权限或调用合约。
+
+## Web3Auth 登录与用户资料
+
+前端先调用 `POST /api/v1/auth/challenge` 获取一次性消息并用当前钱包签名，再将签名和 Web3Auth Identity Token 提交到 `POST /api/v1/auth/web3auth`。后端同时校验 Web3Auth JWT 的签名、签发者、受众、有效期和用户标识，以及钱包签名和挑战有效期。
+
+首次验证成功会自动创建统一用户、登录身份、唯一主钱包、用户资料和 `fan` 角色；再次验证会恢复同一个用户。后端只保存钱包地址，不生成或保存用户私钥。
+
+登录后使用 Bearer Token 调用：
+
+- `GET /api/v1/users/me`
+- `PATCH /api/v1/users/me`
+- `POST /api/v1/auth/logout`
+- `POST /api/v1/communities/{community_id}/join`
+
+创作者社区创建和编辑接口要求数据库中已有 `creator` 或 `admin` 角色，普通用户不能自行提升权限。
+
+## 会员等级与积分规则
+
+会员等级和 Fan Token 规则保存在 `membership_levels` 与 `fan_token_rules` 表中。普通会员按 Fan Token 余额自动升级：新生儿（0–99）、轻度神经（100–499）、中度神经（500–1,499）、重度神经（1,500–3,999）、病入膏肓（4,000–9,999）、无药可救（10,000+）。神经领袖属于管理员或版主管理身份，不通过 Token 自动获得。
+
+Fan Token 规则包含注册、资料完善、每日签到、连续签到、内容互动、活动打卡、社区共创、邀请和链上行为，并为高价值操作设置每日/月度上限或人工审核。违规内容、刷屏骚扰、任务作弊通过负 Token 规则处理。PostgreSQL 触发器会在 `user_profiles.fan_token_balance` 变化时自动重新计算普通会员等级。
+
+系统统一使用 `Fan Token`，符号为 `FAN`，视觉上使用 ETH 菱形图标。余额字段为 `user_profiles.fan_token_balance`，规则变化量字段为 `fan_token_rules.token_delta`。Token 配置保存在 `fan_token_config` 表中；当前 `is_onchain=false`、精度为 0，表示它仍是可审计的站内 Token 单位，而不是真实 ETH 或已发行 ERC-20。未来发行链上 Token 时可补充 `chain_id` 和 `contract_address`。
+
+### 删除测试用户
+
+只允许在非生产环境运行。命令会按外键依赖顺序删除用户的会话、角色、资料、钱包、登录身份、登录挑战、画像运行记录和社区成员关系：
+
+```bash
+uv run python -m app.cli.delete_user \
+  --user-id "要删除的 users.id" \
+  --confirm "要删除的 users.id"
+```
+
+如果用户拥有社区，命令默认停止，避免连带删除其他用户的成员关系。确认这些也是测试数据时才显式级联：
+
+```bash
+uv run python -m app.cli.delete_user \
+  --user-id "要删除的 users.id" \
+  --confirm "要删除的 users.id" \
+  --delete-owned-communities
+```
+
+该工具读取当前 `DATABASE_URL`，执行前务必确认连接的是测试数据库。

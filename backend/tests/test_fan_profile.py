@@ -12,7 +12,7 @@ async def test_fan_profile_graph_scores_and_classifies_a_core_fan() -> None:
         {
             "wallet_address": "0x0000000000000000000000000000000000000001",
             "community_id": "fanora",
-            "points": 900,
+            "fan_token_balance": 900,
             "completed_tasks": 12,
             "active_days": 20,
             "referrals": 4,
@@ -34,7 +34,7 @@ async def test_agent_returns_structured_rule_fallback_without_model() -> None:
         FanProfileRequest(
             wallet_address="0x0000000000000000000000000000000000000002",
             community_id="fanora",
-            points=120,
+            fan_token_balance=120,
             completed_tasks=3,
             active_days=4,
         )

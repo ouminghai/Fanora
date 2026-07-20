@@ -4,14 +4,143 @@ import Nav from "./component/Nav";
 
 import Profile from "./component/Profile";
 import { handleDarkMode } from "@/utlis/handleDarkMode";
+import Image from "next/image";
 import Link from "next/link";
 import {
   addMobileMenuToggle,
   removeMenuActive,
 } from "@/utlis/mobileMenuToggle";
 import WalletButton from "../web3/WalletButton";
+import {
+  VIDEO_SOUND_STATE_EVENT,
+  VIDEO_SOUND_TOGGLE_EVENT,
+  type VideoSoundDetail,
+} from "@/lib/videoSound";
 
-export default function Header3() {
+type Header3Props = {
+  showVideoSoundControl?: boolean;
+};
+
+export function BrandBlendMark() {
+  return (
+    <span
+      data-brand-blend
+      aria-hidden="true"
+      className="relative inline-flex h-6 w-9 shrink-0 items-center justify-center"
+    >
+      <span className="absolute left-0.5 h-[1.125rem] w-[1.125rem] rounded-full bg-[#45BFEF]/85 ring-1 ring-white/20 transition-all duration-300 group-hover:translate-x-0.5 group-hover:shadow-[0_0_12px_rgba(69,191,239,.55)]" />
+      <span className="absolute right-0.5 h-[1.125rem] w-[1.125rem] rounded-full bg-[#836EF9]/85 ring-1 ring-white/20 transition-all duration-300 group-hover:-translate-x-0.5 group-hover:shadow-[0_0_12px_rgba(131,110,249,.6)]" />
+      <span className="absolute h-2.5 w-2.5 rounded-full bg-gradient-to-br from-[#72D8F5] to-[#A28FFF] opacity-90 shadow-[0_0_8px_rgba(131,110,249,.45)] transition-transform duration-300 group-hover:scale-110" />
+    </span>
+  );
+}
+
+export function HeaderBrand() {
+  return (
+    <Link
+      href="/"
+      aria-label="Fanora 与 Monad 融合构建"
+      title="Fanora + Monad · Built together"
+      className="group flex shrink-0 items-center gap-1.5 sm:gap-2"
+    >
+      <Image
+        width={600}
+        height={165}
+        src="/img/logo.png"
+        className="h-auto w-[105px] sm:w-[140px] xl:w-[170px] dark:hidden"
+        alt=""
+      />
+      <Image
+        width={600}
+        height={165}
+        src="/img/logo_white.png"
+        className="hidden h-auto w-[105px] sm:w-[140px] xl:w-[170px] dark:block"
+        alt=""
+      />
+      <BrandBlendMark />
+      <Image
+        width={122}
+        height={121}
+        src="/img/monad-mark.svg"
+        className="h-6 w-6 sm:hidden"
+        alt=""
+      />
+      <Image
+        width={644}
+        height={121}
+        src="/img/monad-logo-light.svg"
+        className="hidden h-auto w-[86px] sm:block xl:w-[105px] dark:sm:hidden"
+        alt=""
+      />
+      <Image
+        width={644}
+        height={121}
+        src="/img/monad-logo-dark.svg"
+        className="hidden h-auto w-[86px] xl:w-[105px] dark:sm:block"
+        alt=""
+      />
+    </Link>
+  );
+}
+
+export function VideoSoundToggle() {
+  const [isMuted, setIsMuted] = useState(true);
+
+  useEffect(() => {
+    const handleSoundState = (event: Event) => {
+      setIsMuted((event as CustomEvent<VideoSoundDetail>).detail.muted);
+    };
+
+    window.addEventListener(VIDEO_SOUND_STATE_EVENT, handleSoundState);
+    return () => window.removeEventListener(VIDEO_SOUND_STATE_EVENT, handleSoundState);
+  }, []);
+
+  const toggleSound = () => {
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    window.dispatchEvent(
+      new CustomEvent<VideoSoundDetail>(VIDEO_SOUND_TOGGLE_EVENT, {
+        detail: { muted: nextMuted },
+      }),
+    );
+  };
+
+  const label = isMuted ? "打开视频声音" : "关闭视频声音";
+
+  return (
+    <button
+      type="button"
+      onClick={toggleSound}
+      aria-label={label}
+      aria-pressed={!isMuted}
+      title={label}
+      data-video-sound-toggle
+      className="group ml-2 flex h-10 w-10 items-center justify-center rounded-full border border-jacarta-100 bg-white transition-colors hover:border-transparent hover:bg-accent focus:border-transparent focus:bg-accent dark:border-transparent dark:bg-white/[.15] dark:hover:bg-accent"
+    >
+      {isMuted ? (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          className="h-4 w-4 fill-jacarta-700 transition-colors group-hover:fill-white group-focus:fill-white dark:fill-white"
+          aria-hidden="true"
+        >
+          <path d="M4 9v6h4l5 4V5L8 9H4zm11.3 1.3 1.4-1.4 2.3 2.3 2.3-2.3 1.4 1.4-2.3 2.3 2.3 2.3-1.4 1.4-2.3-2.3-2.3 2.3-1.4-1.4 2.3-2.3-2.3-2.3z" />
+        </svg>
+      ) : (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          className="h-4 w-4 fill-jacarta-700 transition-colors group-hover:fill-white group-focus:fill-white dark:fill-white"
+          aria-hidden="true"
+        >
+          <path d="M4 9v6h4l5 4V5L8 9H4zm11.5-.5a5 5 0 0 1 0 7l-1.4-1.4a3 3 0 0 0 0-4.2l1.4-1.4zm2.8-2.8a9 9 0 0 1 0 12.6l-1.4-1.4a7 7 0 0 0 0-9.8l1.4-1.4z" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
+export default function Header3({ showVideoSoundControl = false }: Header3Props) {
   useEffect(() => {
     addMobileMenuToggle();
     return () => {
@@ -43,11 +172,8 @@ export default function Header3() {
       >
         <div className="flex items-center px-6 py-6 xl:px-24">
           {/* Logo */}
-          <Link href="/" className="shrink-0">
-            <span className="font-display text-2xl font-bold tracking-tight text-jacarta-700 dark:text-white">
-              Fanor<span className="text-accent">A</span>
-            </span>
-          </Link>
+          <HeaderBrand />
+
 
           {/* Search */}
 
@@ -56,11 +182,7 @@ export default function Header3() {
             {/* Mobile Logo / Menu Close */}
             <div className="t-0 fixed left-0 z-10 flex w-full items-center justify-between bg-white p-6 dark:bg-jacarta-800 lg:hidden">
               {/* Mobile Logo */}
-              <Link href="/" className="shrink-0">
-                <span className="font-display text-2xl font-bold tracking-tight text-jacarta-700 dark:text-white">
-                  Fanor<span className="text-accent">A</span>
-                </span>
-              </Link>
+              <HeaderBrand />
 
               {/* Mobile Menu Close */}
               <button
@@ -200,7 +322,7 @@ export default function Header3() {
             <div className="ml-8 hidden lg:flex xl:ml-12">
               {/* Wallet */}
 
-              <WalletButton>
+              {/* <WalletButton>
                 <a className="js-wallet group flex h-10 w-10 items-center justify-center rounded-full border border-jacarta-100 bg-white transition-colors hover:border-transparent hover:bg-accent focus:border-transparent focus:bg-accent dark:border-transparent dark:bg-white/[.15] dark:hover:bg-accent">
                   <svg
                     xmlns="http://www.w3.org/2000/svg"
@@ -213,10 +335,12 @@ export default function Header3() {
                     <path d="M22 6h-7a6 6 0 1 0 0 12h7v2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v2zm-7 2h8v8h-8a4 4 0 1 1 0-8zm0 3v2h3v-2h-3z" />
                   </svg>
                 </a>
-              </WalletButton>
+              </WalletButton> */}
 
               {/* Profile */}
               <Profile />
+
+              {showVideoSoundControl && <VideoSoundToggle />}
 
               {/* Dark Mode */}
               <div
@@ -250,22 +374,9 @@ export default function Header3() {
           {/* Mobile Menu Actions */}
           <div className="ml-auto flex lg:hidden">
             {/* Profile */}
-            <Link
-              href="/edit-profile"
-              className="group ml-2 flex h-10 w-10 items-center justify-center rounded-full border border-jacarta-100 bg-white transition-colors hover:border-transparent hover:bg-accent focus:border-transparent focus:bg-accent dark:border-transparent dark:bg-white/[.15] dark:hover:bg-accent"
-              aria-label="profile"
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                width="24"
-                height="24"
-                className="h-4 w-4 fill-jacarta-700 transition-colors group-hover:fill-white group-focus:fill-white dark:fill-white"
-              >
-                <path fill="none" d="M0 0h24v24H0z" />
-                <path d="M11 14.062V20h2v-5.938c3.946.492 7 3.858 7 7.938H4a8.001 8.001 0 0 1 7-7.938zM12 13c-3.315 0-6-2.685-6-6s2.685-6 6-6 6 2.685 6 6-2.685 6-6 6z" />
-              </svg>
-            </Link>
+            <Profile />
+
+            {showVideoSoundControl && <VideoSoundToggle />}
 
             {/* Dark Mode */}
             <div

@@ -5,18 +5,18 @@ import Auction from "@/components/homes/common/Auction";
 import Collections from "@/components/homes/common/Collections";
 import Process from "@/components/homes/common/Process";
 import Featured from "@/components/homes/common/Featured";
-import CoverFlowSlider from "@/components/homes/home-4/CoverFlowSlider";
-import Hero from "@/components/homes/home-4/Hero";
+import CoverFlowSlider from "@/components/homes/home/CoverFlowSlider";
+import Hero from "@/components/homes/home/Hero";
 
 import Partners from "@/components/common/Partners";
 
 export const metadata = {
   title: "Fanora Protocol | Proof of Fandom",
 };
-export default function HomePag4() {
+export default function HomePage() {
   return (
     <>
-      <Header3 />
+      <Header3 showVideoSoundControl />
       <main>
         <Hero />
         <CoverFlowSlider />
