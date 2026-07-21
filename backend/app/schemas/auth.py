@@ -64,6 +64,7 @@ class Web3AuthLoginRequest(BaseModel):
     wallet_address: str
     signature: str = Field(min_length=130, max_length=132)
     id_token: str = Field(min_length=20)
+    app_pub_key: str | None = Field(default=None, min_length=66, max_length=132)
     wallet_type: Literal["embedded", "external"] = "embedded"
 
     @field_validator("wallet_address")
@@ -79,6 +80,18 @@ class Web3AuthLoginRequest(BaseModel):
         encoded = value[2:] if value.startswith("0x") else value
         if len(encoded) != 130 or not all(character in "0123456789abcdefABCDEF" for character in encoded):
             raise ValueError("Invalid EVM signature")
+        return value
+
+    @field_validator("app_pub_key")
+    @classmethod
+    def validate_app_pub_key(cls, value: str | None) -> str | None:
+        if value is None or value == "":
+            return None
+        encoded = value[2:] if value.startswith("0x") else value
+        if len(encoded) not in {66, 128, 130} or not all(
+            character in "0123456789abcdefABCDEF" for character in encoded
+        ):
+            raise ValueError("Invalid Web3Auth app public key")
         return value
 
 

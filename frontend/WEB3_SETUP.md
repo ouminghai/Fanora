@@ -1,50 +1,65 @@
-# Web3 接入说明
+# Web3Auth、MetaMask 与 Fanora 合约接入说明
 
-项目现在使用主流的 `wagmi + viem + RainbowKit + TanStack Query` 组合。
+Fanora 前端使用 Web3Auth Modal 统一处理嵌入式身份和外部钱包登录。正式入会必须在 Modal 中选择 MetaMask，由用户钱包弹窗确认 Gateway 交易。
 
-## 1. 本地环境变量
+## 1. 环境变量
 
-复制 `.env.example` 为 `.env.local`，至少填写：
+复制 `.env.example` 为 `.env` 或 `.env.local`。主要配置包括：
 
-```bash
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=你的项目ID
+```env
+NEXT_PUBLIC_WEB3AUTH_CLIENT_ID=Web3Auth项目ClientID
+NEXT_PUBLIC_WEB3AUTH_NETWORK=sapphire_devnet
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
+NEXT_PUBLIC_MONAD_TESTNET_RPC_URL=https://testnet-rpc.monad.xyz
+NEXT_PUBLIC_MEMBERSHIP_PAYMENT_CONTRACT_ADDRESS_MONAD_TESTNET=0x...
+NEXT_PUBLIC_MEMBERSHIP_IDENTITY_CONTRACT_ADDRESS_MONAD_TESTNET=0x...
+NEXT_PUBLIC_COLLECTIBLES_CONTRACT_ADDRESS_MONAD_TESTNET=0x...
 ```
 
-Project ID 在 [WalletConnect Cloud](https://cloud.walletconnect.com) 免费创建。没有该 ID 时，浏览器插件钱包通常仍可测试，但 WalletConnect 扫码连接不能正常使用。
+`NEXT_PUBLIC_` 变量会进入浏览器，只能填写公开配置，严禁填写部署私钥、运营私钥、Pinata JWT 或其他服务端密钥。
 
-开发阶段使用 Monad Testnet。公共 RPC 可以直接启动项目；需要更稳定的请求额度时，再配置专用 RPC。
-
-## 2. 关键文件
-
-- `lib/web3/config.ts`：支持的链、RPC、RainbowKit 和 wagmi 配置。
-- `components/providers/Web3Provider.tsx`：全局 Web3 状态和请求缓存。
-- `components/web3/WalletButton.tsx`：统一的钱包连接、切链和账户入口。
-- `lib/web3/contracts.ts`：不同链上的 Badge 合约地址。
-- `lib/web3/abi/badge.ts`：Badge 合约 ABI，当前使用标准 ERC-1155 读取接口。
-- `hooks/useBadgeBalance.ts`：按 Badge ID 读取当前钱包持有数量的示例。
-
-## 3. 接入 Badge 合约
-
-合约部署后，把对应网络地址写入 `.env.local`：
+合约发布后无需手工复制地址：
 
 ```bash
-NEXT_PUBLIC_BADGE_CONTRACT_ADDRESS_MONAD_TESTNET=0x...
+cd contracts
+npm run sync:testnet
 ```
 
-然后把 Solidity 编译生成的 ABI 放进 `lib/web3/abi/badge.ts`。只有 ABI 中真实存在 `claim` 或 `mint` 方法时，前端才应使用 `useWriteContract` 发起交易；不要在前端猜测合约函数签名。
+## 2. 登录与付款流程
 
-标准交易流程是：
+1. 前端初始化 Web3Auth Modal。
+2. 用户选择 MetaMask 或 Web3Auth 嵌入式身份完成登录。
+3. 后端生成一次性 challenge，用户钱包执行 `personal_sign`。
+4. 后端验证 challenge、签名和 Web3Auth Identity Token 后创建 Fanora 会话。
+5. 入会页要求当前连接器为 MetaMask，并核对 MetaMask 当前账户与登录主钱包一致。
+6. 前端读取后端返回的 Gateway 地址、`paymentId` 和链上当前会费。
+7. 前端通过 `eth_sendTransaction` 请求 MetaMask 调用 `join(paymentId)`，不读取用户私钥。
+8. 后端验证 `MembershipPaid` 事件后激活正式会员，并尝试铸造初始 ERC-721 身份。
 
-1. 使用 `useSimulateContract` 预检查交易。
-2. 使用 `useWriteContract` 请求钱包签名。
-3. 使用 `useWaitForTransactionReceipt` 等待链上确认。
-4. 成功后刷新相关的 `useReadContract` 查询。
+## 3. 合约与 ABI
+
+- `shared/contracts/FanoraMembershipGateway.json`
+- `shared/contracts/FanoraMembershipIdentity.json`
+- `shared/contracts/FanoraCollectibles.json`
+- `shared/contracts/monadTestnet.deployment.json`
+
+ABI 由 `contracts/scripts/export-abis.ts` 自动导出，禁止在前端手工维护第二份 ABI。
+
+运营铸造、等级升级、metadata 管理、会费管理和提现都由后端最小权限运营钱包执行。前端只能发起用户自己的入会付款交易和读取公开状态。
 
 ## 4. 常用命令
 
 ```bash
 npm run dev
+npm run typecheck
 npm run build
 ```
 
-钱包连接不是传统账号密码登录。若后续需要服务端会话和权限控制，可以再接 SIWE（Sign-In with Ethereum），由用户签名随机 nonce，服务端验证签名后创建会话。
+合约完整发布与同步命令：
+
+```bash
+cd contracts
+npm run release:testnet
+```
+
+详细参数见 `docs/CONTRACT_DEPLOYMENT.md`。

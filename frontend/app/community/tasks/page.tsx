@@ -4,7 +4,7 @@ import TaskGallery from "@/components/community/TaskGallery";
 
 export const metadata = {
   title: "粉丝任务中心 | Fanora",
-  description: "浏览、领取并完成 Fanora 官方社区粉丝任务。",
+  description: "浏览、领取并完成 Fanora 链上社区粉丝任务。",
 };
 
 export default function CommunityTasksPage() {

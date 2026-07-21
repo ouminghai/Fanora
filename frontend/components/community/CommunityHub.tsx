@@ -3,13 +3,14 @@
 import axios from "axios";
 import Image from "next/image";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import FanTokenAmount from "@/components/common/FanTokenAmount";
+import CheckInCalendar from "@/components/community/CheckInCalendar";
 import UserAvatar from "@/components/profile/UserAvatar";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { fanTaskCatalogByKey } from "@/data/fanora";
 import { api } from "@/lib/api/client";
 import type {
-  CommunityPostDetail,
   CommunityPostSummary,
   DailyCheckInStatus,
   FanTask,
@@ -23,6 +24,28 @@ const categoryLabels: Record<string, string> = {
   story: "故事",
   creation: "共创",
 };
+const TASK_PREVIEW_LIMIT = 4;
+
+const taskModeLabels: Record<string, string> = {
+  daily_check_in: "每日签到",
+  post_reply: "回复互动",
+  content_publish: "内容共创",
+  page_action: "专属活动",
+  streak: "连续挑战",
+  event_check_in: "活动打卡",
+  future: "未来任务",
+};
+
+function taskPreview(task: FanTask) {
+  const catalog = task.presentation.catalog_key
+    ? fanTaskCatalogByKey.get(task.presentation.catalog_key)
+    : undefined;
+
+  return {
+    imageUrl: task.presentation.image_url || catalog?.imageSrc || "/img/fanora/activity-community.jpg",
+    order: catalog?.order ?? Number.MAX_SAFE_INTEGER,
+  };
+}
 
 function getErrorMessage(error: unknown) {
   if (axios.isAxiosError(error)) {
@@ -47,8 +70,6 @@ export default function CommunityHub() {
   const [loading, setLoading] = useState(true);
   const [action, setAction] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
-  const [showComposer, setShowComposer] = useState(false);
-  const [draft, setDraft] = useState({ title: "", body: "", category: "creation" });
 
   const loadPublic = useCallback(async () => {
     const [communityResponse, postsResponse, tasksResponse] = await Promise.all([
@@ -111,6 +132,12 @@ export default function CommunityHub() {
     () => tasks.filter((task) => task.participation_status === "rewarded").length,
     [tasks],
   );
+  const featuredTasks = useMemo(
+    () => [...tasks]
+      .sort((left, right) => taskPreview(left).order - taskPreview(right).order)
+      .slice(0, TASK_PREVIEW_LIMIT),
+    [tasks],
+  );
 
   const join = async () => {
     if (!user) return;
@@ -121,7 +148,7 @@ export default function CommunityHub() {
       setCommunity(response.data);
       await refreshUser();
       await loadPrivate();
-      setNotice({ kind: "success", text: "已加入 Fanora 官方社区，并记录到你的粉丝身份。" });
+      setNotice({ kind: "success", text: "已加入 Fanora 链上社区，并记录到你的粉丝身份。" });
     } catch (error) {
       setNotice({ kind: "error", text: getErrorMessage(error) });
     } finally {
@@ -163,23 +190,6 @@ export default function CommunityHub() {
     }
   };
 
-  const createPost = async (event: FormEvent) => {
-    event.preventDefault();
-    setAction("create-post");
-    setNotice(null);
-    try {
-      const response = await api.post<CommunityPostDetail>("/community/posts", draft);
-      setDraft({ title: "", body: "", category: "creation" });
-      setShowComposer(false);
-      await loadPublic();
-      setNotice({ kind: "success", text: `《${response.data.title}》已发布到创作社区。` });
-    } catch (error) {
-      setNotice({ kind: "error", text: getErrorMessage(error) });
-    } finally {
-      setAction(null);
-    }
-  };
-
   if (loading) {
     return (
       <main className="min-h-screen bg-light-base pt-36 dark:bg-jacarta-900">
@@ -191,20 +201,20 @@ export default function CommunityHub() {
   }
 
   return (
-    <main className="min-h-screen bg-[#F7F7FB] pb-24 pt-28 dark:bg-jacarta-900 md:pt-32">
+    <main className="community-page-enter min-h-screen bg-[#F7F7FB] pb-24 pt-28 dark:bg-jacarta-900 md:pt-32">
       <section className="container">
-        <div className="relative overflow-hidden rounded-[2rem] bg-[#171A43] px-6 py-8 text-white shadow-2xl md:px-10 md:py-12">
+        <div className="community-hero-enter relative overflow-hidden rounded-[2rem] bg-[#171A43] px-6 py-8 text-white shadow-2xl md:px-10 md:py-12">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_78%_18%,rgba(131,88,255,.55),transparent_34%),radial-gradient(circle_at_20%_90%,rgba(69,191,239,.22),transparent_28%)]" />
           <div className="relative flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
             <div className="max-w-3xl">
-              <div className="mb-5 flex items-center gap-3">
+              {/* <div className="mb-5 flex items-center gap-3">
                 <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white p-2 shadow-lg">
                   <Image src={community?.logo_url || "/img/logo.png"} alt="" width={120} height={40} className="h-auto w-full" />
                 </div>
                 <span className="rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold text-white/80">
-                  唯一官方社区
+                  链上共创空间
                 </span>
-              </div>
+              </div> */}
               <h1 className="font-display text-3xl font-semibold md:text-5xl">{community?.name}</h1>
               <p className="mt-4 max-w-2xl text-sm leading-7 text-white/70 md:text-base">{community?.description}</p>
               <div className="mt-6 flex flex-wrap gap-5 text-sm text-white/65">
@@ -220,7 +230,7 @@ export default function CommunityHub() {
                 </Link>
               ) : !joined ? (
                 <button onClick={() => void join()} disabled={action === "join"} className="rounded-full bg-accent px-7 py-3.5 font-semibold text-white shadow-accent-volume disabled:opacity-60">
-                  {action === "join" ? "加入中…" : "加入官方社区"}
+                  {action === "join" ? "加入中…" : "加入链上社区"}
                 </button>
               ) : (
                 <span className="rounded-full border border-green/35 bg-green/15 px-6 py-3 font-semibold text-green">✓ 已加入社区</span>
@@ -231,99 +241,124 @@ export default function CommunityHub() {
         </div>
 
         {notice && (
-          <div className={`mt-6 rounded-2xl border px-5 py-4 text-sm font-semibold ${notice.kind === "success" ? "border-green/20 bg-green/10 text-green" : "border-red/20 bg-red/10 text-red"}`}>
+          <div className={`community-notice-enter mt-6 rounded-2xl border px-5 py-4 text-sm font-semibold ${notice.kind === "success" ? "border-green/20 bg-green/10 text-green" : "border-red/20 bg-red/10 text-red"}`}>
             {notice.text}
           </div>
         )}
 
         <div className="mt-8 grid gap-8 xl:grid-cols-[1fr_340px]">
           <div className="space-y-8">
-            <section id="check-in" className="scroll-mt-32 overflow-hidden rounded-[2rem] bg-white shadow-sm dark:bg-jacarta-800">
-              <div className="grid md:grid-cols-[1.1fr_.9fr]">
-                <div className="p-7 md:p-9">
-                  <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">Daily check-in</p>
-                  <h2 className="mt-3 font-display text-2xl font-semibold text-jacarta-700 dark:text-white">每日签到</h2>
-                  <p className="mt-3 max-w-xl text-sm leading-7 text-jacarta-500 dark:text-jacarta-300">每天一次，由服务端按北京时间记录。重复点击不会重复获得 FAN，连续七天还有额外奖励。</p>
-                  <div className="mt-6 flex flex-wrap gap-3">
-                    <div className="rounded-2xl bg-jacarta-50 px-5 py-4 dark:bg-white/[.05]">
+            <section id="check-in" className="community-section-enter community-section-enter--1 scroll-mt-32 overflow-hidden rounded-[2rem] bg-white shadow-sm dark:bg-jacarta-800">
+              <div className="p-7 md:p-9">
+                <p className="text-xs font-bold uppercase text-accent">Daily check-in</p>
+                <h2 className="mt-3 font-display text-2xl font-semibold text-jacarta-700 dark:text-white">每日签到</h2>
+                <p className="mt-3 max-w-2xl text-sm leading-7 text-jacarta-500 dark:text-jacarta-300">每天一次，由服务端按北京时间记录。重复点击不会重复获得 FAN，连续七天还有额外奖励。</p>
+
+                <div className="mt-7 grid gap-5 lg:grid-cols-[minmax(0,1fr)_240px]">
+                  <CheckInCalendar checkIn={checkIn} />
+                  <div className="flex flex-col gap-4">
+                    <div className="community-stat-card rounded-lg bg-jacarta-50 p-5 dark:bg-white/[.05]">
                       <p className="text-xs text-jacarta-400">连续签到</p>
-                      <p className="mt-1 font-display text-2xl font-semibold text-jacarta-700 dark:text-white">{checkIn?.streak_days || 0} 天</p>
+                      <p className="mt-2 font-display text-3xl font-semibold text-jacarta-700 dark:text-white">{checkIn?.streak_days || 0} 天</p>
+                      <p className="mt-2 text-xs leading-5 text-jacarta-400">连续 7 天可获得额外奖励</p>
                     </div>
-                    <div className="rounded-2xl bg-accent/10 px-5 py-4">
+                    <div className="community-stat-card rounded-lg bg-accent/10 p-5">
                       <p className="text-xs text-accent">今日奖励</p>
-                      <FanTokenAmount amount={checkIn?.reward_fan_tokens || 20} className="mt-1 font-display text-2xl font-semibold text-accent" />
+                      <FanTokenAmount amount={checkIn?.reward_fan_tokens || 20} className="mt-2 font-display text-3xl font-semibold text-accent" />
+                      <p className="mt-2 text-xs leading-5 text-accent/70">签到后自动进入 FAN 流水</p>
                     </div>
-                  </div>
-                </div>
-                <div className="flex min-h-64 items-center justify-center bg-[url('/img/fanora/activity-checkin.jpg')] bg-cover bg-center p-8">
-                  <div className="w-full max-w-xs rounded-3xl border border-white/20 bg-[#101436]/80 p-6 text-center text-white backdrop-blur-lg">
-                    {!user ? (
-                      <Link href="/login" className="block rounded-full bg-accent py-3.5 font-semibold">登录后签到</Link>
-                    ) : !user.is_official_member ? (
-                      <Link href="/membership/join" className="block rounded-full bg-accent py-3.5 font-semibold">缴纳 1 MON 解锁签到</Link>
-                    ) : !joined ? (
-                      <button onClick={() => void join()} className="w-full rounded-full bg-accent py-3.5 font-semibold">先加入社区</button>
-                    ) : (
-                      <button
-                        onClick={() => void performCheckIn()}
-                        disabled={checkIn?.checked_in || action === "check-in"}
-                        className="w-full rounded-full bg-accent py-3.5 font-semibold shadow-accent-volume disabled:bg-green disabled:shadow-none"
-                      >
-                        {action === "check-in" ? "签到中…" : checkIn?.checked_in ? "✓ 今日已签到" : "立即签到"}
-                      </button>
-                    )}
-                    <p className="mt-4 text-xs leading-5 text-white/60">签到事实与奖励流水都保存在 Fanora 服务端。</p>
+                    <div className="mt-auto rounded-lg bg-[#101436] p-5 text-center text-white">
+                      {!user ? (
+                        <Link href="/login" className="community-motion-button block rounded-full bg-accent py-3.5 font-semibold">登录后签到</Link>
+                      ) : !user.is_official_member ? (
+                        <Link href="/membership/join" className="community-motion-button block rounded-full bg-accent py-3.5 font-semibold">缴纳会费解锁签到</Link>
+                      ) : !joined ? (
+                        <button onClick={() => void join()} className="community-motion-button w-full rounded-full bg-accent py-3.5 font-semibold">先加入社区</button>
+                      ) : (
+                        <button
+                          onClick={() => void performCheckIn()}
+                          disabled={checkIn?.checked_in || action === "check-in"}
+                          className="community-motion-button w-full rounded-full bg-accent py-3.5 font-semibold shadow-accent-volume disabled:bg-green disabled:shadow-none"
+                        >
+                          {action === "check-in" ? "签到中…" : checkIn?.checked_in ? "✓ 今日已签到" : "立即签到"}
+                        </button>
+                      )}
+                      <p className="mt-3 text-xs leading-5 text-white/55">签到记录与奖励均由服务端保存</p>
+                    </div>
                   </div>
                 </div>
               </div>
             </section>
 
-            <section id="tasks" className="scroll-mt-32 rounded-[2rem] bg-white p-7 shadow-sm dark:bg-jacarta-800 md:p-9">
+            <section id="tasks" className="community-section-enter community-section-enter--2 scroll-mt-32 overflow-hidden rounded-[2rem] bg-[#101436] p-6 text-white shadow-[0_24px_60px_rgba(13,16,45,.2)] md:p-9">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">Fan missions</p>
-                  <h2 className="mt-3 font-display text-2xl font-semibold text-jacarta-700 dark:text-white">任务模块</h2>
-                  <p className="mt-2 text-sm text-jacarta-500 dark:text-jacarta-300">领取后回复指定帖子，发布成功即由系统验证并发放 FAN，无需人工审核。</p>
+                  <p className="text-xs font-bold uppercase tracking-[.2em] text-accent-light">Fan missions</p>
+                  <h2 className="mt-3 font-display text-2xl font-semibold">任务</h2>
+                  <p className="mt-2 text-sm text-white/55">完成真实互动后由系统自动验证并发放 FAN。</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="rounded-full bg-green/10 px-4 py-2 text-xs font-semibold text-green">自动验证 · 幂等奖励</span>
-                  <Link href="/community/tasks" className="group inline-flex items-center gap-2 rounded-full border border-accent/20 px-4 py-2 text-xs font-semibold text-accent transition-all hover:bg-accent hover:text-white">
+                  <span className="rounded-full border border-green/25 bg-green/10 px-4 py-2 text-xs font-semibold text-green">自动验证</span>
+                  <Link href="/community/tasks" className="group inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs font-semibold text-white transition-colors hover:border-accent hover:bg-accent">
                     更多 <span className="transition-transform group-hover:translate-x-1">→</span>
                   </Link>
                 </div>
               </div>
-              <div className="mt-7 grid gap-5 md:grid-cols-2">
-                {tasks.map((task) => {
+              <div className="mt-7 space-y-4">
+                {featuredTasks.map((task, taskIndex) => {
                   const rewarded = task.participation_status === "rewarded";
                   const claimed = task.participation_status === "claimed";
+                  const active = task.status === "published";
+                  const view = taskPreview(task);
+                  const taskAction = claimed || rewarded
+                    ? `/community/posts/${task.target_post_id}`
+                    : !user
+                      ? "/login"
+                      : !user.is_official_member
+                        ? "/membership/join"
+                        : null;
                   return (
-                    <article key={task.id} className="flex flex-col rounded-3xl border border-jacarta-100 p-6 dark:border-white/10">
-                      <div className="flex items-start justify-between gap-4">
-                        <span className={`rounded-full px-3 py-1 text-xs font-semibold ${rewarded ? "bg-green/10 text-green" : claimed ? "bg-orange/10 text-orange" : "bg-accent/10 text-accent"}`}>
-                          {rewarded ? "已完成" : claimed ? "进行中" : "可领取"}
-                        </span>
-                        <FanTokenAmount amount={task.reward_fan_tokens} className="font-display text-lg font-semibold text-accent" />
+                    <article key={task.id} style={{ animationDelay: `${taskIndex * 70}ms` }} className="community-list-item group grid min-h-36 grid-cols-[7.25rem_minmax(0,1fr)] overflow-hidden rounded-[1.25rem] border border-white/10 bg-[#171B49] hover:border-accent/45 md:min-h-40 md:grid-cols-[9.5rem_minmax(0,1fr)]">
+                      <div className="relative min-h-full overflow-hidden">
+                        <Image
+                          src={view.imageUrl}
+                          alt={task.title}
+                          fill
+                          sizes="(max-width: 767px) 116px, 152px"
+                          className="object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
                       </div>
-                      <h3 className="mt-5 font-display text-xl font-semibold text-jacarta-700 dark:text-white">{task.title}</h3>
-                      <p className="mt-3 flex-1 text-sm leading-6 text-jacarta-500 dark:text-jacarta-300">{task.description}</p>
-                      <p className="mt-4 truncate rounded-xl bg-jacarta-50 px-3 py-2 text-xs text-jacarta-500 dark:bg-white/[.04] dark:text-jacarta-300">指定帖子：{task.target_post_title}</p>
-                      <div className="mt-5 flex gap-3">
-                        {claimed || rewarded ? (
-                          <Link href={`/community/posts/${task.target_post_id}`} className="flex-1 rounded-full bg-accent px-5 py-3 text-center text-sm font-semibold text-white">
-                            {rewarded ? "查看回复" : "去回复完成"}
+                      <div className="flex min-w-0 items-center gap-4 p-4 md:gap-6 md:p-5">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-3 text-xs">
+                            <span className={`font-semibold ${rewarded ? "text-green" : claimed ? "text-orange" : active ? "text-accent-light" : "text-white/40"}`}>
+                              {rewarded ? "已完成" : claimed ? "进行中" : active ? "可领取" : "即将开放"}
+                            </span>
+                            <span className="text-white/35">{taskModeLabels[task.task_type] || task.task_type}</span>
+                          </div>
+                          <h3 className="mt-2 truncate font-display text-base font-semibold md:text-lg">{task.title}</h3>
+                          <p className="mt-1 line-clamp-2 text-sm leading-5 text-white/55">{task.description}</p>
+                          <div className="mt-3 flex items-center gap-3 text-xs text-white/40">
+                            <FanTokenAmount amount={task.reward_fan_tokens} className="font-semibold text-accent-light" />
+                            <span className="truncate">{task.target_post_title || "链上活动任务"}</span>
+                          </div>
+                        </div>
+                        {taskAction ? (
+                          <Link href={taskAction} aria-label={`打开任务：${task.title}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/15 text-lg text-white transition-colors hover:border-accent hover:bg-accent">
+                            →
                           </Link>
                         ) : user && task.eligible ? (
-                          <button onClick={() => void claimTask(task)} disabled={action === `task:${task.id}`} className="flex-1 rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white disabled:opacity-60">
-                            {action === `task:${task.id}` ? "领取中…" : "领取任务"}
+                          <button onClick={() => void claimTask(task)} disabled={action === `task:${task.id}`} aria-label={`领取任务：${task.title}`} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-accent/60 text-lg text-accent-light transition-colors hover:bg-accent hover:text-white disabled:cursor-wait disabled:opacity-50">
+                            {action === `task:${task.id}` ? "…" : "→"}
                           </button>
-                        ) : !user ? (
-                          <Link href="/login" className="flex-1 rounded-full bg-accent px-5 py-3 text-center text-sm font-semibold text-white">登录后领取</Link>
-                        ) : !user.is_official_member ? (
-                          <Link href="/membership/join" className="flex-1 rounded-full bg-accent px-5 py-3 text-center text-sm font-semibold text-white">正式入会后领取</Link>
                         ) : !joined ? (
-                          <button onClick={() => void join()} className="flex-1 rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white">先加入社区</button>
+                          <button onClick={() => void join()} aria-label="加入链上社区" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-accent/60 text-lg text-accent-light transition-colors hover:bg-accent hover:text-white">
+                            →
+                          </button>
                         ) : (
-                          <span className="flex-1 rounded-full bg-jacarta-50 px-5 py-3 text-center text-sm font-semibold text-jacarta-400 dark:bg-white/[.05]">{task.unavailable_reason}</span>
+                          <span title={task.unavailable_reason || "任务暂不可领取"} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-white/10 text-white/30">
+                            −
+                          </span>
                         )}
                       </div>
                     </article>
@@ -332,44 +367,24 @@ export default function CommunityHub() {
               </div>
             </section>
 
-            <section id="creation" className="scroll-mt-32 rounded-[2rem] bg-white p-7 shadow-sm dark:bg-jacarta-800 md:p-9">
+            <section id="creation" className="community-section-enter community-section-enter--3 scroll-mt-32 rounded-[2rem] bg-white p-7 shadow-sm dark:bg-jacarta-800 md:p-9">
               <div className="flex flex-wrap items-end justify-between gap-4">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[.2em] text-accent">Creation community</p>
-                  <h2 className="mt-3 font-display text-2xl font-semibold text-jacarta-700 dark:text-white">创作社区模块</h2>
+                  <h2 className="mt-3 font-display text-2xl font-semibold text-jacarta-700 dark:text-white">创作社区</h2>
                   <p className="mt-2 text-sm text-jacarta-500 dark:text-jacarta-300">分享故事、歌单与作品，也可以进入主题帖参与任务。</p>
                 </div>
                 <div className="flex items-center gap-3">
                   <Link href="/community/creations" className="group inline-flex items-center gap-2 rounded-full border border-accent/20 px-4 py-2 text-sm font-semibold text-accent transition-all hover:bg-accent hover:text-white">
                     更多 <span className="transition-transform group-hover:translate-x-1">→</span>
                   </Link>
-                  {user?.is_official_member && joined && (
-                    <button onClick={() => setShowComposer((current) => !current)} className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5">
-                      {showComposer ? "收起发布框" : "+ 发布创作"}
-                    </button>
-                  )}
+                  <Link href="/community/creations?composer=1" className="rounded-full bg-accent px-5 py-3 text-sm font-semibold text-white transition-transform hover:-translate-y-0.5">+ 发布创作</Link>
                 </div>
               </div>
 
-              {showComposer && (
-                <form onSubmit={createPost} className="mt-6 rounded-3xl border border-accent/20 bg-accent/[.035] p-5 md:p-6">
-                  <div className="grid gap-4 md:grid-cols-[1fr_160px]">
-                    <input required minLength={4} maxLength={120} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="给创作起一个标题" className="rounded-xl border-jacarta-100 bg-white dark:border-white/10 dark:bg-jacarta-700 dark:text-white" />
-                    <select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} className="rounded-xl border-jacarta-100 bg-white dark:border-white/10 dark:bg-jacarta-700 dark:text-white">
-                      <option value="creation">共创</option>
-                      <option value="story">故事</option>
-                      <option value="music">音乐</option>
-                      <option value="discussion">讨论</option>
-                    </select>
-                  </div>
-                  <textarea required minLength={10} maxLength={10000} rows={5} value={draft.body} onChange={(event) => setDraft({ ...draft, body: event.target.value })} placeholder="写下你的内容…" className="mt-4 w-full resize-none rounded-xl border-jacarta-100 bg-white dark:border-white/10 dark:bg-jacarta-700 dark:text-white" />
-                  <button disabled={action === "create-post"} className="mt-4 rounded-full bg-accent px-6 py-3 text-sm font-semibold text-white disabled:opacity-60">{action === "create-post" ? "发布中…" : "发布到社区"}</button>
-                </form>
-              )}
-
               <div className="mt-7 grid gap-5 md:grid-cols-2">
-                {posts.map((post) => (
-                  <Link key={post.id} href={`/community/posts/${post.id}`} className="group overflow-hidden rounded-3xl border border-jacarta-100 transition-all hover:-translate-y-1 hover:shadow-xl dark:border-white/10">
+                {posts.map((post, postIndex) => (
+                  <Link key={post.id} style={{ animationDelay: `${Math.min(postIndex, 7) * 65}ms` }} href={`/community/posts/${post.id}`} className="community-grid-card group overflow-hidden rounded-3xl border border-jacarta-100 dark:border-white/10">
                     <div className="h-44 overflow-hidden bg-jacarta-100 dark:bg-jacarta-700">
                       {post.cover_url ? <Image src={post.cover_url} alt="" width={720} height={360} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /> : <div className="h-full bg-gradient-to-br from-accent/60 to-[#45BFEF]/40" />}
                     </div>
@@ -392,8 +407,8 @@ export default function CommunityHub() {
             </section>
           </div>
 
-          <aside className="space-y-6">
-            <section className="rounded-[2rem] bg-white p-6 shadow-sm dark:bg-jacarta-800">
+          <aside className="community-sidebar-enter space-y-6">
+            <section className="community-stat-card rounded-[2rem] bg-white p-6 shadow-sm dark:bg-jacarta-800">
               <p className="text-xs font-bold uppercase tracking-[.18em] text-accent">Your progress</p>
               <h2 className="mt-2 font-display text-xl font-semibold text-jacarta-700 dark:text-white">我的社区成长</h2>
               {user ? (
@@ -417,7 +432,7 @@ export default function CommunityHub() {
             </section>
 
             {user && (
-              <section className="rounded-[2rem] bg-white p-6 shadow-sm dark:bg-jacarta-800">
+              <section className="community-stat-card rounded-[2rem] bg-white p-6 shadow-sm dark:bg-jacarta-800">
                 <div className="flex items-center justify-between">
                   <h2 className="font-display text-lg font-semibold text-jacarta-700 dark:text-white">最近 FAN 明细</h2>
                   <span className="text-xs text-jacarta-400">不可直接修改</span>

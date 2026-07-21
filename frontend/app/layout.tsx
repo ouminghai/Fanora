@@ -1,6 +1,8 @@
 import "@rainbow-me/rainbowkit/styles.css";
 import "../public/styles/style.css";
 import "swiper/css";
+import "swiper/css/pagination";
+import "photoswipe/dist/photoswipe.css";
 import "tippy.js/dist/tippy.css";
 
 import BidModal from "@/components/modals/BidModal";

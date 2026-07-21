@@ -1,11 +1,11 @@
 from datetime import timedelta
 
 from eth_account import Account
-from sqlmodel import select
+from sqlmodel import col, select
 
 from app.core.database import database_service
 from app.models.base import utc_now
-from app.models.community import FanTokenLedger, TaskParticipation
+from app.models.community import CommunityPost, FanTokenLedger, TaskParticipation
 from app.models.user import User, UserProfile, UserSession, Wallet
 from app.services.auth import hash_session_token
 from app.services.product_seed import (
@@ -65,6 +65,13 @@ async def test_join_check_in_reply_task_and_ledger_are_idempotent(client):
     assert first_check_in.status_code == 200
     assert first_check_in.json()["already_checked_in"] is False
     assert first_check_in.json()["reward_fan_tokens"] == 20
+    assert first_check_in.json()["monthly_reward_fan_tokens"] == 20
+    assert first_check_in.json()["monthly_records"] == [
+        {
+            "check_in_date": first_check_in.json()["check_in_date"],
+            "reward_fan_tokens": 20,
+        }
+    ]
     assert second_check_in.status_code == 200
     assert second_check_in.json()["already_checked_in"] is True
 
@@ -171,19 +178,38 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
 
     story_claim = client.post(f"/api/v1/tasks/{FAN_STORY_TASK_ID}/claim", headers=headers)
     assert story_claim.status_code == 200
+    assert story_claim.json()["required_tag"] == "#粉丝故事图文征集"
     story_post = client.post(
         "/api/v1/community/posts",
         headers=headers,
         json={
             "title": "一次值得长期保存的现场记忆",
-            "body": "## 最难忘的瞬间\n\n我最想留下的是 **全场合唱** 结束后，大家仍然不愿离开的那几分钟。",
+            "body": "#粉丝故事图文征集\n\n## 最难忘的瞬间\n\n我最想留下的是 **全场合唱** 结束后，大家仍然不愿离开的那几分钟。",
             "category": "story",
             "cover_url": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=",
+            "image_urls": [
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=",
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII=",
+            ],
         },
     )
     assert story_post.status_code == 201
-    assert story_post.json()["body"].startswith("## 最难忘的瞬间")
+    assert story_post.json()["body"].startswith("#粉丝故事图文征集")
     assert story_post.json()["cover_url"].startswith("data:image/png;base64,")
+    assert len(story_post.json()["image_urls"]) == 2
+    async with database_service.session() as session:
+        post_publish_entries = list(
+            (
+                await session.execute(
+                    select(FanTokenLedger).where(
+                        FanTokenLedger.user_id == user_id,
+                        FanTokenLedger.source_type == "rule:post-publish",
+                    )
+                )
+            ).scalars().all()
+        )
+        assert len(post_publish_entries) == 1
+        assert post_publish_entries[0].delta == 5
     post_list = client.get("/api/v1/community/posts", headers=headers).json()
     story_summary = next(item for item in post_list if item["id"] == story_post.json()["id"])
     assert "##" not in story_summary["body_preview"]
@@ -200,11 +226,26 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
     fear_complete = client.post(
         f"/api/v1/tasks/{FEAR_TASK_ID}/complete",
         headers=headers,
-        json={"interaction_note": "最后一首歌结束时，全场一起亮起灯光的瞬间最难忘。"},
+        json={
+            "interaction_note": "最后一首歌结束时，全场一起亮起灯光的瞬间最难忘。",
+            "image_urls": ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII="],
+        },
     )
     assert fear_complete.status_code == 200
     assert fear_complete.json()["participation_status"] == "rewarded"
     assert fear_complete.json()["presentation"]["special"] is True
+
+    async with database_service.session() as session:
+        fear_participation = (
+            await session.execute(
+                select(TaskParticipation).where(
+                    TaskParticipation.task_id == FEAR_TASK_ID,
+                    TaskParticipation.user_id == user_id,
+                )
+            )
+        ).scalar_one()
+        assert fear_participation.submission["body"].startswith("最后一首歌")
+        assert len(fear_participation.submission["image_urls"]) == 1
 
     tasks = client.get("/api/v1/tasks", headers=headers).json()
     statuses = {task["id"]: task["participation_status"] for task in tasks}
@@ -234,7 +275,7 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
 
 async def test_post_reactions_and_two_level_comments(client):
     raw_token = "community-social-interaction-session"
-    await create_official_member(raw_token)
+    user_id = await create_official_member(raw_token)
     headers = {"Authorization": f"Bearer {raw_token}"}
     assert client.post("/api/v1/community/join", headers=headers).status_code == 200
 
@@ -250,6 +291,19 @@ async def test_post_reactions_and_two_level_comments(client):
     assert like_response.json()["liked"] is True
     assert bookmark_response.status_code == 200
     assert bookmark_response.json()["bookmarked"] is True
+
+    bookmark_off_response = client.post(
+        f"/api/v1/community/posts/{WELCOME_POST_ID}/bookmark",
+        headers=headers,
+    )
+    bookmark_again_response = client.post(
+        f"/api/v1/community/posts/{WELCOME_POST_ID}/bookmark",
+        headers=headers,
+    )
+    assert bookmark_off_response.status_code == 200
+    assert bookmark_off_response.json()["bookmarked"] is False
+    assert bookmark_again_response.status_code == 200
+    assert bookmark_again_response.json()["bookmarked"] is True
 
     root_response = client.post(
         f"/api/v1/community/posts/{WELCOME_POST_ID}/replies",
@@ -285,6 +339,19 @@ async def test_post_reactions_and_two_level_comments(client):
     assert reply_like_response.status_code == 200
     assert reply_like_response.json()["liked"] is True
 
+    unlike_response = client.post(
+        f"/api/v1/community/posts/{WELCOME_POST_ID}/like",
+        headers=headers,
+    )
+    repeated_like_response = client.post(
+        f"/api/v1/community/posts/{WELCOME_POST_ID}/like",
+        headers=headers,
+    )
+    assert unlike_response.status_code == 200
+    assert unlike_response.json()["liked"] is False
+    assert repeated_like_response.status_code == 200
+    assert repeated_like_response.json()["liked"] is True
+
     detail_response = client.get(f"/api/v1/community/posts/{WELCOME_POST_ID}", headers=headers)
     assert detail_response.status_code == 200
     detail = detail_response.json()
@@ -294,3 +361,77 @@ async def test_post_reactions_and_two_level_comments(client):
     assert root["like_count"] == 1
     assert root["liked"] is True
     assert len(root["children"]) == 1
+
+    async with database_service.session() as session:
+        interaction_entries = list(
+            (
+                await session.execute(
+                    select(FanTokenLedger).where(
+                        FanTokenLedger.user_id == user_id,
+                        col(FanTokenLedger.source_type).in_(["rule:post-like", "rule:post-reply"]),
+                    )
+                )
+            ).scalars().all()
+        )
+        post_like_entries = [entry for entry in interaction_entries if entry.source_type == "rule:post-like"]
+        post_reply_entries = [entry for entry in interaction_entries if entry.source_type == "rule:post-reply"]
+        assert len(post_like_entries) == 1
+        assert post_like_entries[0].delta == 1
+        assert len(post_reply_entries) == 2
+        assert all(entry.delta == 1 for entry in post_reply_entries)
+
+        welcome_post = await session.get(CommunityPost, WELCOME_POST_ID)
+        assert welcome_post is not None
+        bookmark_entries = list(
+            (
+                await session.execute(
+                    select(FanTokenLedger).where(
+                        FanTokenLedger.user_id == welcome_post.author_user_id,
+                        FanTokenLedger.source_type == "rule:post-bookmark-received",
+                        FanTokenLedger.source_id == WELCOME_POST_ID,
+                    )
+                )
+            ).scalars().all()
+        )
+        assert len(bookmark_entries) == 1
+        assert bookmark_entries[0].delta == 1
+
+
+async def test_post_comments_are_paginated_by_root_comment(client):
+    raw_token = "community-comment-pagination-session"
+    await create_official_member(raw_token)
+    headers = {"Authorization": f"Bearer {raw_token}"}
+    assert client.post("/api/v1/community/join", headers=headers).status_code == 200
+
+    for index in range(11):
+        response = client.post(
+            f"/api/v1/community/posts/{WELCOME_POST_ID}/replies",
+            headers=headers,
+            json={"body": f"第 {index + 1} 条顶级评论，用于验证社区评论的分页加载能力。"},
+        )
+        assert response.status_code == 201
+
+    first_page = client.get(f"/api/v1/community/posts/{WELCOME_POST_ID}?reply_limit=10&reply_offset=0", headers=headers)
+    assert first_page.status_code == 200
+    assert len(first_page.json()["replies"]) == 10
+    assert first_page.json()["has_more_replies"] is True
+    assert first_page.json()["next_replies_offset"] == 10
+
+    second_page = client.get(f"/api/v1/community/posts/{WELCOME_POST_ID}?reply_limit=10&reply_offset=10", headers=headers)
+    assert second_page.status_code == 200
+    assert 1 <= len(second_page.json()["replies"]) <= 10
+    assert second_page.json()["has_more_replies"] is False
+    assert second_page.json()["next_replies_offset"] is None
+
+
+async def test_community_posts_support_stable_offset_pagination(client):
+    first_page = client.get("/api/v1/community/posts?limit=2&offset=0")
+    second_page = client.get("/api/v1/community/posts?limit=2&offset=2")
+
+    assert first_page.status_code == 200
+    assert second_page.status_code == 200
+    assert len(first_page.json()) == 2
+    assert len(second_page.json()) == 2
+    assert {post["id"] for post in first_page.json()}.isdisjoint(
+        {post["id"] for post in second_page.json()}
+    )

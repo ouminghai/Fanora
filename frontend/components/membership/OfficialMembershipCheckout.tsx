@@ -55,12 +55,13 @@ export default function OfficialMembershipCheckout() {
   }, [authStatus, loadMembership, router]);
 
   const pay = async () => {
-    if (!membership?.treasury_address || !user) return;
+    if (!membership?.payment_contract_address || !membership.payment_id || !user) return;
     setError(null);
     setPhase("wallet");
     try {
       const hash = await sendMembershipPayment({
-        treasuryAddress: membership.treasury_address,
+        paymentContractAddress: membership.payment_contract_address,
+        paymentId: membership.payment_id,
         feeWei: membership.fee_wei,
         chainId: membership.chain_id,
       });
@@ -89,6 +90,7 @@ export default function OfficialMembershipCheckout() {
 
   const isActive = membership?.is_official_member || phase === "success";
   const isPaying = phase === "wallet" || phase === "verifying";
+  const feeLabel = membership?.fee_mon ? `${membership.fee_mon} MON` : "当前会费";
 
   return (
     <main className="relative isolate min-h-screen overflow-hidden bg-[#09051c] pb-24 pt-32 text-white">
@@ -115,7 +117,8 @@ export default function OfficialMembershipCheckout() {
               {isActive ? "你已成为正式会员" : "Activate your on-chain identity and become part of Fanora."}
             </h1>
             <p className="mx-auto mt-4 max-w-xl leading-7 text-white/65">
-              注册只会创建 Fanora 身份和钱包。完成一次可验证的 1 MON 入会交易后，才会解锁神经萌新等级、每日签到和粉丝任务参与资格。
+              请在 Web3Auth Modal 中连接 MetaMask，再由 MetaMask 弹窗确认 {feeLabel}
+              入会交易。Fanora 不会读取、保存或上传你的钱包私钥。
             </p>
           </div>
 
@@ -129,7 +132,7 @@ export default function OfficialMembershipCheckout() {
               </div>
               <div className="rounded-2xl border border-white/10 bg-black/15 p-4">
                 <p className="text-xs text-white/45">入会费用</p>
-                <p className="mt-2 font-display text-xl font-semibold ">1  &nbsp;&nbsp; MON</p>
+                <p className="mt-2 font-display text-xl font-semibold">{feeLabel}</p>
               </div>
               <div className="rounded-2xl border border-white/10 bg-black/15 p-4">
                 <p className="text-xs text-white/45">网络</p>
@@ -137,9 +140,9 @@ export default function OfficialMembershipCheckout() {
               </div>
             </div>
 
-            {!membership?.treasury_address && !isActive && (
+            {!membership?.payment_contract_address && !isActive && (
               <div className="mt-6 rounded-2xl border border-orange/25 bg-orange/10 px-5 py-4 text-sm leading-6 text-orange">
-                后端尚未配置正式会员收款地址。请先设置 `MEMBERSHIP_TREASURY_ADDRESS`，系统不会向未知地址发起交易。
+                后端尚未配置入会付款合约。部署后设置 `MEMBERSHIP_PAYMENT_CONTRACT_ADDRESS`，系统不会把普通地址转账当作入会凭证。
               </div>
             )}
 
@@ -170,13 +173,13 @@ export default function OfficialMembershipCheckout() {
                   href="/community"
                   className="mt-6 inline-flex rounded-full bg-accent px-8 py-3.5 font-semibold text-white shadow-accent-volume transition-all hover:-translate-y-0.5 hover:bg-accent-dark"
                 >
-                  前往官方社区
+                  前往链上社区
                 </Link>
               </div>
             ) : (
               <button
                 type="button"
-                disabled={isPaying || !membership?.treasury_address}
+                disabled={isPaying || !membership?.payment_contract_address || !membership.payment_id}
                 onClick={() => void pay()}
                 className="mt-8 flex w-full items-center justify-center rounded-full bg-accent px-8 py-4 text-lg font-semibold text-white shadow-accent-volume transition-all hover:-translate-y-0.5 hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-45"
               >
@@ -184,17 +187,17 @@ export default function OfficialMembershipCheckout() {
                   <span className="mr-3 h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                 )}
                 {phase === "wallet"
-                  ? "请在钱包中确认 1 MON 交易"
+                  ? `请在 MetaMask 中确认 ${feeLabel} 交易`
                   : phase === "verifying"
                     ? "正在等待 Monad 确认…"
-                    : "缴纳 1 MON 正式加入"}
+                    : `使用 MetaMask 确认支付 ${feeLabel}`}
               </button>
             )}
 
             <div className="mt-8 grid gap-3 text-sm leading-6 text-white/55 sm:grid-cols-3">
-              <p>✓ 交易发送方必须是当前登录的主钱包</p>
-              <p>✓ 后端校验网络、收款地址、金额和确认状态</p>
-              <p>✓ 同一交易只能激活一个 Fanora 会员</p>
+              <p>✓ 交易由当前登录主钱包的 MetaMask 弹窗签名</p>
+              <p>✓ 合约精确校验并托管当前会费，管理员可审计提现</p>
+              <p>✓ Fanora 不接触用户私钥，paymentId 与钱包仅可入会一次</p>
             </div>
           </div>
         </section>

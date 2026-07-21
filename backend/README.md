@@ -33,7 +33,7 @@ Fanora 的 LangGraph 接口只负责粉丝画像、身份评分解释、粉丝�
 app/
 ├── api/              # HTTP 路由
 ├── agents/           # Fanora LangGraph 工作流
-├── adapters/         # 后续外部系统 Adapter
+├── adapters/         # Monad、Pinata 等外部系统 Adapter
 ├── core/             # 配置、数据库、缓存、日志、限流、指标
 ├── models/           # SQLModel 数据模型
 ├── repositories/     # 持久化 Interface 与实现
@@ -59,7 +59,7 @@ make dev
 访问：
 
 - API 文档：`http://localhost:8000/docs`
-- 健康检查：`http://localhost:8000/health`
+- 健康检查：`http://localhost:8000/api/v1/health`
 - Prometheus 指标：`http://localhost:8000/metrics`
 
 如果尚未配置模型 API，粉丝画像工作流会使用确定性规则结果，不影响启动和测试。
@@ -147,7 +147,7 @@ OPENAI_FALLBACK_MODELS=provider/fallback-model,provider/another-model
 
 无需登录即可调用 `GET /api/v1/membership-levels`，按 `rank` 返回所有启用的会员等级、Fan Token 门槛、管理身份标记和 Badge 图片地址，供首页成长模块读取。
 
-注册用户默认为待入会状态，不会对外显示神经萌新等级。配置 `MEMBERSHIP_TREASURY_ADDRESS` 后，用户可通过 `GET /api/v1/membership/me` 获取 1 MON 入会参数，并向 `POST /api/v1/membership/verify` 提交交易哈希。后端会验证 Monad 链 ID、交易成功状态、确认数、发送主钱包、收款地址和金额，再写入 `official_membership_payments` 并激活 `user_profiles.is_official_member`。签到和任务接口应使用 `require_official_member` 依赖。
+注册用户默认为待入会状态，不会对外显示神经萌新等级。配置付款合约后，用户可通过 `GET /api/v1/membership/me` 获取链上当前会费（默认 1 MON），并向 `POST /api/v1/membership/verify` 提交交易哈希。后端会验证 Monad 链 ID、交易成功状态、确认数、发送主钱包、付款合约和 `MembershipPaid` 事件金额，再写入 `official_membership_payments` 并激活 `user_profiles.is_official_member`。签到和任务接口应使用 `require_official_member` 依赖。
 
 创作者社区创建和编辑接口要求数据库中已有 `creator` 或 `admin` 角色，普通用户不能自行提升权限。
 

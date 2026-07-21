@@ -9,6 +9,7 @@ from typing import Any
 import jwt
 from eth_account import Account
 from eth_account.messages import encode_defunct
+from eth_keys import keys
 from fastapi import HTTPException, status
 from jwt import PyJWKClient
 from sqlalchemy.exc import IntegrityError
@@ -44,11 +45,75 @@ def as_utc(value: datetime) -> datetime:
 
 class Web3AuthService:
     def __init__(self) -> None:
-        self.jwks_client = PyJWKClient(settings.web3auth_jwks_url, cache_keys=True)
+        self.jwks_client = PyJWKClient(
+            settings.web3auth_jwks_url,
+            cache_keys=True,
+            lifespan=settings.web3auth_jwks_cache_lifespan_seconds,
+            timeout=settings.web3auth_jwks_timeout_seconds,
+        )
+        self.legacy_jwks_client = PyJWKClient(
+            settings.web3auth_legacy_jwks_url,
+            cache_keys=True,
+            lifespan=settings.web3auth_jwks_cache_lifespan_seconds,
+            timeout=settings.web3auth_jwks_timeout_seconds,
+        )
+        self.external_jwks_client = PyJWKClient(
+            settings.web3auth_external_jwks_url,
+            cache_keys=True,
+            lifespan=settings.web3auth_jwks_cache_lifespan_seconds,
+            timeout=settings.web3auth_jwks_timeout_seconds,
+        )
 
-    async def verify_identity_token(self, id_token: str, expected_wallet: str) -> dict[str, Any]:
+    @staticmethod
+    def _normalize_public_key(public_key: str) -> set[str]:
+        value = public_key.lower().removeprefix("0x")
+        keys_to_match = {value}
+        if len(value) == 130 and value.startswith("04"):
+            value = value[2:]
+            keys_to_match.add(value)
+        if len(value) == 128:
+            public_key_bytes = bytes.fromhex(value)
+            compressed = keys.PublicKey(public_key_bytes).to_compressed_bytes().hex()
+            keys_to_match.add(compressed)
+        return keys_to_match
+
+    @staticmethod
+    def _token_wallet_public_keys(claims: dict[str, Any]) -> set[str]:
+        public_keys: set[str] = set()
+        for wallet in claims.get("wallets") or []:
+            if not isinstance(wallet, dict):
+                continue
+            public_key = str(wallet.get("public_key") or "")
+            if not public_key:
+                continue
+            public_keys.update(Web3AuthService._normalize_public_key(public_key))
+        return public_keys
+
+    async def verify_identity_token(
+        self, id_token: str, expected_wallet: str, expected_app_pub_key: str | None = None
+    ) -> dict[str, Any]:
         def decode() -> dict[str, Any]:
-            signing_key = self.jwks_client.get_signing_key_from_jwt(id_token)
+            unverified_claims = jwt.decode(
+                id_token,
+                options={
+                    "verify_signature": False,
+                    "verify_exp": False,
+                    "verify_iat": False,
+                    "verify_aud": False,
+                    "verify_iss": False,
+                },
+            )
+            issuer = str(unverified_claims.get("iss") or "").strip()
+            if (
+                issuer == settings.web3auth_external_issuer
+                or issuer.lower() in settings.allowed_web3auth_external_issuers
+            ):
+                jwks_client = self.external_jwks_client
+            elif issuer == settings.web3auth_legacy_issuer:
+                jwks_client = self.legacy_jwks_client
+            else:
+                jwks_client = self.jwks_client
+            signing_key = jwks_client.get_signing_key_from_jwt(id_token)
             claims = jwt.decode(
                 id_token,
                 signing_key.key,
@@ -65,13 +130,20 @@ class Web3AuthService:
             if not issuer or not any(value and value != "None" for value in audiences):
                 raise jwt.InvalidTokenError("Web3Auth issuer or audience is missing")
 
-            if issuer == settings.web3auth_issuer:
+            if issuer in {settings.web3auth_issuer, settings.web3auth_legacy_issuer}:
                 provider_user_id = claims.get("sub") or claims.get("userId") or claims.get("verifierId")
                 if settings.web3auth_client_id not in audiences or not provider_user_id:
                     raise jwt.InvalidAudienceError("Web3Auth client audience or subject does not match")
+                if not expected_app_pub_key:
+                    raise jwt.InvalidTokenError("Web3Auth app public key is required for embedded wallet login")
+                expected_keys = self._normalize_public_key(expected_app_pub_key)
+                if not expected_keys.intersection(self._token_wallet_public_keys(claims)):
+                    raise jwt.InvalidTokenError("Web3Auth token does not contain the embedded wallet public key")
             else:
                 if issuer.lower() not in settings.allowed_web3auth_external_issuers:
                     raise jwt.InvalidIssuerError("External wallet issuer is not allowed")
+                if not audiences.intersection(settings.allowed_web3auth_external_audiences):
+                    raise jwt.InvalidAudienceError("External wallet token audience does not match")
                 wallets = claims.get("wallets")
                 addresses = {
                     Web3.to_checksum_address(str(wallet.get("address")))
@@ -130,7 +202,7 @@ class Web3AuthService:
         if Web3.to_checksum_address(recovered) != address:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Wallet signature does not match")
 
-        claims = await self.verify_identity_token(payload.id_token, address)
+        claims = await self.verify_identity_token(payload.id_token, address, payload.app_pub_key)
         issuer = str(claims.get("iss") or "").strip()
         provider_user_id = claims.get("sub") or claims.get("userId") or claims.get("verifierId")
         subject = str(provider_user_id or f"{issuer}:{address.lower()}").strip()

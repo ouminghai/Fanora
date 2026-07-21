@@ -77,7 +77,7 @@ export function ProfileMenuPanel({ user, onClose, onLogout }: ProfileMenuPanelPr
             onClick={onClose}
             className="mt-3 flex items-center justify-center rounded-xl bg-accent px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-accent-dark"
           >
-            缴纳 1 MON 正式加入
+            缴纳会费正式加入
           </Link>
         )}
       </div>
@@ -92,7 +92,7 @@ export function ProfileMenuPanel({ user, onClose, onLogout }: ProfileMenuPanelPr
           <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current text-white/70" aria-hidden="true">
             <path d="M4 3h16a2 2 0 0 1 2 2v11a2 2 0 0 1-2 2h-5l-3 3-3-3H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2Zm2 5v2h12V8H6Zm0 4v2h8v-2H6Z" />
           </svg>
-          官方社区
+          链上社区
         </Link>
         <Link
           href="/profile"

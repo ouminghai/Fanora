@@ -1,0 +1,48 @@
+{
+  "network": "monadTestnet",
+  "chainId": 10143,
+  "deployedAt": "2026-07-21T12:30:48.471Z",
+  "deployer": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+  "admin": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+  "treasury": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+  "membershipFeeWei": "1000000000000000000",
+  "membershipLevelRanks": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    100
+  ],
+  "roles": {
+    "treasuryManager": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+    "gatewayPauser": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+    "identityMinter": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+    "identityLevelManager": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+    "identityUriManager": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+    "identityPauser": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+    "collectibleTypeManager": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+    "collectibleMinter": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+    "collectibleUriManager": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
+    "collectiblePauser": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b"
+  },
+  "compiler": "0.8.28",
+  "contracts": {
+    "FanoraMembershipGateway": {
+      "address": "0xd966Fb616cBFd6c54d317Fc1d87344455e1F7A93",
+      "transactionHash": "0xd0f463fbeaad2f5a28d246f7843fdc3312468abeb05d36a0f588551cc19ad904",
+      "startBlock": 46839663
+    },
+    "FanoraMembershipIdentity": {
+      "address": "0x14bE25042ac73Eb984aa60b8f0b49D78c79FcfEf",
+      "transactionHash": "0xce9614bdcce6f6bdd7c6a951938949f683cb07ea7e3694a494456df3c01272fe",
+      "startBlock": 46839671
+    },
+    "FanoraCollectibles": {
+      "address": "0xb8Eea4B312c58E6Cb1d142c8705fF766F03eD19f",
+      "transactionHash": "0x0a3794d7289bfe176dd5edddb256350db17eab27906c0c5215dfa00d1cb2e37c",
+      "startBlock": 46839678
+    }
+  }
+}

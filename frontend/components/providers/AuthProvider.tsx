@@ -12,9 +12,12 @@ import {
   type ReactNode,
 } from "react";
 import type { Web3Auth } from "@web3auth/modal";
+import { encodeFunctionData, type Abi } from "viem";
 import { api, SESSION_TOKEN_KEY } from "@/lib/api/client";
 import type { AuthSession, FanoraUser } from "@/lib/api/types";
 import { requestEmbeddedPrivateKey } from "@/lib/web3auth/privateKey";
+import { withWeb3AuthTimeout } from "@/lib/web3auth/timeout";
+import membershipGatewayArtifact from "../../../shared/contracts/FanoraMembershipGateway.json";
 
 type AuthStatus =
   | "initializing"
@@ -32,7 +35,8 @@ type AuthContextValue = {
   logout: () => Promise<void>;
   exportPrivateKey: () => Promise<string>;
   sendMembershipPayment: (payment: {
-    treasuryAddress: string;
+    paymentContractAddress: string;
+    paymentId: string;
     feeWei: string;
     chainId: number;
   }) => Promise<string>;
@@ -45,6 +49,13 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const clientId =
   process.env.NEXT_PUBLIC_WEB3AUTH_CLIENT_ID ||
   "BICxTe9MSpkkwRIrgNGa8cGgksO4VvNiBHqt694T88J_WecKTHn474CmkEtFvaOqfE0CxrtZUmUoZCPYiOf8r88";
+const WEB3AUTH_CONNECT_TIMEOUT_MS = 30_000;
+
+function encodePersonalSignMessage(message: string) {
+  return `0x${Array.from(new TextEncoder().encode(message))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("")}`;
+}
 
 function getErrorMessage(error: unknown) {
   if (axios.isAxiosError(error)) {
@@ -90,21 +101,21 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       challenge_id: string;
       message: string;
     }>("/auth/challenge", { wallet_address: address });
-    const messageHex = `0x${Array.from(new TextEncoder().encode(challenge.data.message))
-      .map((byte) => byte.toString(16).padStart(2, "0"))
-      .join("")}`;
     const signature = await provider.request<unknown[], string>({
       method: "personal_sign",
-      params: [messageHex, address],
+      params: [encodePersonalSignMessage(challenge.data.message), address],
     });
-    const { idToken } = await web3auth.getIdentityToken();
-    const connector = String(web3auth.connectedConnectorName || "");
     const response = await api.post<AuthSession>("/auth/web3auth", {
       challenge_id: challenge.data.challenge_id,
       wallet_address: address,
       signature,
-      id_token: idToken,
-      wallet_type: connector === "auth" ? "embedded" : "external",
+      id_token: (await web3auth.getIdentityToken()).idToken,
+      app_pub_key:
+        String(web3auth.connectedConnectorName || "") === "auth"
+          ? await provider.request<never, string>({ method: "public_key" })
+          : undefined,
+      wallet_type:
+        String(web3auth.connectedConnectorName || "") === "auth" ? "embedded" : "external",
     });
     window.localStorage.setItem(SESSION_TOKEN_KEY, response.data.access_token);
     setUser(response.data.user);
@@ -117,7 +128,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
     async function initialize() {
       try {
-        const { Web3Auth, WEB3AUTH_NETWORK, CHAIN_NAMESPACES } = await import(
+        const { Web3Auth, WEB3AUTH_NETWORK, CHAIN_NAMESPACES, WALLET_CONNECTORS } = await import(
           "@web3auth/modal"
         );
         const web3AuthNetwork =
@@ -131,9 +142,25 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
           ssr: true,
           storageType: "local",
           sessionTime: 7 * 24 * 60 * 60,
-          walletServicesConfig: {
-            loginMode: "plugin",
-            enableKeyExport: true,
+          modalConfig: {
+            connectors: {
+              [WALLET_CONNECTORS.AUTH]: {
+                label: "auth",
+                showOnModal: true,
+              },
+              [WALLET_CONNECTORS.METAMASK]: {
+                label: "metamask",
+                showOnModal: true,
+              },
+              [WALLET_CONNECTORS.WALLET_CONNECT_V2]: {
+                label: "wallet-connect",
+                showOnModal: Boolean(process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID),
+              },
+              [WALLET_CONNECTORS.COINBASE]: {
+                label: "coinbase",
+                showOnModal: false,
+              },
+            },
           },
           chains: [
             {
@@ -200,14 +227,20 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
     setError(null);
     setStatus("connecting");
     try {
-      if (!instance.connected) await instance.connect();
+      if (!instance.connected) {
+        await withWeb3AuthTimeout(
+          instance.connect(),
+          WEB3AUTH_CONNECT_TIMEOUT_MS,
+          "钱包确认没有完成，请重试，或改用邮箱/社交账号登录。",
+        );
+      }
       await completeFanoraLogin(instance);
     } catch (loginError) {
       setError(getErrorMessage(loginError));
-      setStatus("error");
+      setStatus(user ? "authenticated" : "anonymous");
       throw loginError;
     }
-  }, [completeFanoraLogin]);
+  }, [completeFanoraLogin, user]);
 
   const logout = useCallback(async () => {
     const token = window.localStorage.getItem(SESSION_TOKEN_KEY);
@@ -242,11 +275,13 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
 
   const sendMembershipPayment = useCallback(
     async ({
-      treasuryAddress,
+      paymentContractAddress,
+      paymentId,
       feeWei,
       chainId,
     }: {
-      treasuryAddress: string;
+      paymentContractAddress: string;
+      paymentId: string;
       feeWei: string;
       chainId: number;
     }) => {
@@ -254,7 +289,18 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       if (!user || !instance?.connected || !instance.provider) {
         throw new Error("钱包会话尚未准备好，请重新登录后再缴纳会费。");
       }
+      const connectorName = String(instance.connectedConnectorName || "").toLowerCase();
+      if (user.primary_wallet.wallet_type !== "external" || connectorName !== "metamask") {
+        throw new Error(
+          "入会付款必须由 MetaMask 确认。请退出当前钱包，并在 Web3Auth Modal 中选择 MetaMask 重新连接。",
+        );
+      }
       const provider = instance.provider;
+      const accounts = await provider.request<never, string[]>({ method: "eth_accounts" });
+      const activeAccount = accounts?.[0];
+      if (!activeAccount || activeAccount.toLowerCase() !== user.primary_wallet.address.toLowerCase()) {
+        throw new Error("MetaMask 当前账户与 Fanora 登录主钱包不一致，请切换账户后重试。");
+      }
       const expectedChainId = `0x${chainId.toString(16)}`;
       const currentChainId = await provider.request<never, string>({ method: "eth_chainId" });
       if (currentChainId.toLowerCase() !== expectedChainId.toLowerCase()) {
@@ -270,12 +316,18 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
         }
       }
       return provider.request<unknown[], string>({
+        // eth_sendTransaction 只请求 MetaMask 弹窗签名，不读取、导出或上传用户私钥。
         method: "eth_sendTransaction",
         params: [
           {
             from: user.primary_wallet.address,
-            to: treasuryAddress,
+            to: paymentContractAddress,
             value: `0x${BigInt(feeWei).toString(16)}`,
+            data: encodeFunctionData({
+              abi: membershipGatewayArtifact.abi as Abi,
+              functionName: "join",
+              args: [paymentId],
+            }),
           },
         ],
       });

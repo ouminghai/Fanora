@@ -5,10 +5,10 @@ import { usePathname } from "next/navigation";
 
 const navigation = [
   { href: "/", label: "首页" },
-  { href: "/community", label: "官方社区" },
+  { href: "/community/creations", label: "链上社区" },
   { href: "/community#check-in", label: "每日签到" },
-  { href: "/community#tasks", label: "粉丝任务" },
-  { href: "/community#creation", label: "创作社区" },
+  { href: "/community/tasks", label: "粉丝任务" },
+  { href: "/collection", label: "我的收藏" },
 ];
 
 export default function Nav() {

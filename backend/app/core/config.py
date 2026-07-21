@@ -2,6 +2,7 @@
 
 from enum import StrEnum
 from functools import lru_cache
+from urllib.parse import urlparse
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,7 +28,13 @@ class Settings(BaseSettings):
     web3auth_client_id: str = "BICxTe9MSpkkwRIrgNGa8cGgksO4VvNiBHqt694T88J_WecKTHn474CmkEtFvaOqfE0CxrtZUmUoZCPYiOf8r88"
     web3auth_jwks_url: str = "https://api-auth.web3auth.io/jwks"
     web3auth_issuer: str = "https://api-auth.web3auth.io"
-    web3auth_external_issuers: str = "metamask,wallet-connect-v2,coinbase"
+    web3auth_legacy_jwks_url: str = "https://api.openlogin.com/jwks"
+    web3auth_legacy_issuer: str = "https://api.openlogin.com/"
+    web3auth_external_jwks_url: str = "https://authjs.web3auth.io/jwks"
+    web3auth_external_issuer: str = "https://authjs.web3auth.io"
+    web3auth_external_issuers: str = "https://authjs.web3auth.io,metamask,wallet-connect-v2,coinbase"
+    web3auth_jwks_timeout_seconds: float = 5.0
+    web3auth_jwks_cache_lifespan_seconds: int = 3600
     auth_challenge_ttl_seconds: int = 300
     auth_session_ttl_seconds: int = 604800
 
@@ -71,8 +78,29 @@ class Settings(BaseSettings):
     membership_treasury_address: str = ""
     membership_fee_wei: int = 1_000_000_000_000_000_000
     membership_min_confirmations: int = 1
-    badge_contract_address: str = ""
-    operator_private_key: str = ""
+    membership_payment_contract_address: str = ""
+    membership_identity_contract_address: str = ""
+    collectibles_contract_address: str = ""
+    membership_identity_start_block: int = 0
+    collectibles_start_block: int = 0
+    chain_write_confirmations: int = 1
+    chain_transaction_timeout_seconds: int = 90
+    membership_treasury_manager_private_key: str = ""
+    identity_minter_private_key: str = ""
+    identity_level_manager_private_key: str = ""
+    identity_uri_manager_private_key: str = ""
+    collectible_type_manager_private_key: str = ""
+    collectible_minter_private_key: str = ""
+    collectible_uri_manager_private_key: str = ""
+    pinata_jwt: str = ""
+    pinata_api_url: str = "https://uploads.pinata.cloud/v3/files"
+    pinata_gateway_url: str = "https://gateway.pinata.cloud/ipfs"
+    pinata_timeout_seconds: float = 30.0
+    pinata_max_retries: int = 3
+    nft_max_image_bytes: int = 5_000_000
+    nft_min_image_dimension: int = 256
+    nft_max_image_dimension: int = 4096
+    fanora_issuer_name: str = "Fanora Protocol"
 
     log_level: str = "INFO"
     log_format: str = "console"
@@ -100,6 +128,14 @@ class Settings(BaseSettings):
     @property
     def allowed_web3auth_external_issuers(self) -> set[str]:
         return {issuer.strip().lower() for issuer in self.web3auth_external_issuers.split(",") if issuer.strip()}
+
+    @property
+    def allowed_web3auth_external_audiences(self) -> set[str]:
+        return {
+            hostname.lower()
+            for origin in self.cors_origins
+            if (hostname := urlparse(origin).hostname)
+        }
 
     @property
     def llm_enabled(self) -> bool:

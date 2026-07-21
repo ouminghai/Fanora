@@ -24,6 +24,7 @@ venv/
 *.egg-info/
 *.db
 logs/
+.dbg/
 
 # Editors
 .idea/

@@ -1,7 +1,7 @@
 # Fanora Protocol 技术架构文档
 
-> 文档版本：v1.3\
-> 更新日期：2026-07-20\
+> 文档版本：v1.4\
+> 更新日期：2026-07-21\
 > 需求基线：[PRODUCT_REQUIREMENTS.md](./PRODUCT_REQUIREMENTS.md)\
 > MVP 网络：Monad Testnet
 
@@ -26,7 +26,7 @@ Fanora 采用“链下业务事实 + 链上公开凭证”的混合架构：
 - Pinata 保存已批准 NFT 图片与 metadata；合约保存 `ipfs://CID`。
 - LangGraph 负责分析、解释、推荐和 ERC-1155 草案，不修改积分、不审批申请、不决定 ERC-721 等级。
 - 链上写入采用后台异步任务、唯一 operationId/claimKey、确认状态和事件对账。
-- 当前 `ProofOfFandomBadge.sol` 仅为早期 ERC-1155 SBT 原型，目标架构需要两个新合约。
+- 早期 `ProofOfFandomBadge.sol` 原型已删除，正式架构使用付款 Gateway、ERC-721 身份与 ERC-1155 纪念资产合约。
 
 ## 2. 系统总体架构
 
@@ -302,15 +302,9 @@ flowchart LR
 
 合约必须在链上校验供应量、累计钱包领取量、时间窗和 claimKey。自定义徽章默认供应量 1 且不可转让；任务限定 Badge 单钱包最多 1；演唱会纪念卡的转让策略在创建时确定。
 
-### 8.3 当前原型迁移
+### 8.3 原型迁移
 
-当前 `ProofOfFandomBadge`：
-
-- 已实现 ERC-1155、角色、基础 mint/upgrade、URI 和全局 Soulbound。
-- 未实现 ERC-721 唯一会员身份。
-- 未实现三类 ERC-1155 token 类型、供应量、钱包限额、时间窗、claimKey 和 metadata 冻结。
-
-因此它只作为 OpenZeppelin、Hardhat 和 Monad 配置参考，不直接认定为目标合约完成。
+`ProofOfFandomBadge` 已删除。正式合约拆分资金、会员身份和纪念资产职责，旧的 Badge 地址、ABI 与读取 Hook 不再使用。
 
 ## 9. 核心业务流
 
@@ -415,6 +409,7 @@ Pinata
   └─ 已批准 NFT 图片与 metadata
 
 Monad Testnet
+  ├─ FanoraMembershipGateway
   ├─ FanoraMembershipIdentity
   └─ FanoraCollectibles
 ```
@@ -431,27 +426,24 @@ Vercel Functions 可以用于短请求，但不适合依赖 HTTP 返回后继续
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
 - `NEXT_PUBLIC_MONAD_TESTNET_RPC_URL`
 
-目标双合约接入后，以公开变量提供 ERC-721 和 ERC-1155 地址。公开变量只能包含可公开链上配置，不能包含任何密钥。
+当前以前端公开变量提供 Gateway、ERC-721 和 ERC-1155 地址。公开变量只能包含可公开链上配置，不能包含任何密钥。
 
 ### 11.2 当前已有服务端配置
 
 - `DATABASE_URL`
 - Web3Auth 验证配置
 - `MONAD_RPC_URL`、`MONAD_CHAIN_ID`
-- 正式入会收款地址、费用和确认数
+- 正式入会 Gateway、动态会费备用值、资金地址和确认数
+- ERC-721、ERC-1155 地址、事件起始区块和最小权限运营签名配置
+- Pinata JWT、上传地址、Gateway 地址、超时和重试配置
 - `OPENAI_API_KEY`、模型与超时配置
-- 当前原型 `BADGE_CONTRACT_ADDRESS`、`OPERATOR_PRIVATE_KEY`
+- 历史原型变量 `BADGE_CONTRACT_ADDRESS`、`OPERATOR_PRIVATE_KEY` 已停用。
 
-### 11.3 v1.3 目标新增配置
+### 11.3 尚待生产化的配置
 
-命名以实现时最终配置模型为准，至少需要表达：
-
-- ERC-721 会员身份合约地址。
-- ERC-1155 纪念资产合约地址。
-- 各最小权限运营签名账户或安全签名服务。
-- Pinata JWT、Gateway Base URL 与可选 Gateway Token。
-- 临时审核存储桶和文件限制。
-- 链上确认数、任务轮询间隔和事件起始区块。
+- 将测试网共用部署钱包拆分为独立运营账户或安全签名服务。
+- 配置生产 Pinata JWT、受控临时审核存储和文件清理策略。
+- 配置后台任务队列、事件轮询间隔、链重组确认和告警渠道。
 
 Pinata JWT、运营私钥、管理员私钥、数据库凭证和 OpenAI Key 只能存在服务端密钥环境。
 
@@ -473,24 +465,23 @@ Pinata JWT、运营私钥、管理员私钥、数据库凭证和 OpenAI Key 只�
 
 ### 13.1 已具备
 
-- Web3Auth 快捷登录、钱包签名挑战、统一会话、用户资料和私钥导出安全交互。
-- 用户、钱包、官方社区成员、会员等级、Fan Token 规则和正式入会数据模型。
-- 1 MON 正式入会交易验证与前端页面。
-- 首页会员等级真实数据、当前等级、升级差额和 Coverflow 展示。
-- FastAPI、LangGraph、PostgreSQL/Alembic、本地 Docker 数据库、日志和健康检查基础。
-- ERC-1155 SBT 原型合约、基础铸造和禁止转让测试。
+- Web3Auth Modal 登录、钱包签名挑战、统一会话和 MetaMask 入会付款确认。
+- 官方社区创作、Markdown、多图、评论回复、任务、签到日历和 Fan Token 幂等奖励闭环。
+- 动态会费 Gateway、管理员提现与改价、付款事件验证和正式会员激活。
+- ERC-721 SBT 会员身份、等级 metadata 版本、Pinata 固定和用户主动等级同步。
+- ERC-1155 纪念资产合约、自定义徽章申请/审核/处理和统一收藏页。
+- Monad/Pinata 适配器、链上操作和 NFT 数据模型，以及对应 FastAPI 接口。
+- LangGraph 确定性评分、结构化画像、LLM 降级和分析记录持久化。
+- 三个合约 Monad Testnet 部署、16 项合约测试、ABI 导出和前后端配置自动同步。
 
 ### 13.2 仍需完成
 
-- 外部钱包完整端到端登录与主钱包管理。
-- 任务、任务验证、积分流水和等级事件闭环。
-- ERC-721 `FanoraMembershipIdentity`。
-- ERC-1155 `FanoraCollectibles` 的类别、供应、限额、时间窗和 claimKey。
-- Pinata 适配器、metadata 版本和临时审核存储。
-- 自定义 NFT 申请与创作者审核。
-- 链上异步写入、确认、重试、事件监听和对账。
-- 会员证、收藏页、任务限定 Badge 和申请页面。
-- Monad Testnet 双合约部署与 ABI/地址同步。
+- 外部钱包关联、主钱包切换和 SBT 身份恢复/迁移管理。
+- 可靠后台任务执行器、失败自动重试、链重组处理、常驻事件监听和完整对账。
+- 任务限定 Badge 与演唱会纪念卡的资格领取、类型管理和前端闭环。
+- Pinata pin 状态查询、受控临时审核存储、恶意内容检测、配额和清理策略。
+- 自定义 NFT 重新编辑/版本审核、完整审计日志和管理员操作页面。
+- 将 Testnet 共用运营钱包拆分为最小权限账户，并迁移 `DEFAULT_ADMIN_ROLE` 至多签。
 
 ## 14. 非目标
 

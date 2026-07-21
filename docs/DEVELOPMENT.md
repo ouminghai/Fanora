@@ -1,7 +1,7 @@
 # Fanora 本地开发说明
 
-> 更新日期：2026-07-20\
-> 本文只描述当前代码可以执行的命令；尚未实现的 ERC-721、ERC-1155 v1.3 和 Pinata 配置会明确标为“目标配置”。
+> 更新日期：2026-07-21\
+> 本文描述当前代码可执行的前后端、数据库、Pinata、Monad 合约和发布同步流程。
 
 ## 1. 前置环境
 
@@ -20,7 +20,7 @@
 PostgreSQL
   → FastAPI / migration
   → Next.js
-  → 按需编译合约原型
+  → 按需编译、测试或发布正式合约
 ```
 
 ### 2.1 启动 PostgreSQL
@@ -151,19 +151,20 @@ npm run dev
 
 开发种子从仓库根目录 `resources/` 及其子目录读取选定图片，转换为 Base64 Data URL 后写入 PostgreSQL：社区帖子写入 `community_posts.cover_url`，任务卡图片写入 `fan_tasks.validation_rule.presentation.image_url`。迁移 `20260720_0012` 会将现有官方帖子和任务一并更新；当前方案用于原型阶段，生产环境应迁移到对象存储并在数据库保存 URL、哈希和媒体元数据。
 
-链上资产持有/交易任务、ERC-721 身份、ERC-1155 纪念资产、自定义 NFT 申请和 Pinata 接口仍属于待实现范围，以 `PRODUCT_REQUIREMENTS.md` 为准。
+ERC-721 身份、ERC-1155 纪念资产、自定义 NFT 申请和 Pinata 适配器已经接入。链上资产任务、任务限定 Badge 自动领取、后台重试和常驻事件对账仍属于待完成范围。
 
 ## 4. 正式入会本地配置
 
-真实测试 1 MON 入会交易前，在 `backend/.env.local` 配置 Monad Testnet 收款地址：
+发布脚本会自动将 Gateway、当前会费备用值和资金地址同步到 `backend/.env`：
 
 ```env
-MEMBERSHIP_TREASURY_ADDRESS=0x你的Monad测试网收款地址
+MEMBERSHIP_PAYMENT_CONTRACT_ADDRESS=0xd966...
+MEMBERSHIP_TREASURY_ADDRESS=0x你的Monad测试网资金地址
 MEMBERSHIP_FEE_WEI=1000000000000000000
 MEMBERSHIP_MIN_CONFIRMATIONS=1
 ```
 
-未配置收款地址时，缴纳页只展示配置提示，不会调用钱包发送交易。
+实际付款金额读取 Gateway 的 `membershipFee`，`MEMBERSHIP_FEE_WEI` 只在链上读取暂时失败时作为备用值。未配置付款合约时，缴纳页只展示配置提示，不会调用钱包发送交易。
 
 ## 5. 钱包与私钥安全
 
@@ -177,16 +178,13 @@ MEMBERSHIP_MIN_CONFIRMATIONS=1
 
 ### 6.1 当前代码状态
 
-`contracts/contracts/ProofOfFandomBadge.sol` 是早期 ERC-1155 SBT 原型，目前用于验证：
+早期 `ProofOfFandomBadge.sol` 原型已经删除。当前合约为：
 
-- OpenZeppelin ERC-1155 与 AccessControl。
-- 受控 mint/upgrade。
-- 基础 URI 更新。
-- 用户间转让被拒绝。
+- `FanoraMembershipGateway`：精确收取当前会费、付款防重、资金托管、管理员改价与提现。
+- `FanoraMembershipIdentity`：ERC-721 SBT 会员身份、等级和 metadata 版本。
+- `FanoraCollectibles`：ERC-1155 演唱会纪念卡、自定义徽章和任务限定 Badge。
 
-它不满足 v1.3 的双合约需求，不能作为 `FanoraMembershipIdentity` 或 `FanoraCollectibles` 的最终部署版本。
-
-### 6.2 编译与测试当前原型
+### 6.2 编译与测试正式合约
 
 ```bash
 cd contracts
@@ -196,46 +194,41 @@ npm run compile
 npm test
 ```
 
-准备独立测试网部署钱包后：
+准备测试网部署钱包后，可执行一键发布：
 
 ```bash
-npm run deploy:testnet
+npm run release:testnet
 ```
 
-部署前确认 `.env` 没有被 Git 跟踪。
+该命令依次运行测试、编译、部署、ABI 导出、前后端环境变量同步和链上复核。部署前确认 `.env` 没有被 Git 跟踪，完整参数见 `docs/CONTRACT_DEPLOYMENT.md`。
 
-### 6.3 v1.3 目标合约
+### 6.3 测试网配置
 
-后续实现应新增：
-
-- `FanoraMembershipIdentity`：ERC-721 SBT，唯一会员身份与等级更新。
-- `FanoraCollectibles`：ERC-1155，演唱会纪念卡、自定义徽章和任务限定 Badge。
-
-目标合约的函数、角色、事件、幂等和测试要求见 `PRODUCT_REQUIREMENTS.md` 第 7 节。实现完成前，不要把旧的 `BADGE_CONTRACT_ADDRESS` 解释为两个新合约地址。
+当前 Monad Testnet 部署地址保存在 `contracts/deployments/monadTestnet.json`，公开副本位于 `shared/contracts/monadTestnet.deployment.json`。ABI 由 `contracts/scripts/export-abis.ts` 统一生成到 `shared/contracts`。
 
 ## 7. Pinata 与 NFT metadata
 
 ### 7.1 当前状态
 
-当前代码和 `.env.example` 尚未接入 Pinata。Pinata 是 v1.3 目标能力，不应在前端直接试接密钥。
+当前后端已接入 Pinata 图片和 metadata 上传、Gateway URL、超时与有限重试。`PINATA_JWT` 只允许配置在后端，不得使用 `NEXT_PUBLIC_` 前缀。
 
-### 7.2 目标服务端配置
-
-具体变量名以实现时的 Settings 模型为准，至少需要表达：
+### 7.2 服务端配置
 
 ```text
 PINATA_JWT
-PINATA_GATEWAY_BASE_URL
-PINATA_GATEWAY_TOKEN            # 仅私有 Gateway 需要
-NFT_MAX_UPLOAD_BYTES
-NFT_ALLOWED_IMAGE_TYPES
-NFT_STAGING_STORAGE_BUCKET
+PINATA_API_URL
+PINATA_GATEWAY_URL
+PINATA_TIMEOUT_SECONDS
+PINATA_MAX_RETRIES
+NFT_MAX_IMAGE_BYTES
+NFT_MIN_IMAGE_DIMENSION
+NFT_MAX_IMAGE_DIMENSION
 ```
 
 要求：
 
 - Pinata JWT 只能存在后端密钥环境。
-- 未审核图片先进入受控临时存储，不直接上传公开 IPFS。
+- 当前未审核自定义图片保存在数据库受控字段中；生产环境仍需迁移到独立临时审核存储。
 - 后端先上传图片，再生成引用图片 CID 的 metadata JSON。
 - 合约保存 `ipfs://metadataCid`，Gateway URL 只用于展示。
 - Pinata 上传成功不等于链上铸造成功，两者分别记录状态。
@@ -288,7 +281,7 @@ npm run compile
 npm test
 ```
 
-新双合约实现后，至少补充 ERC-721 SBT、operationId、ERC-1155 供应量、钱包限额、时间窗、claimKey、metadata 冻结和恶意 receiver 测试。
+当前正式合约已有 16 项测试，覆盖 ERC-721 SBT、operationId、ERC-1155 供应量、钱包限额、时间窗、claimKey、metadata 冻结和恶意 receiver。
 
 ## 9. 常见问题
 
@@ -312,7 +305,7 @@ npm test
 
 ### 合约地址为空
 
-当前目标双合约尚未部署是正常状态。不得使用虚构地址或前端 mock 冒充 Monad Testnet 部署证据。
+执行 `cd contracts && npm run sync:testnet`，使用 `contracts/deployments/monadTestnet.json` 重新同步前后端环境变量，然后重启 FastAPI 和 Next.js。
 
 ## 10. 相关文档
 
@@ -320,3 +313,5 @@ npm test
 - [产品与开发需求](./PRODUCT_REQUIREMENTS.md)
 - [技术架构](./ARCHITECTURE.md)
 - [MVP 路线图](./MVP_ROADMAP.md)
+- [合约发布指南](./CONTRACT_DEPLOYMENT.md)
+- [2026-07-21 交付总结](./DELIVERY_SUMMARY_2026-07-21.md)

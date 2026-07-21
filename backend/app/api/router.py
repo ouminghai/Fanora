@@ -9,6 +9,7 @@ from app.api.routes.fan_tokens import router as fan_tokens_router
 from app.api.routes.health import router as health_router
 from app.api.routes.membership import router as membership_router
 from app.api.routes.membership_payment import router as membership_payment_router
+from app.api.routes.nft import router as nft_router
 from app.api.routes.roles import router as roles_router
 from app.api.routes.tasks import check_in_router, task_router
 
@@ -25,3 +26,4 @@ api_router.include_router(fan_tokens_router, tags=["fan-tokens"])
 api_router.include_router(roles_router, tags=["roles"])
 api_router.include_router(membership_router, tags=["membership"])
 api_router.include_router(membership_payment_router, tags=["membership"])
+api_router.include_router(nft_router, tags=["nft"])

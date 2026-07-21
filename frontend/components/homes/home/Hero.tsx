@@ -179,7 +179,7 @@ export function OfficialMembershipJoinButton() {
       data-hero-reveal
       className="hero-reveal hero-reveal--4 group relative mb-4 flex w-full items-center justify-center rounded-full bg-accent py-3 px-8 text-center font-semibold text-white shadow-accent-volume transition-all hover:-translate-y-0.5 hover:bg-accent-dark"
     >
-      缴纳 1 MON 正式加入
+      缴纳会费正式加入
     </Link>
   );
 }

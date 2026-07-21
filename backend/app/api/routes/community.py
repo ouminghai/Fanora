@@ -15,6 +15,7 @@ from app.models.community import (
     CommunityPostReaction,
     CommunityReply,
     CommunityReplyLike,
+    FanTokenLedger,
 )
 from app.models.user import Community, CommunityMember, User, UserProfile, UserRole
 from app.schemas.community import (
@@ -140,6 +141,7 @@ async def to_reply_response(
         post_id=reply.post_id,
         author=await author_summary(session, reply.author_user_id),
         body=reply.body,
+        image_urls=reply.image_urls,
         parent_reply_id=reply.parent_reply_id,
         like_count=like_count,
         liked=liked,
@@ -252,7 +254,7 @@ async def join_community(
                 source_id=community.id,
                 idempotency_key=f"join-community:{community.id}:{identity.user_id}",
                 fallback_delta=50,
-                fallback_description="加入 Fanora 官方社区",
+                fallback_description="加入 Fanora 链上社区",
             )
             await session.commit()
         except IntegrityError:
@@ -264,6 +266,8 @@ async def join_community(
 async def list_posts(
     category: str | None = Query(default=None, max_length=30),
     limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0, le=10_000),
+    sort: str = Query(default="latest", pattern="^(latest|hot)$"),
     identity: AuthenticatedIdentity | None = Depends(get_optional_identity),
     session: AsyncSession = Depends(get_database_session),
 ) -> list[PostSummaryResponse]:
@@ -274,9 +278,20 @@ async def list_posts(
     )
     if category:
         query = query.where(CommunityPost.category == category)
-    posts = list(
-        (await session.execute(query.order_by(col(CommunityPost.updated_at).desc()).limit(limit))).scalars().all()
-    )
+    if sort == "latest":
+        posts = list(
+            (
+                await session.execute(
+                    query.order_by(col(CommunityPost.updated_at).desc(), col(CommunityPost.id).desc())
+                    .offset(offset)
+                    .limit(limit)
+                )
+            )
+            .scalars()
+            .all()
+        )
+    else:
+        posts = list((await session.execute(query)).scalars().all())
     responses: list[PostSummaryResponse] = []
     for post in posts:
         like_count, bookmark_count, liked, bookmarked = await post_engagement(
@@ -288,6 +303,7 @@ async def list_posts(
                 title=post.title,
                 body_preview=markdown_preview(post.body),
                 cover_url=post.cover_url,
+                image_urls=post.image_urls,
                 category=post.category,
                 reply_count=post.reply_count,
                 like_count=like_count,
@@ -299,6 +315,12 @@ async def list_posts(
                 updated_at=post.updated_at,
             )
         )
+    if sort == "hot":
+        responses.sort(
+            key=lambda post: (post.reply_count * 3 + post.like_count * 2 + post.bookmark_count * 2, post.updated_at),
+            reverse=True,
+        )
+        return responses[offset : offset + limit]
     return responses
 
 
@@ -326,6 +348,15 @@ async def create_post(
     )
     session.add(post)
     await session.flush()
+    await fan_token_service.award_rule(
+        session,
+        user_id=identity.user_id,
+        rule_code="post-publish",
+        source_id=post.id,
+        idempotency_key=f"post-publish:{post.id}",
+        fallback_delta=5,
+        fallback_description="发布帖子",
+    )
     await complete_claimed_tasks(
         session,
         user_id=identity.user_id,
@@ -333,6 +364,7 @@ async def create_post(
             task_type="content_publish",
             source_id=post.id,
             content_category=post.category,
+            content_text=f"{post.title}\n{post.body}",
             detail="The member published an eligible community creation.",
         ),
     )
@@ -343,6 +375,7 @@ async def create_post(
         title=post.title,
         body=post.body,
         cover_url=post.cover_url,
+        image_urls=post.image_urls,
         category=post.category,
         reply_count=0,
         like_count=0,
@@ -351,6 +384,8 @@ async def create_post(
         bookmarked=False,
         author=await author_summary(session, post.author_user_id),
         replies=[],
+        has_more_replies=False,
+        next_replies_offset=None,
         created_at=post.created_at,
         updated_at=post.updated_at,
     )
@@ -359,23 +394,51 @@ async def create_post(
 @router.get("/posts/{post_id}", response_model=PostDetailResponse)
 async def get_post(
     post_id: str,
+    reply_limit: int = Query(default=10, ge=1, le=50),
+    reply_offset: int = Query(default=0, ge=0),
     identity: AuthenticatedIdentity | None = Depends(get_optional_identity),
     session: AsyncSession = Depends(get_database_session),
 ) -> PostDetailResponse:
     post = await session.get(CommunityPost, post_id)
     if post is None or post.status != "published":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Post not found")
-    replies = list(
+    roots = list(
         (
             await session.execute(
                 select(CommunityReply)
-                .where(CommunityReply.post_id == post.id, CommunityReply.status == "published")
+                .where(
+                    CommunityReply.post_id == post.id,
+                    CommunityReply.status == "published",
+                    col(CommunityReply.parent_reply_id).is_(None),
+                )
                 .order_by(col(CommunityReply.created_at))
+                .offset(reply_offset)
+                .limit(reply_limit + 1)
             )
         )
         .scalars()
         .all()
     )
+    has_more_replies = len(roots) > reply_limit
+    roots = roots[:reply_limit]
+    root_ids = [reply.id for reply in roots]
+    children = []
+    if root_ids:
+        children = list(
+            (
+                await session.execute(
+                    select(CommunityReply)
+                    .where(
+                        CommunityReply.post_id == post.id,
+                        CommunityReply.status == "published",
+                        col(CommunityReply.parent_reply_id).in_(root_ids),
+                    )
+                    .order_by(col(CommunityReply.created_at))
+                )
+            )
+            .scalars()
+            .all()
+        )
     like_count, bookmark_count, liked, bookmarked = await post_engagement(
         session, post.id, identity.user_id if identity else None
     )
@@ -384,6 +447,7 @@ async def get_post(
         title=post.title,
         body=post.body,
         cover_url=post.cover_url,
+        image_urls=post.image_urls,
         category=post.category,
         reply_count=post.reply_count,
         like_count=like_count,
@@ -391,7 +455,9 @@ async def get_post(
         liked=liked,
         bookmarked=bookmarked,
         author=await author_summary(session, post.author_user_id),
-        replies=await build_reply_tree(session, replies, identity.user_id if identity else None),
+        replies=await build_reply_tree(session, [*roots, *children], identity.user_id if identity else None),
+        has_more_replies=has_more_replies,
+        next_replies_offset=reply_offset + reply_limit if has_more_replies else None,
         created_at=post.created_at,
         updated_at=post.updated_at,
     )
@@ -430,6 +496,7 @@ async def create_reply(
         author_user_id=identity.user_id,
         parent_reply_id=parent_reply_id,
         body=payload.body,
+        image_urls=payload.image_urls,
     )
     session.add(reply)
     await session.flush()
@@ -438,11 +505,11 @@ async def create_reply(
     await fan_token_service.award_rule(
         session,
         user_id=identity.user_id,
-        rule_code="valid-interaction",
+        rule_code="post-reply",
         source_id=reply.id,
-        idempotency_key=f"valid-interaction:reply:{reply.id}",
-        fallback_delta=10,
-        fallback_description="有效内容互动",
+        idempotency_key=f"post-reply:{reply.id}",
+        fallback_delta=1,
+        fallback_description="回复帖子",
     )
 
     await complete_claimed_tasks(
@@ -499,8 +566,39 @@ async def toggle_post_reaction(
     if reaction is None:
         reaction = CommunityPostReaction(post_id=post.id, user_id=user_id)
         session.add(reaction)
-    setattr(reaction, field, not bool(getattr(reaction, field)))
+    next_value = not bool(getattr(reaction, field))
+    setattr(reaction, field, next_value)
     reaction.updated_at = utc_now()
+    if field == "liked" and next_value:
+        await fan_token_service.award_rule(
+            session,
+            user_id=user_id,
+            rule_code="post-like",
+            source_id=post.id,
+            idempotency_key=f"post-like:{post.id}:{user_id}",
+            fallback_delta=1,
+            fallback_description="点赞帖子",
+        )
+    if field == "bookmarked" and next_value and post.author_user_id != user_id:
+        await session.execute(select(CommunityPost.id).where(CommunityPost.id == post.id).with_for_update())
+        rewarded_bookmarks = (
+            await session.execute(
+                select(func.count(col(FanTokenLedger.id))).where(
+                    FanTokenLedger.source_type == "rule:post-bookmark-received",
+                    FanTokenLedger.source_id == post.id,
+                )
+            )
+        ).scalar_one()
+        if rewarded_bookmarks < 10:
+            await fan_token_service.award_rule(
+                session,
+                user_id=post.author_user_id,
+                rule_code="post-bookmark-received",
+                source_id=post.id,
+                idempotency_key=f"post-bookmark-received:{post.id}:{user_id}",
+                fallback_delta=1,
+                fallback_description="帖子被收藏",
+            )
     await session.commit()
     like_count, bookmark_count, liked, bookmarked = await post_engagement(session, post.id, user_id)
     return PostEngagementResponse(

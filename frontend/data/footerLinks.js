@@ -17,7 +17,7 @@ export const nftCategories = [
 export const menuItems = [
   { id: 1, name: "Proof of Fandom", href: "/#proof-of-fandom" },
   { id: 2, name: "加入流程", href: "/#fan-journey" },
-  { id: 3, name: "官方社区", href: "/community" },
+  { id: 3, name: "链上社区", href: "/community" },
   { id: 4, name: "隐私与安全", href: "/#fan-journey" },
   { id: 5, name: "常见问题", href: "/#fan-journey" },
 ];

@@ -1,6 +1,6 @@
 # Fanora 文档中心
 
-> 更新日期：2026-07-20\
+> 更新日期：2026-07-21\
 > 当前产品基线：v1.3，单一 Fanora 官方社区 + 全局 Fan Token/等级 + ERC-721 会员身份 + ERC-1155 粉丝纪念资产 + Pinata IPFS + Monad
 
 ## 1. 文档层级
@@ -8,9 +8,11 @@
 | 文档 | 定位 | 是否作为当前基线 |
 | --- | --- | --- |
 | [PRODUCT_REQUIREMENTS.md](./PRODUCT_REQUIREMENTS.md) | 产品范围、编号需求、验收标准和 MVP 完成定义 | 是，需求事实源 |
-| [ARCHITECTURE.md](./ARCHITECTURE.md) | 系统边界、数据归属、双合约、Pinata、部署和安全设计 | 是，技术架构事实源 |
+| [ARCHITECTURE.md](./ARCHITECTURE.md) | 系统边界、数据归属、三合约、Pinata、部署和安全设计 | 是，技术架构事实源 |
 | [MVP_ROADMAP.md](./MVP_ROADMAP.md) | 按依赖关系排列的实施阶段、交付物和退出条件 | 是，执行顺序基线 |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 当前代码可执行的本地启动、测试和配置说明 | 是，开发操作基线 |
+| [CONTRACT_DEPLOYMENT.md](./CONTRACT_DEPLOYMENT.md) | Monad 合约编译、发布、角色配置和前后端参数同步 | 是，合约发布操作指南 |
+| [DELIVERY_SUMMARY_2026-07-21.md](./DELIVERY_SUMMARY_2026-07-21.md) | 社区、Fan Token、NFT、合约与 Testnet 发布完成摘要 | 是，当前交付证据 |
 | [WEEK2_DELIVERY_SUMMARY.md](./WEEK2_DELIVERY_SUMMARY.md) | 2026-07-17 阶段交付证据和当时的 Known Issues | 否，历史快照 |
 
 如果文档内容发生冲突，按以下优先级处理：
@@ -33,7 +35,8 @@ PRODUCT_REQUIREMENTS
 6. NFT 图片与 metadata 由后端上传至 Pinata IPFS Platform，合约保存 `ipfs://CID`。
 7. 未审核的用户图片只进入受控临时审核存储；批准后才固定到公开 IPFS。
 8. LangGraph 只负责粉丝画像、解释、推荐和 ERC-1155 metadata 草案，不修改积分、不决定 ERC-721 等级、不持有合约权限。
-9. 当前 `ProofOfFandomBadge.sol` 是早期 ERC-1155 SBT 原型，不等于新双合约架构已经实现。
+9. 早期 `ProofOfFandomBadge.sol` 原型已删除，付款 Gateway、ERC-721 身份和 ERC-1155 纪念资产已部署至 Monad Testnet。
+10. 当前测试网所有运营角色暂时共用部署钱包；正式环境必须拆分最小权限账户并将管理员迁移至多签。
 
 ## 3. 推荐阅读路径
 
@@ -45,10 +48,11 @@ PRODUCT_REQUIREMENTS
 
 ### 开发实现
 
-1. `DEVELOPMENT.md` 启动当前前端、后端、PostgreSQL 和合约原型。
-2. `PRODUCT_REQUIREMENTS.md` 查找需求编号与验收条件。
-3. `ARCHITECTURE.md` 确认模块边界、数据库事实源、Pinata 和链上写入约束。
-4. `MVP_ROADMAP.md` 确认当前阶段是否允许扩展范围。
+1. `DELIVERY_SUMMARY_2026-07-21.md` 了解当前已经交付的完整范围与剩余工作。
+2. `DEVELOPMENT.md` 启动当前前端、后端、PostgreSQL 和正式合约。
+3. `PRODUCT_REQUIREMENTS.md` 查找需求编号与验收条件。
+4. `ARCHITECTURE.md` 确认模块边界、数据库事实源、Pinata 和链上写入约束。
+5. `CONTRACT_DEPLOYMENT.md` 执行测试网发布与三端配置同步。
 
 ### 了解历史进度
 

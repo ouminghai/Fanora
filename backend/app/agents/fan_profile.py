@@ -26,18 +26,21 @@ from app.services.llm.service import LLMUnavailable
 
 class FanProfileState(TypedDict, total=False):
     wallet_address: Required[str]
-    community_id: Required[str]
     fan_token_balance: Required[int]
     completed_tasks: Required[int]
     active_days: Required[int]
     referrals: Required[int]
     onchain_actions: Required[int]
+    chain_summary: Required[dict[str, Any]]
+    risk_signals: Required[list[str]]
     scores: Required[dict[str, int]]
     fan_type: Required[FanType]
+    labels: Required[list[str]]
+    risk_level: Required[str]
     summary: Required[str]
     analysis_source: Required[str]
     badge_eligible: Required[bool]
-    badge_draft: Required[dict[str, str] | None]
+    badge_draft: Required[dict[str, Any] | None]
 
 
 def calculate_scores(state: FanProfileState) -> dict[str, Any]:
@@ -61,14 +64,29 @@ def calculate_scores(state: FanProfileState) -> dict[str, Any]:
 def classify_fan(state: FanProfileState) -> dict[str, FanType]:
     score = state["scores"]["total"]
     if score >= 80:
-        fan_type: FanType = "core_contributor"
+        fan_type: FanType = "high_value_contributor"
     elif state.get("referrals", 0) >= 3:
         fan_type = "advocate"
-    elif state.get("active_days", 0) >= 10:
+    elif state.get("active_days", 0) >= 30:
         fan_type = "loyal_fan"
+    elif state.get("active_days", 0) >= 10:
+        fan_type = "active_fan"
+    elif state.get("chain_summary", {}).get("early_supporter") is True:
+        fan_type = "early_supporter"
     else:
         fan_type = "emerging_fan"
-    return {"fan_type": fan_type}
+    labels: list[str] = [fan_type]
+    if state.get("active_days", 0) >= 30 and "loyal_fan" not in labels:
+        labels.append("loyal_fan")
+    if state.get("referrals", 0) >= 3 and "advocate" not in labels:
+        labels.append("advocate")
+    if state.get("completed_tasks", 0) >= 10 and "active_fan" not in labels:
+        labels.append("active_fan")
+    if state.get("chain_summary", {}).get("early_supporter") is True and "early_supporter" not in labels:
+        labels.append("early_supporter")
+    risk_count = len(state.get("risk_signals", []))
+    risk_level = "high" if risk_count >= 3 else "medium" if risk_count else "low"
+    return {"fan_type": fan_type, "labels": labels, "risk_level": risk_level}  # type: ignore[return-value]
 
 
 def _rule_summary(state: FanProfileState) -> str:
@@ -78,13 +96,18 @@ def _rule_summary(state: FanProfileState) -> str:
     )
 
 
-def _rule_badge_draft(state: FanProfileState) -> dict[str, str] | None:
+def _rule_badge_draft(state: FanProfileState) -> dict[str, Any] | None:
     if not state.get("badge_eligible"):
         return None
     return {
         "name": f"{state['fan_type'].replace('_', ' ').title()} Badge",
-        "description": "Proof of Fandom badge generated from verified Fan Token activity.",
+        "description": "Proof of Fandom badge draft generated from verified Fanora activity.",
         "level": state["fan_type"],
+        "image_prompt": "A premium Fanora digital commemorative badge with musical energy and verifiable fandom symbolism.",
+        "suggested_attributes": [
+            {"trait_type": "Fan Type", "value": state["fan_type"]},
+            {"trait_type": "Score", "value": str(state["scores"]["total"])},
+        ],
     }
 
 
@@ -110,7 +133,7 @@ def build_fan_profile_graph(
             ),
             HumanMessage(
                 content=(
-                    f"Community: {state['community_id']}\nFan Token balance: {state['fan_token_balance']}\n"
+                    f"Fan Token balance: {state['fan_token_balance']}\n"
                     f"Completed tasks: {state['completed_tasks']}\nActive days: {state['active_days']}\n"
                     f"Referrals: {state['referrals']}\nOnchain actions: {state['onchain_actions']}\n"
                     f"Verified scores: {state['scores']}\nRule classification: {state['fan_type']}\n"
@@ -129,6 +152,8 @@ def build_fan_profile_graph(
                     "name": narrative.badge_name or rule_draft["name"],
                     "description": narrative.badge_description or rule_draft["description"],
                     "level": narrative.fan_type,
+                    "image_prompt": narrative.image_prompt or rule_draft["image_prompt"],
+                    "suggested_attributes": rule_draft["suggested_attributes"],
                 }
             return {
                 "fan_type": narrative.fan_type,
@@ -178,11 +203,16 @@ class FanProfileAgent:
             return FanProfileAnalysis(
                 run_id=run_id,
                 wallet_address=request.wallet_address,
-                community_id=request.community_id,
                 scores=FanProfileScores(**result["scores"]),
                 fan_type=result["fan_type"],
+                labels=result["labels"],
+                risk_level=result["risk_level"],
                 summary=result["summary"],
                 analysis_source=source,
+                degraded=source == "rules" and self.model_service.available,
+                rule_version="fan-profile-v2",
+                prompt_version="fan-profile-prompt-v2",
+                model_id=settings.openai_model if source == "llm" else "rules",
                 badge_eligible=result["badge_eligible"],
                 badge_draft=BadgeDraft(**result["badge_draft"]) if result.get("badge_draft") else None,
             )

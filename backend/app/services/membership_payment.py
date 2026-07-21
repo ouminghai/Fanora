@@ -11,6 +11,7 @@ from sqlmodel import select
 from web3 import Web3
 from web3.exceptions import TimeExhausted, TransactionNotFound
 
+from app.adapters.monad import monad_contract_adapter
 from app.core.config import settings
 from app.models.base import utc_now
 from app.models.user import OfficialMembershipPayment, UserProfile
@@ -22,6 +23,8 @@ class ConfirmedChainPayment:
     transaction_hash: str
     from_address: str
     to_address: str
+    treasury_address: str
+    payment_id: str
     value_wei: int
     chain_id: int
     block_number: int
@@ -29,13 +32,19 @@ class ConfirmedChainPayment:
 
 
 class OfficialMembershipPaymentService:
-    def configured_treasury(self) -> str:
-        if not settings.membership_treasury_address or not Web3.is_address(settings.membership_treasury_address):
+    def configured_gateway(self) -> str:
+        if not settings.membership_payment_contract_address or not Web3.is_address(
+            settings.membership_payment_contract_address
+        ):
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Official membership payment address is not configured",
+                detail="Official membership payment contract is not configured",
             )
-        return Web3.to_checksum_address(settings.membership_treasury_address)
+        return Web3.to_checksum_address(settings.membership_payment_contract_address)
+
+    @staticmethod
+    def payment_id_for_user(user_id: str) -> str:
+        return Web3.keccak(text=f"fanora-membership:{user_id}").hex()
 
     async def _load_chain_payment(self, transaction_hash: str) -> ConfirmedChainPayment:
         def load() -> ConfirmedChainPayment:
@@ -79,10 +88,33 @@ class OfficialMembershipPaymentService:
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Membership payment transaction is missing transfer fields",
                 )
+            gateway = web3.eth.contract(
+                address=Web3.to_checksum_address(self.configured_gateway()),
+                abi=monad_contract_adapter.membership_gateway_abi,
+            )
+            events = gateway.events.MembershipPaid().process_receipt(receipt)
+            if len(events) != 1:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Transaction does not contain one valid MembershipPaid event",
+                )
+            event = events[0]["args"]
+            if Web3.to_checksum_address(event["account"]) != Web3.to_checksum_address(from_address):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="MembershipPaid account does not match the transaction sender",
+                )
+            if int(event["amount"]) != int(value_wei):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="MembershipPaid amount does not match the transaction value",
+                )
             return ConfirmedChainPayment(
                 transaction_hash=transaction_hash.lower(),
                 from_address=Web3.to_checksum_address(from_address),
                 to_address=Web3.to_checksum_address(to_address),
+                treasury_address=Web3.to_checksum_address(event["treasury"]),
+                payment_id=event["paymentId"].hex(),
                 value_wei=int(value_wei),
                 chain_id=int(web3.eth.chain_id),
                 block_number=block_number,
@@ -97,7 +129,7 @@ class OfficialMembershipPaymentService:
         identity: AuthenticatedIdentity,
         transaction_hash: str,
     ) -> OfficialMembershipPayment:
-        treasury_address = self.configured_treasury()
+        gateway_address = self.configured_gateway()
         profile = await session.get(UserProfile, identity.user_id)
         if profile is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found")
@@ -131,10 +163,10 @@ class OfficialMembershipPaymentService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Payment sender does not match the signed-in primary wallet",
             )
-        if payment.to_address != treasury_address:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment recipient is incorrect")
-        if payment.value_wei < settings.membership_fee_wei:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Membership payment is less than 1 MON")
+        if payment.to_address != gateway_address:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment was not sent through the membership contract")
+        if payment.payment_id != self.payment_id_for_user(identity.user_id):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Membership payment id does not match this user")
         if payment.confirmations < settings.membership_min_confirmations:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -145,7 +177,7 @@ class OfficialMembershipPaymentService:
         record = OfficialMembershipPayment(
             user_id=identity.user_id,
             wallet_address=payment.from_address,
-            treasury_address=payment.to_address,
+            treasury_address=payment.treasury_address,
             transaction_hash=payment.transaction_hash,
             chain_id=payment.chain_id,
             amount_wei=payment.value_wei,

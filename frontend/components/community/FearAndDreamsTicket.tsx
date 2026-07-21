@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import FanTokenAmount from "@/components/common/FanTokenAmount";
+import MarkdownEditor from "@/components/community/MarkdownEditor";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { api } from "@/lib/api/client";
 import type { FanTask, OfficialCommunity } from "@/lib/api/types";
@@ -21,6 +22,7 @@ export default function FearAndDreamsTicket() {
   const [task, setTask] = useState<FanTask | null>(null);
   const [community, setCommunity] = useState<OfficialCommunity | null>(null);
   const [memory, setMemory] = useState("");
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -51,7 +53,7 @@ export default function FearAndDreamsTicket() {
     try {
       await api.post("/community/join");
       await Promise.all([load(), refreshUser()]);
-      setNotice("已加入官方社区，现在可以领取纪念票任务。 ");
+      setNotice("已加入链上社区，现在可以领取纪念票任务。 ");
     } catch (error) { setNotice(message(error)); } finally { setBusy(null); }
   };
 
@@ -62,9 +64,10 @@ export default function FearAndDreamsTicket() {
     }
     setBusy("complete");
     try {
-      const response = await api.post<FanTask>(`/tasks/${task.id}/complete`, { interaction_note: memory.trim() });
+      const response = await api.post<FanTask>(`/tasks/${task.id}/complete`, { interaction_note: memory.trim(), image_urls: imageUrls });
       setTask(response.data);
       await refreshUser();
+      setImageUrls([]);
       setNotice("纪念页打卡完成，500 FAN 已发放。NFT 纪念票将在后续版本开放。 ");
     } catch (error) { setNotice(message(error)); } finally { setBusy(null); }
   };
@@ -116,22 +119,21 @@ export default function FearAndDreamsTicket() {
           <div className="rounded-[2rem] border border-white/10 bg-[#111538] p-6 md:p-8">
             <p className="text-xs font-bold uppercase tracking-[.24em] text-accent-light">Your live memory</p>
             <h2 className="mt-4 font-display text-3xl font-semibold">你最想留住哪一个现场瞬间？</h2>
-            <p className="mt-4 text-sm leading-7 text-white/50">这段文字会作为本次任务的互动记录保存在任务审计中，未来可继续扩展为纪念票元数据或公开社区故事。</p>
-            <textarea value={memory} onChange={(event) => setMemory(event.target.value)} maxLength={300} rows={5} placeholder="例如：灯光熄灭前，全场一起唱完最后一句的那一刻……" className="mt-6 w-full resize-none rounded-2xl border-white/10 bg-white/[.05] text-white placeholder:text-white/25 focus:border-accent/50" />
-            <div className="mt-2 text-right text-xs text-white/30">{memory.trim().length}/300</div>
+            <p className="mt-4 text-sm leading-7 text-white/50">用 Markdown 写下现场记忆，也可以上传多张图片。内容会作为本次任务提交记录保存，未来可扩展为纪念票元数据或公开社区故事。</p>
+            <MarkdownEditor value={memory} onChange={setMemory} maxLength={300} imageUrls={imageUrls} onImageUrlsChange={setImageUrls} onImageError={setNotice} />
           </div>
 
           <aside className="rounded-[2rem] border border-white/10 bg-[#111538] p-6 md:p-8">
             <h2 className="font-display text-2xl font-semibold">领取流程</h2>
             <ol className="mt-6 space-y-5 text-sm text-white/55">
-              <li className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">1</span><span>加入 Fanora 官方社区并领取任务</span></li>
+              <li className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">1</span><span>加入 Fanora 链上社区并领取任务</span></li>
               <li className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">2</span><span>写下至少 10 个字的现场记忆</span></li>
               <li className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">3</span><span>完成打卡并领取 500 FAN</span></li>
             </ol>
             <div className="mt-7">
               {!user ? <Link href="/login" className="web3-action-button block rounded-full py-3.5 text-center font-semibold">登录后领取</Link>
                 : !user.is_official_member ? <Link href="/membership/join" className="web3-action-button block rounded-full py-3.5 text-center font-semibold">正式入会后领取</Link>
-                  : !joined ? <button onClick={() => void join()} disabled={busy === "join"} className="web3-action-button w-full rounded-full py-3.5 font-semibold">{busy === "join" ? "加入中…" : "先加入官方社区"}</button>
+                  : !joined ? <button onClick={() => void join()} disabled={busy === "join"} className="web3-action-button w-full rounded-full py-3.5 font-semibold">{busy === "join" ? "加入中…" : "先加入链上社区"}</button>
                     : !task ? <div className="rounded-full bg-white/5 py-3.5 text-center text-sm text-white/35">任务加载中…</div>
                       : !task.participation_status ? <button onClick={() => void claim()} disabled={busy === "claim" || !task.eligible} className="web3-action-button w-full rounded-full py-3.5 font-semibold disabled:opacity-45">{busy === "claim" ? "领取中…" : "领取纪念票任务"}</button>
                         : task.participation_status === "claimed" ? <button onClick={() => void complete()} disabled={busy === "complete" || memory.trim().length < 10} className="web3-action-button w-full rounded-full py-3.5 font-semibold disabled:opacity-45">{busy === "complete" ? "记录中…" : "完成打卡并领取 FAN"}</button>

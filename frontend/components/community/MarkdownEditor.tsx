@@ -2,11 +2,15 @@
 
 import { useRef, useState } from "react";
 import MarkdownContent from "@/components/community/MarkdownContent";
+import ImageAttachmentPicker from "@/components/community/ImageAttachmentPicker";
 
 type MarkdownEditorProps = {
   value: string;
   onChange: (value: string) => void;
   maxLength?: number;
+  imageUrls?: string[];
+  onImageUrlsChange?: (value: string[]) => void;
+  onImageError?: (message: string) => void;
 };
 
 const toolbar = [
@@ -20,7 +24,7 @@ const toolbar = [
   { label: "</>", title: "代码", before: "`", after: "`", placeholder: "代码" },
 ];
 
-export default function MarkdownEditor({ value, onChange, maxLength = 10_000 }: MarkdownEditorProps) {
+export default function MarkdownEditor({ value, onChange, maxLength = 10_000, imageUrls, onImageUrlsChange, onImageError }: MarkdownEditorProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [mode, setMode] = useState<"write" | "preview">("write");
 
@@ -63,6 +67,7 @@ export default function MarkdownEditor({ value, onChange, maxLength = 10_000 }: 
         <span>支持 Markdown 与 GitHub 风格表格、删除线和任务列表</span>
         <span>{value.length}/{maxLength}</span>
       </div>
+      {imageUrls && onImageUrlsChange && <div className="border-t border-white/5 px-4 pb-3"><ImageAttachmentPicker value={imageUrls} onChange={onImageUrlsChange} onError={onImageError} compact /></div>}
     </div>
   );
 }

@@ -7,6 +7,22 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes communityPageEnter {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes communityCardEnter {
+  from { opacity: 0; transform: translateY(24px) scale(.97); }
+  to { opacity: var(--community-card-opacity, 1); transform: translateY(0) scale(1); }
+}
+
+@keyframes communityNoticeEnter {
+  0% { opacity: 0; transform: translateY(-8px) scale(.98); }
+  65% { opacity: 1; transform: translateY(2px) scale(1.005); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
 @keyframes web3OrbFloat {
   0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
   50% { transform: translate3d(0, 18px, 0) scale(1.08); }
@@ -21,6 +37,107 @@
 
 .community-reveal {
   animation: communityReveal .62s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.community-page-enter {
+  animation: communityPageEnter .5s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.community-hero-enter {
+  animation: communityReveal .75s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.community-hero-enter > div:last-child > * {
+  opacity: 0;
+  animation: communityReveal .6s cubic-bezier(.22, 1, .36, 1) forwards;
+}
+
+.community-hero-enter > div:last-child > *:first-child { animation-delay: .12s; }
+.community-hero-enter > div:last-child > *:last-child { animation-delay: .22s; }
+
+.community-section-enter {
+  animation: communityReveal .7s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+.community-section-enter--1 { animation-delay: .1s; }
+.community-section-enter--2 { animation-delay: .18s; }
+.community-section-enter--3 { animation-delay: .26s; }
+.community-section-enter--4 { animation-delay: .34s; }
+
+.community-sidebar-enter {
+  animation: communityReveal .72s cubic-bezier(.22, 1, .36, 1) .24s both;
+}
+
+.community-list-item,
+.community-grid-card,
+.community-task-card {
+  opacity: 0;
+  animation: communityCardEnter .62s cubic-bezier(.22, 1, .36, 1) forwards;
+  animation-delay: var(--community-item-delay, 0ms);
+}
+
+.community-task-card.opacity-75 {
+  --community-card-opacity: .75;
+}
+
+.community-list-item,
+.community-grid-card,
+.community-task-card {
+  transition:
+    transform .32s cubic-bezier(.22, 1, .36, 1),
+    border-color .32s ease,
+    box-shadow .32s ease;
+}
+
+.community-list-item:hover,
+.community-grid-card:hover,
+.community-task-card:hover {
+  transform: translateY(-6px) scale(1.01);
+  box-shadow: 0 22px 55px rgba(6, 8, 31, .3), 0 0 28px rgba(131, 88, 255, .09);
+}
+
+.community-task-card::after {
+  position: absolute;
+  inset: 0;
+  content: "";
+  background: linear-gradient(115deg, transparent 32%, rgba(255,255,255,.12) 48%, transparent 64%);
+  opacity: 0;
+  transform: translateX(-75%);
+  transition: opacity .25s ease, transform .7s cubic-bezier(.22, 1, .36, 1);
+  pointer-events: none;
+}
+
+.community-task-card:hover::after {
+  opacity: 1;
+  transform: translateX(75%);
+}
+
+.community-motion-button {
+  transition: transform .2s ease, border-color .25s ease, background-color .25s ease, box-shadow .25s ease;
+}
+
+.community-motion-button:hover { transform: translateY(-2px); }
+.community-motion-button:active { transform: translateY(0) scale(.96); }
+
+.community-stat-card {
+  transition: transform .3s cubic-bezier(.22, 1, .36, 1), box-shadow .3s ease;
+}
+
+.community-stat-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 32px rgba(13, 16, 45, .12);
+}
+
+.community-notice-enter {
+  animation: communityNoticeEnter .48s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@supports (animation-timeline: view()) {
+  .community-section-enter {
+    animation-timeline: view();
+    animation-range: entry 0% cover 28%;
+    animation-delay: 0s;
+  }
 }
 
 .web3-orb {
@@ -85,8 +202,31 @@
 .creation-action:hover, .post-action:hover { background: rgba(131,88,255,.11); transform: translateY(-1px); }
 
 @media (prefers-reduced-motion: reduce) {
-  .community-reveal, .web3-orb { animation: none; }
-  .web3-interactive-card, .web3-action-button { transition: none; }
+  .community-reveal,
+  .community-page-enter,
+  .community-hero-enter,
+  .community-hero-enter > div:last-child > *,
+  .community-section-enter,
+  .community-sidebar-enter,
+  .community-list-item,
+  .community-grid-card,
+  .community-task-card,
+  .community-notice-enter,
+  .web3-orb {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+  .web3-interactive-card,
+  .web3-action-button,
+  .community-list-item,
+  .community-grid-card,
+  .community-task-card,
+  .community-motion-button,
+  .community-stat-card {
+    transition: none;
+  }
+  .community-task-card::after { display: none; }
 }
 
 @layer utilities {

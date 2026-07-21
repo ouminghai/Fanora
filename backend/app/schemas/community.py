@@ -8,6 +8,12 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 from app.schemas.auth import validate_image_url
 
 
+def validate_image_urls(value: list[str]) -> list[str]:
+    if len(value) > 6:
+        raise ValueError("A maximum of 6 images is allowed")
+    return [validate_image_url(item, label="Image") for item in value]
+
+
 class AuthorSummary(BaseModel):
     id: str
     display_name: str
@@ -37,6 +43,7 @@ class PostCreate(BaseModel):
     body: str = Field(min_length=10, max_length=10_000)
     category: Literal["discussion", "music", "story", "creation"] = "discussion"
     cover_url: str | None = None
+    image_urls: list[str] = Field(default_factory=list)
 
     @field_validator("title", "body")
     @classmethod
@@ -48,15 +55,26 @@ class PostCreate(BaseModel):
     def validate_cover(cls, value: str | None) -> str | None:
         return validate_image_url(value, label="Cover image")
 
+    @field_validator("image_urls")
+    @classmethod
+    def validate_images(cls, value: list[str]) -> list[str]:
+        return validate_image_urls(value)
+
 
 class ReplyCreate(BaseModel):
     body: str = Field(min_length=10, max_length=2000)
     parent_reply_id: str | None = None
+    image_urls: list[str] = Field(default_factory=list)
 
     @field_validator("body")
     @classmethod
     def clean_body(cls, value: str) -> str:
         return value.strip()
+
+    @field_validator("image_urls")
+    @classmethod
+    def validate_images(cls, value: list[str]) -> list[str]:
+        return validate_image_urls(value)
 
 
 class ReplyResponse(BaseModel):
@@ -64,6 +82,7 @@ class ReplyResponse(BaseModel):
     post_id: str
     author: AuthorSummary
     body: str
+    image_urls: list[str]
     parent_reply_id: str | None
     like_count: int
     liked: bool
@@ -76,6 +95,7 @@ class PostSummaryResponse(BaseModel):
     title: str
     body_preview: str
     cover_url: str | None
+    image_urls: list[str]
     category: str
     reply_count: int
     like_count: int
@@ -92,6 +112,7 @@ class PostDetailResponse(BaseModel):
     title: str
     body: str
     cover_url: str | None
+    image_urls: list[str]
     category: str
     reply_count: int
     like_count: int
@@ -100,6 +121,8 @@ class PostDetailResponse(BaseModel):
     bookmarked: bool
     author: AuthorSummary
     replies: list[ReplyResponse]
+    has_more_replies: bool = False
+    next_replies_offset: int | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -155,6 +178,12 @@ class TaskStatusUpdate(BaseModel):
 
 class TaskPageCompletion(BaseModel):
     interaction_note: str = Field(min_length=10, max_length=300)
+    image_urls: list[str] = Field(default_factory=list)
+
+    @field_validator("image_urls")
+    @classmethod
+    def validate_images(cls, value: list[str]) -> list[str]:
+        return validate_image_urls(value)
 
 
 class TaskResponse(BaseModel):
@@ -168,6 +197,7 @@ class TaskResponse(BaseModel):
     reward_fan_tokens: int
     target_post_id: str | None
     target_post_title: str | None
+    required_tag: str | None
     presentation: TaskPresentation
     participation_limit: int | None
     participant_count: int
@@ -178,6 +208,11 @@ class TaskResponse(BaseModel):
     updated_at: datetime
 
 
+class CheckInRecordResponse(BaseModel):
+    check_in_date: date
+    reward_fan_tokens: int
+
+
 class CheckInResponse(BaseModel):
     check_in_date: date
     checked_in: bool
@@ -185,6 +220,9 @@ class CheckInResponse(BaseModel):
     streak_days: int
     reward_fan_tokens: int
     fan_token_balance: int
+    month: str
+    monthly_records: list[CheckInRecordResponse]
+    monthly_reward_fan_tokens: int
 
 
 class FanTokenLedgerResponse(BaseModel):

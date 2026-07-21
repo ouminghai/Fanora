@@ -369,7 +369,7 @@ TASK_SEEDS = [
 
 async def seed_product_defaults(session: AsyncSession) -> None:
     if await session.get(User, SYSTEM_USER_ID) is None:
-        session.add(User(id=SYSTEM_USER_ID, display_name="Fanora 官方", status="system"))
+        session.add(User(id=SYSTEM_USER_ID, display_name="Fanora Protocol", status="system"))
         await session.flush()
     if await session.get(Community, OFFICIAL_COMMUNITY_ID) is None:
         session.add(
@@ -377,8 +377,8 @@ async def seed_product_defaults(session: AsyncSession) -> None:
                 id=OFFICIAL_COMMUNITY_ID,
                 owner_user_id=SYSTEM_USER_ID,
                 slug="fanora-official",
-                name="Fanora 官方社区",
-                description="围绕音乐、现场与长期支持展开的唯一官方粉丝社区。",
+                name="Fanora 链上社区",
+                description="围绕音乐、现场与长期支持展开的链上共创空间。",
                 logo_url="/img/logo.png",
             )
         )

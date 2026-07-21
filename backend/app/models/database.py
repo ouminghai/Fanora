@@ -13,6 +13,14 @@ from app.models.community import (
 )
 from app.models.fan_profile import FanProfileRun
 from app.models.membership import FanTokenConfig, FanTokenRule, MembershipLevel
+from app.models.nft import (
+    ChainOperation,
+    CollectibleOwnership,
+    CollectibleTokenType,
+    MembershipIdentityNft,
+    NftApplication,
+    NftMetadataVersion,
+)
 from app.models.user import (
     AuthIdentity,
     AuthSecurityEvent,
@@ -44,6 +52,12 @@ __all__ = [
     "FanTask",
     "LoginChallenge",
     "MembershipLevel",
+    "ChainOperation",
+    "CollectibleOwnership",
+    "CollectibleTokenType",
+    "MembershipIdentityNft",
+    "NftApplication",
+    "NftMetadataVersion",
     "OfficialMembershipPayment",
     "User",
     "UserProfile",

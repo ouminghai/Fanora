@@ -1,20 +1,22 @@
 """Structured input and output for the Fanora profile Agent."""
 
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-FanType = Literal["emerging_fan", "loyal_fan", "advocate", "core_contributor"]
+FanType = Literal["emerging_fan", "loyal_fan", "advocate", "active_fan", "early_supporter", "high_value_contributor"]
+RiskLevel = Literal["low", "medium", "high"]
 
 
 class FanProfileRequest(BaseModel):
     wallet_address: str
-    community_id: str = Field(min_length=1, max_length=100)
     fan_token_balance: int = Field(default=0, ge=0)
     completed_tasks: int = Field(default=0, ge=0)
     active_days: int = Field(default=0, ge=0)
     referrals: int = Field(default=0, ge=0)
     onchain_actions: int = Field(default=0, ge=0)
+    chain_summary: dict[str, Any] = Field(default_factory=dict)
+    risk_signals: list[str] = Field(default_factory=list, max_length=20)
 
     @field_validator("wallet_address")
     @classmethod
@@ -41,6 +43,8 @@ class BadgeDraft(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     description: str = Field(min_length=1, max_length=500)
     level: str = Field(min_length=1, max_length=50)
+    image_prompt: str = Field(min_length=1, max_length=500)
+    suggested_attributes: list[dict[str, str]] = Field(default_factory=list, max_length=12)
 
 
 class FanProfileNarrative(BaseModel):
@@ -48,15 +52,21 @@ class FanProfileNarrative(BaseModel):
     summary: str = Field(min_length=1, max_length=600)
     badge_name: str | None = Field(default=None, max_length=100)
     badge_description: str | None = Field(default=None, max_length=500)
+    image_prompt: str | None = Field(default=None, max_length=500)
 
 
 class FanProfileAnalysis(BaseModel):
     run_id: str
     wallet_address: str
-    community_id: str
     scores: FanProfileScores
     fan_type: FanType
+    labels: list[str]
+    risk_level: RiskLevel
     summary: str
     analysis_source: Literal["rules", "llm"]
+    degraded: bool
+    rule_version: str
+    prompt_version: str
+    model_id: str
     badge_eligible: bool
     badge_draft: BadgeDraft | None = None

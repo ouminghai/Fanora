@@ -21,6 +21,7 @@ dependencies = [
   "langgraph-checkpoint-postgres>=3.0",
   "pyjwt[crypto]>=2.10",
   "prometheus-client>=0.22",
+  "pillow>=11.0",
   "psycopg[binary,pool]>=3.2",
   "pydantic-settings>=2.8",
   "slowapi>=0.1.9",

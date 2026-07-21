@@ -18,6 +18,7 @@ class CommunityPost(SQLModel, table=True):
     title: str = Field(max_length=120, index=True)
     body: str = Field(max_length=10_000)
     cover_url: str | None = Field(default=None, max_length=1_500_000)
+    image_urls: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     category: str = Field(default="discussion", max_length=30, index=True)
     status: str = Field(default="published", max_length=20, index=True)
     reply_count: int = Field(default=0, ge=0)
@@ -33,6 +34,7 @@ class CommunityReply(SQLModel, table=True):
     author_user_id: str = Field(foreign_key="users.id", index=True)
     parent_reply_id: str | None = Field(default=None, foreign_key="community_replies.id", index=True)
     body: str = Field(max_length=2000)
+    image_urls: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     status: str = Field(default="published", max_length=20, index=True)
     created_at: datetime = Field(default_factory=utc_now, index=True)
     updated_at: datetime = Field(default_factory=utc_now)
@@ -99,6 +101,7 @@ class TaskParticipation(SQLModel, table=True):
     status: str = Field(default="claimed", max_length=20, index=True)
     reward_snapshot: int
     reply_id: str | None = Field(default=None, foreign_key="community_replies.id", index=True)
+    submission: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
     claimed_at: datetime = Field(default_factory=utc_now)
     submitted_at: datetime | None = Field(default=None)
     completed_at: datetime | None = Field(default=None)

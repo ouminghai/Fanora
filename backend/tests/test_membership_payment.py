@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from eth_account import Account
 
+from app.adapters.monad import monad_contract_adapter
 from app.core.config import settings
 from app.core.database import database_service
 from app.models.base import utc_now
@@ -38,14 +39,23 @@ async def test_verified_one_mon_payment_activates_official_membership(client, mo
             ]
         )
         await session.commit()
+        user_id = user.id
 
-    monkeypatch.setattr(settings, "membership_treasury_address", treasury)
+    gateway = Account.create().address
+    monkeypatch.setattr(settings, "membership_payment_contract_address", gateway)
+
+    async def current_fee() -> int:
+        return settings.membership_fee_wei
+
+    monkeypatch.setattr(monad_contract_adapter, "membership_fee", current_fee)
 
     async def confirmed_payment(_: str) -> ConfirmedChainPayment:
         return ConfirmedChainPayment(
             transaction_hash=transaction_hash,
             from_address=account.address,
-            to_address=treasury,
+            to_address=gateway,
+            treasury_address=treasury,
+            payment_id=official_membership_payment_service.payment_id_for_user(user_id),
             value_wei=settings.membership_fee_wei,
             chain_id=settings.monad_chain_id,
             block_number=123,
@@ -76,7 +86,7 @@ async def test_verified_one_mon_payment_activates_official_membership(client, mo
     assert me_response.json()["level"] == "新生儿"
 
 
-async def test_membership_status_does_not_offer_payment_without_treasury(client):
+async def test_membership_status_does_not_offer_payment_without_gateway(client):
     account = Account.create()
     raw_token = "membership-unconfigured-session-token"
 
@@ -102,4 +112,4 @@ async def test_membership_status_does_not_offer_payment_without_treasury(client)
         headers={"Authorization": f"Bearer {raw_token}"},
     )
     assert response.status_code == 200
-    assert response.json()["treasury_address"] is None
+    assert response.json()["payment_contract_address"] is None

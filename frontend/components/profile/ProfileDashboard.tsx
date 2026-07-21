@@ -255,13 +255,13 @@ export default function ProfileDashboard() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs font-bold uppercase tracking-[.18em] text-accent">Official community</p>
-                  <h2 className="mt-2 font-display text-xl font-semibold text-jacarta-700 dark:text-white">Fanora 官方社区</h2>
+                  <h2 className="mt-2 font-display text-xl font-semibold text-jacarta-700 dark:text-white">Fanora 链上社区</h2>
                 </div>
                 <span className="rounded-full bg-accent/10 px-3 py-1 text-xs font-semibold text-accent">已加入 {joinedIds.size}</span>
               </div>
               <div className="mt-5 space-y-3">
                 {communities.length === 0 ? (
-                  <p className="rounded-xl bg-jacarta-50 p-4 text-sm leading-6 text-jacarta-500 dark:bg-white/[.04] dark:text-jacarta-300">官方社区正在初始化，请稍后刷新。</p>
+                  <p className="rounded-xl bg-jacarta-50 p-4 text-sm leading-6 text-jacarta-500 dark:bg-white/[.04] dark:text-jacarta-300">链上社区正在初始化，请稍后刷新。</p>
                 ) : communities.map((community) => {
                   const joined = joinedIds.has(community.id);
                   return (

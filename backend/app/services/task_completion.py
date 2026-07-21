@@ -21,6 +21,7 @@ class TaskCompletionEvent:
     reply_id: str | None = None
     reply_length: int | None = None
     content_category: str | None = None
+    content_text: str | None = None
     award_tokens: bool = True
 
 
@@ -35,6 +36,9 @@ def _matches(task: FanTask, event: TaskCompletionEvent) -> bool:
             return False
     allowed_categories = task.validation_rule.get("content_categories", [])
     if allowed_categories and event.content_category not in allowed_categories:
+        return False
+    required_tag = (task.validation_rule.get("required_tag") or f"#{task.title}") if task.task_type == "content_publish" else None
+    if required_tag and (event.content_text is None or required_tag.casefold() not in event.content_text.casefold()):
         return False
     return True
 

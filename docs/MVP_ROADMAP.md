@@ -135,7 +135,7 @@
 
 ## 8. 阶段 6：部署与发布验收
 
-1. 两个合约部署至 Monad Testnet。
+1. Gateway、ERC-721 身份和 ERC-1155 纪念资产三个合约部署至 Monad Testnet。
 2. ABI、地址、chainId 和事件起始区块同步到前后端。
 3. Pinata 使用独立项目和最小权限 JWT。
 4. 管理员、铸造、等级、类型、URI 和暂停角色分离。

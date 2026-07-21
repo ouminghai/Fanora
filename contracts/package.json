@@ -3,9 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "compile": "hardhat compile",
+    "compile": "hardhat compile && hardhat run scripts/export-abis.ts",
     "test": "hardhat test",
-    "deploy:testnet": "hardhat run scripts/deploy.ts --network monadTestnet"
+    "export:abis": "hardhat run scripts/export-abis.ts",
+    "deploy:testnet": "hardhat run --no-compile scripts/deploy.ts --network monadTestnet",
+    "sync:testnet": "ts-node scripts/sync-deployment.ts monadTestnet",
+    "verify:testnet": "hardhat run --no-compile scripts/verify-deployment.ts --network monadTestnet",
+    "release:testnet": "npm test && npm run compile && npm run deploy:testnet && npm run sync:testnet && npm run verify:testnet"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
@@ -16,4 +20,3 @@
     "typescript": "^5.7.3"
   }
 }
-

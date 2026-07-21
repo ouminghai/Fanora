@@ -1,6 +1,6 @@
 """Off-chain fan tasks, daily check-ins, and deterministic completion."""
 
-from datetime import timedelta
+from datetime import date, timedelta
 from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -94,7 +94,7 @@ async def to_task_response(
     elif not is_official_member:
         reason = "正式入会后可参与"
     elif not joined:
-        reason = "请先加入官方社区"
+        reason = "请先加入链上社区"
     elif task.participation_limit is not None and participant_count >= task.participation_limit:
         eligible = False
         reason = "任务名额已满"
@@ -109,6 +109,7 @@ async def to_task_response(
         reward_fan_tokens=task.reward_fan_tokens,
         target_post_id=task.target_post_id,
         target_post_title=target_title,
+        required_tag=task.validation_rule.get("required_tag") or f"#{task.title}",
         presentation=task_presentation(task),
         participation_limit=task.participation_limit,
         participant_count=participant_count,
@@ -284,6 +285,10 @@ async def complete_page_task(
     if participation is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Claim the task before completing it")
     if participation.status == "claimed":
+        participation.submission = {
+            "body": payload.interaction_note,
+            "image_urls": payload.image_urls,
+        }
         await complete_claimed_tasks(
             session,
             user_id=identity.user_id,
@@ -405,28 +410,74 @@ async def change_task_status(
     return await to_task_response(session, task, user_id=identity.user_id, is_official_member=True, joined=True)
 
 
+async def build_check_in_response(
+    session: AsyncSession,
+    *,
+    user_id: str,
+    local_date: date,
+    already_checked_in: bool,
+) -> CheckInResponse:
+    month_start = local_date.replace(day=1)
+    next_month = (
+        date(month_start.year + 1, 1, 1)
+        if month_start.month == 12
+        else date(month_start.year, month_start.month + 1, 1)
+    )
+    monthly_records = list(
+        (
+            await session.execute(
+                select(DailyCheckIn)
+                .where(
+                    DailyCheckIn.user_id == user_id,
+                    DailyCheckIn.check_in_date >= month_start,
+                    DailyCheckIn.check_in_date < next_month,
+                )
+                .order_by(col(DailyCheckIn.check_in_date))
+            )
+        )
+        .scalars()
+        .all()
+    )
+    today_record = next((record for record in monthly_records if record.check_in_date == local_date), None)
+    profile = await session.get(UserProfile, user_id)
+    return CheckInResponse(
+        check_in_date=local_date,
+        checked_in=today_record is not None,
+        already_checked_in=already_checked_in,
+        streak_days=today_record.streak_days if today_record else 0,
+        reward_fan_tokens=today_record.reward_fan_tokens if today_record else 20,
+        fan_token_balance=profile.fan_token_balance if profile else 0,
+        month=month_start.strftime("%Y-%m"),
+        monthly_records=[
+            {
+                "check_in_date": record.check_in_date,
+                "reward_fan_tokens": record.reward_fan_tokens,
+            }
+            for record in monthly_records
+        ],
+        monthly_reward_fan_tokens=sum(record.reward_fan_tokens for record in monthly_records),
+    )
+
+
 @check_in_router.get("/me", response_model=CheckInResponse)
 async def get_today_check_in(
     identity: AuthenticatedIdentity = Depends(get_current_identity),
     session: AsyncSession = Depends(get_database_session),
 ) -> CheckInResponse:
     local_date = utc_now().astimezone(ZoneInfo("Asia/Shanghai")).date()
-    check_in = (
+    existing = (
         await session.execute(
-            select(DailyCheckIn).where(
+            select(DailyCheckIn.id).where(
                 DailyCheckIn.user_id == identity.user_id,
                 DailyCheckIn.check_in_date == local_date,
             )
         )
     ).scalar_one_or_none()
-    profile = await session.get(UserProfile, identity.user_id)
-    return CheckInResponse(
-        check_in_date=local_date,
-        checked_in=check_in is not None,
-        already_checked_in=check_in is not None,
-        streak_days=check_in.streak_days if check_in else 0,
-        reward_fan_tokens=check_in.reward_fan_tokens if check_in else 20,
-        fan_token_balance=profile.fan_token_balance if profile else 0,
+    return await build_check_in_response(
+        session,
+        user_id=identity.user_id,
+        local_date=local_date,
+        already_checked_in=existing is not None,
     )
 
 
@@ -461,13 +512,11 @@ async def check_in(
         if completed:
             await session.commit()
             await session.refresh(profile)
-        return CheckInResponse(
-            check_in_date=local_date,
-            checked_in=True,
+        return await build_check_in_response(
+            session,
+            user_id=identity.user_id,
+            local_date=local_date,
             already_checked_in=True,
-            streak_days=existing.streak_days,
-            reward_fan_tokens=existing.reward_fan_tokens,
-            fan_token_balance=profile.fan_token_balance,
         )
     yesterday = local_date - timedelta(days=1)
     previous = (
@@ -522,11 +571,9 @@ async def check_in(
         await session.rollback()
         return await get_today_check_in(identity, session)
     await session.refresh(profile)
-    return CheckInResponse(
-        check_in_date=local_date,
-        checked_in=True,
+    return await build_check_in_response(
+        session,
+        user_id=identity.user_id,
+        local_date=local_date,
         already_checked_in=False,
-        streak_days=streak,
-        reward_fan_tokens=reward,
-        fan_token_balance=profile.fan_token_balance,
     )
