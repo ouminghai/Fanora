@@ -163,15 +163,20 @@ npm run dev
 
 创作正文前端使用 `MarkdownEditor` 编辑和预览，详情与编辑预览统一通过 `MarkdownContent` 渲染 GitHub Flavored Markdown。渲染器不启用原始 HTML；文章详情采用“分类与标题 → 作者 → 大幅首图 → Markdown 正文”的顺序。列表摘要由服务端移除常见 Markdown 标记后生成。
 
-迁移 `20260720_0012` 只写入仓库内可用的前端兜底图片 URL，不再读取本机 `resources/`，因此 Railway 可以在没有本地素材的情况下安全执行全量迁移。上线且完成迁移后，在拥有 `resources/` 的本地仓库中把 `DATABASE_URL` 指向 Railway PostgreSQL，再统一执行：
+迁移 `20260720_0012` 只写入前端兜底图片 URL，不读取本机文件，因此 Railway 可以安全执行全量迁移。上线且完成迁移后，从已经验证过的本地测试 PostgreSQL 直接同步数据到 Railway：
 
 ```bash
 cd backend
-DATABASE_URL='Railway 的 PostgreSQL 连接字符串' PYTHONPATH=. uv run python scripts/seed_eason_fan_attraction_posts.py \
-  --resources-dir ../resources
+SOURCE_DATABASE_URL='本地测试 PostgreSQL 连接字符串' \
+TARGET_DATABASE_URL='Railway PostgreSQL 连接字符串' \
+PYTHONPATH=. uv run python scripts/seed_eason_fan_attraction_posts.py --dry-run
+
+SOURCE_DATABASE_URL='本地测试 PostgreSQL 连接字符串' \
+TARGET_DATABASE_URL='Railway PostgreSQL 连接字符串' \
+PYTHONPATH=. uv run python scripts/seed_eason_fan_attraction_posts.py
 ```
 
-该脚本是幂等的，会同时更新 6 篇 Echo 基础帖子图片、10 个 Quests 任务图片，并创建或刷新 50 篇陈奕迅粉丝社区帖子。可先加 `--dry-run` 检查所需图片，不会写入数据库。当前 Base64 Data URL 方案用于原型阶段，生产环境后续应迁移到对象存储并在数据库保存 URL、哈希和媒体元数据。
+脚本会原样复制官方社区的 `community_posts` 和 `fan_tasks`，包括数据库中已有的 Base64 图片、正文、状态、时间戳和 JSON 配置。为满足外键，会先同步这些记录引用的用户和官方社区，再依次 upsert 帖子和任务；整个目标库写入使用一个事务。当前 Base64 Data URL 方案用于原型阶段，长期应迁移到对象存储。
 
 ERC-721 身份、ERC-1155 纪念资产、粉丝限量 NFT 发布/购买和 Pinata 适配器已经接入。链上资产任务、任务限定 Badge 自动领取、后台重试和常驻事件对账仍属于待完成范围。
 
@@ -316,7 +321,7 @@ npm test
 
 ### 新测试数据库初始化时报种子图片缺失
 
-`backend/app/services/product_seed.py` 只用于自动建表的本地开发和测试数据库，使用前端兜底 URL 创建系统用户、官方社区、基础 Echo 帖子和 Quests，不再读取本地文件。所有 `resources/` 图片映射和 Base64 写入均集中在上述一次性 seed 脚本中。Railway 生产环境仍应使用 `AUTO_CREATE_SCHEMA=false`，并由 Alembic 管理表结构和基础数据。
+`backend/app/services/product_seed.py` 只在自动建表时创建系统用户和官方社区这两类父记录，不创建 `community_posts` 或 `fan_tasks`。真实 Echo/Quests 数据由上述数据库同步脚本从已验证的测试库原样复制。Railway 生产环境仍应使用 `AUTO_CREATE_SCHEMA=false`，并由 Alembic 管理表结构和基础数据。
 
 ### 数据库连接等待时间长
 

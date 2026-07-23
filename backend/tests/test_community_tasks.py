@@ -155,7 +155,7 @@ async def test_pending_member_cannot_check_in_or_claim_task(client):
     assert client.post(f"/api/v1/tasks/{WELCOME_TASK_ID}/claim", headers=headers).status_code == 403
 
 
-async def test_auto_created_tasks_and_posts_use_portable_fallback_images(client):
+async def test_explicit_test_tasks_and_posts_use_portable_fallback_images(client):
     tasks = client.get("/api/v1/tasks").json()
     posts = client.get("/api/v1/community/posts").json()
 

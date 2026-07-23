@@ -1,11 +1,7 @@
-"""Idempotent, filesystem-independent defaults for development and test databases."""
-
-from copy import deepcopy
+"""Idempotent parent records for auto-created development and test databases."""
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import select
 
-from app.models.community import CommunityPost, FanTask
 from app.models.user import Community, User
 
 SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000001"
@@ -332,6 +328,8 @@ TASK_SEEDS = [
 
 
 async def seed_product_defaults(session: AsyncSession) -> None:
+    """Create only the parent records required by an auto-created database."""
+
     if await session.get(User, SYSTEM_USER_ID) is None:
         session.add(User(id=SYSTEM_USER_ID, display_name="Fanora Protocol", status="system"))
         await session.flush()
@@ -347,54 +345,4 @@ async def seed_product_defaults(session: AsyncSession) -> None:
             )
         )
         await session.flush()
-    existing_post = (
-        await session.execute(select(CommunityPost.id).where(CommunityPost.id == WELCOME_POST_ID))
-    ).scalar_one_or_none()
-    if existing_post is None:
-        session.add_all(
-            [
-                CommunityPost(
-                    id=WELCOME_POST_ID,
-                    community_id=OFFICIAL_COMMUNITY_ID,
-                    author_user_id=SYSTEM_USER_ID,
-                    title="你与喜欢的音乐，第一次相遇在什么时候？",
-                    body=POST_MARKDOWN_BODIES[WELCOME_POST_ID],
-                    cover_url="/img/fanora/activity-community.jpg",
-                    category="story",
-                ),
-                CommunityPost(
-                    id=MUSIC_POST_ID,
-                    community_id=OFFICIAL_COMMUNITY_ID,
-                    author_user_id=SYSTEM_USER_ID,
-                    title="本周循环：安利一首你舍不得切掉的歌",
-                    body=POST_MARKDOWN_BODIES[MUSIC_POST_ID],
-                    cover_url="/img/fanora/activity-music.jpg",
-                    category="music",
-                ),
-            ]
-        )
-        await session.flush()
-    for task_seed in TASK_SEEDS:
-        if await session.get(FanTask, task_seed["id"]) is None:
-            stored_task = deepcopy(task_seed)
-            session.add(
-                FanTask(
-                    community_id=OFFICIAL_COMMUNITY_ID,
-                    created_by_user_id=SYSTEM_USER_ID,
-                    **stored_task,
-                )
-            )
-    for post_id, title, _body, cover_url, category in CREATION_SEEDS:
-        if await session.get(CommunityPost, post_id) is None:
-            session.add(
-                CommunityPost(
-                    id=post_id,
-                    community_id=OFFICIAL_COMMUNITY_ID,
-                    author_user_id=SYSTEM_USER_ID,
-                    title=title,
-                    body=POST_MARKDOWN_BODIES[post_id],
-                    cover_url=cover_url,
-                    category=category,
-                )
-            )
     await session.commit()
