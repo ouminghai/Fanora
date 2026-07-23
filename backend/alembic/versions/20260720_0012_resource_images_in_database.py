@@ -1,7 +1,10 @@
-"""Store selected project resource images in task and post records as Base64 data URLs."""
+"""Set portable fallback images for task and post records.
 
-import base64
-from pathlib import Path
+The original version read ignored files from the repository-level ``resources``
+directory. Production migrations must be reproducible without a developer's
+local files, so Base64 image import now lives in
+``scripts/seed_eason_fan_attraction_posts.py``.
+"""
 
 import sqlalchemy as sa
 
@@ -11,18 +14,6 @@ revision = "20260720_0012"
 down_revision = "20260720_0011"
 branch_labels = None
 depends_on = None
-
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-MIME_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
-
-POST_IMAGES = {
-    "00000000-0000-0000-0000-000000000003": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图1.jpg",
-    "00000000-0000-0000-0000-000000000004": "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图10.jpg",
-    "00000000-0000-0000-0000-000000000010": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图33.jpg",
-    "00000000-0000-0000-0000-000000000011": "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图1.jpg",
-    "00000000-0000-0000-0000-000000000012": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图6.jpg",
-    "00000000-0000-0000-0000-000000000013": "Eason-Concert-Horizontal-01-2-3c-2048x1025.webp",
-}
 
 POST_BODIES = {
     "00000000-0000-0000-0000-000000000003": """## 第一次被一首歌击中的时候
@@ -89,19 +80,6 @@ Fanora 共创海报希望收集粉丝对 **Proof of Fandom** 的不同理解：�
 优秀灵感会进入后续社区共创提案。""",
 }
 
-TASK_IMAGES = {
-    "daily-check-in": "7560176241271295283/20251012-#fnds #大头仔-图24.jpg",
-    "fear-and-dreams": "Eason-Concert-Horizontal-01-2-3c-2048x1025.webp",
-    "new-song-listening": "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图10.jpg",
-    "share-your-song": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图33.jpg",
-    "fan-story": "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图1.jpg",
-    "anniversary-wishes": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图6.jpg",
-    "classic-lyrics-chain": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图1.jpg",
-    "core-fan-identity": "Gemini_Generated_Image_lv6h8blv6h8blv6h.png",
-    "city-checkin": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图39.jpg",
-    "anniversary-badge": "7560176241271295283/20251012-#fnds #大头仔-图3.jpg",
-}
-
 LEGACY_POST_IMAGES = {
     "00000000-0000-0000-0000-000000000003": "/img/fanora/activity-community.jpg",
     "00000000-0000-0000-0000-000000000004": "/img/fanora/activity-music.jpg",
@@ -134,12 +112,6 @@ LEGACY_TASK_IMAGES = {
 }
 
 
-def data_url(relative_path: str) -> str:
-    path = PROJECT_ROOT / "resources" / relative_path
-    mime_type = MIME_TYPES[path.suffix.lower()]
-    return f"data:{mime_type};base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
-
-
 def set_task_image(catalog_key: str, image_url: str) -> None:
     op.get_bind().execute(
         sa.text(
@@ -161,7 +133,7 @@ def set_task_image(catalog_key: str, image_url: str) -> None:
 
 def upgrade() -> None:
     connection = op.get_bind()
-    for post_id, relative_path in POST_IMAGES.items():
+    for post_id, cover_url in LEGACY_POST_IMAGES.items():
         connection.execute(
             sa.text(
                 """
@@ -170,10 +142,10 @@ def upgrade() -> None:
                 WHERE id = :post_id
                 """
             ),
-            {"post_id": post_id, "cover_url": data_url(relative_path), "body": POST_BODIES[post_id]},
+            {"post_id": post_id, "cover_url": cover_url, "body": POST_BODIES[post_id]},
         )
-    for catalog_key, relative_path in TASK_IMAGES.items():
-        set_task_image(catalog_key, data_url(relative_path))
+    for catalog_key, image_url in LEGACY_TASK_IMAGES.items():
+        set_task_image(catalog_key, image_url)
 
 
 def downgrade() -> None:

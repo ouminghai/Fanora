@@ -163,7 +163,15 @@ npm run dev
 
 创作正文前端使用 `MarkdownEditor` 编辑和预览，详情与编辑预览统一通过 `MarkdownContent` 渲染 GitHub Flavored Markdown。渲染器不启用原始 HTML；文章详情采用“分类与标题 → 作者 → 大幅首图 → Markdown 正文”的顺序。列表摘要由服务端移除常见 Markdown 标记后生成。
 
-开发种子从仓库根目录 `resources/` 及其子目录读取选定图片，转换为 Base64 Data URL 后写入 PostgreSQL：社区帖子写入 `community_posts.cover_url`，任务卡图片写入 `fan_tasks.validation_rule.presentation.image_url`。迁移 `20260720_0012` 会将现有官方帖子和任务一并更新；当前方案用于原型阶段，生产环境应迁移到对象存储并在数据库保存 URL、哈希和媒体元数据。
+迁移 `20260720_0012` 只写入仓库内可用的前端兜底图片 URL，不再读取本机 `resources/`，因此 Railway 可以在没有本地素材的情况下安全执行全量迁移。上线且完成迁移后，在拥有 `resources/` 的本地仓库中把 `DATABASE_URL` 指向 Railway PostgreSQL，再统一执行：
+
+```bash
+cd backend
+DATABASE_URL='Railway 的 PostgreSQL 连接字符串' PYTHONPATH=. uv run python scripts/seed_eason_fan_attraction_posts.py \
+  --resources-dir ../resources
+```
+
+该脚本是幂等的，会同时更新 6 篇 Echo 基础帖子图片、10 个 Quests 任务图片，并创建或刷新 50 篇陈奕迅粉丝社区帖子。可先加 `--dry-run` 检查所需图片，不会写入数据库。当前 Base64 Data URL 方案用于原型阶段，生产环境后续应迁移到对象存储并在数据库保存 URL、哈希和媒体元数据。
 
 ERC-721 身份、ERC-1155 纪念资产、粉丝限量 NFT 发布/购买和 Pinata 适配器已经接入。链上资产任务、任务限定 Badge 自动领取、后台重试和常驻事件对账仍属于待完成范围。
 
@@ -308,7 +316,7 @@ npm test
 
 ### 新测试数据库初始化时报种子图片缺失
 
-`backend/app/services/product_seed.py` 当前会从仓库根目录、但被 Git 忽略的 `resources/` 读取原型图片。缺少任一被引用文件时，`make test` 或开启自动建表的新环境会在启动阶段抛出 `FileNotFoundError`。2026-07-23 已确认缺少 `resources/Eason-Concert-Horizontal-01-2-3c-2048x1025.webp` 会导致 16 项接口测试在 fixture setup 阶段失败。修复前需补齐本地素材；生产方案应改为已提交的可再分发资源或对象存储，并为缺失素材提供回退。
+`backend/app/services/product_seed.py` 的本地开发种子仍会读取被 Git 忽略的 `resources/`，所有映射已对齐当前实际存在的素材。Railway 数据库迁移不依赖该目录；生产 Base64 图片由上述一次性 seed 脚本从有素材的本机写入。长期生产方案仍应改为已提交的可再分发资源或对象存储。
 
 ### 数据库连接等待时间长
 

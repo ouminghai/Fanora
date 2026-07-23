@@ -1,19 +1,27 @@
-"""Seed 50 image-backed community posts about Eason Chan's fan appeal."""
+"""Seed Echo/Quests local images and 50 Eason fan-attraction posts."""
 
 import argparse
 import asyncio
 import base64
 import mimetypes
 import re
+from copy import deepcopy
 from dataclasses import dataclass
 from datetime import timedelta
 from pathlib import Path
 
+from sqlmodel import select
+
 from app.core.database import database_service
 from app.models.base import utc_now
-from app.models.community import CommunityPost
+from app.models.community import CommunityPost, FanTask
 from app.models.user import Community, User
-from app.services.product_seed import OFFICIAL_COMMUNITY_ID, SYSTEM_USER_ID
+from app.services.product_seed import (
+    OFFICIAL_COMMUNITY_ID,
+    RESOURCE_POST_IMAGES,
+    RESOURCE_TASK_IMAGES,
+    SYSTEM_USER_ID,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RESOURCE_ROOT = PROJECT_ROOT / "resources"
@@ -130,11 +138,25 @@ def validate_post_seeds() -> None:
             raise ValueError(f"Post {index} title is too long")
 
 
-def select_resource_images(limit: int) -> list[Path]:
+def validate_resource_files(resource_root: Path) -> None:
+    required_paths = {
+        *(resource_root / relative_path for relative_path in RESOURCE_POST_IMAGES.values()),
+        *(resource_root / relative_path for relative_path in RESOURCE_TASK_IMAGES.values()),
+    }
+    missing_paths = sorted(path for path in required_paths if not path.is_file())
+    if missing_paths:
+        formatted = "\n".join(f"- {path}" for path in missing_paths)
+        raise FileNotFoundError(
+            f"Missing {len(missing_paths)} required Echo/Quests image file(s) under {resource_root}:\n{formatted}\n"
+            "Run this script from a checkout that contains the local resources directory, or pass --resources-dir."
+        )
+
+
+def select_resource_images(resource_root: Path, limit: int) -> list[Path]:
     images = sorted(
         (
             path
-            for path in RESOURCE_ROOT.rglob("*")
+            for path in resource_root.rglob("*")
             if path.is_file() and path.suffix.lower() in SUPPORTED_IMAGE_SUFFIXES
         ),
         key=lambda path: (path.stat().st_size, path.as_posix()),
@@ -159,12 +181,20 @@ def render_body(seed: PostSeed, index: int) -> str:
     )
 
 
-async def seed_posts(*, dry_run: bool) -> None:
+async def seed_posts(*, dry_run: bool, resource_root: Path) -> None:
     validate_post_seeds()
-    images = select_resource_images(len(POST_SEEDS))
+    validate_resource_files(resource_root)
+    images = select_resource_images(resource_root, len(POST_SEEDS))
     if dry_run:
+        print("Echo post images:")
+        for post_id, relative_path in RESOURCE_POST_IMAGES.items():
+            print(f"- {post_id} <- {resource_root / relative_path}")
+        print("Quest images:")
+        for catalog_key, relative_path in RESOURCE_TASK_IMAGES.items():
+            print(f"- {catalog_key} <- {resource_root / relative_path}")
+        print("Eason fan attraction posts:")
         for index, (seed, image) in enumerate(zip(POST_SEEDS, images, strict=True), start=1):
-            print(f"{index:02d}. {seed.title} <- {image.relative_to(PROJECT_ROOT)}")
+            print(f"{index:02d}. {seed.title} <- {image}")
         return
 
     async with database_service.session() as session:
@@ -172,6 +202,38 @@ async def seed_posts(*, dry_run: bool) -> None:
             raise RuntimeError("Fanora system user is missing; initialize the application database first")
         if await session.get(Community, OFFICIAL_COMMUNITY_ID) is None:
             raise RuntimeError("Fanora official community is missing; initialize the application database first")
+
+        base_posts: dict[str, CommunityPost] = {}
+        for post_id in RESOURCE_POST_IMAGES:
+            post = await session.get(CommunityPost, post_id)
+            if post is None:
+                raise RuntimeError(f"Echo base post is missing: {post_id}; run database migrations first")
+            base_posts[post_id] = post
+
+        tasks = (await session.execute(select(FanTask))).scalars().all()
+        tasks_by_catalog_key = {
+            presentation["catalog_key"]: task
+            for task in tasks
+            if isinstance(task.validation_rule, dict)
+            and isinstance((presentation := task.validation_rule.get("presentation")), dict)
+            and isinstance(presentation.get("catalog_key"), str)
+        }
+        missing_task_keys = sorted(set(RESOURCE_TASK_IMAGES) - tasks_by_catalog_key.keys())
+        if missing_task_keys:
+            raise RuntimeError(
+                f"Quest records are missing for catalog keys: {', '.join(missing_task_keys)}; run database migrations first"
+            )
+
+        for post_id, relative_path in RESOURCE_POST_IMAGES.items():
+            base_posts[post_id].cover_url = image_data_url(resource_root / relative_path)
+            base_posts[post_id].updated_at = utc_now()
+
+        for catalog_key, relative_path in RESOURCE_TASK_IMAGES.items():
+            task = tasks_by_catalog_key[catalog_key]
+            validation_rule = deepcopy(task.validation_rule)
+            validation_rule["presentation"]["image_url"] = image_data_url(resource_root / relative_path)
+            task.validation_rule = validation_rule
+            task.updated_at = utc_now()
 
         now = utc_now()
         created = 0
@@ -209,22 +271,32 @@ async def seed_posts(*, dry_run: bool) -> None:
                 updated += 1
 
         await session.commit()
-        print(f"Seeded Eason fan attraction posts: created={created}, updated={updated}, total={len(POST_SEEDS)}")
+        print(
+            "Seed completed: "
+            f"echo_posts_updated={len(base_posts)}, quests_updated={len(RESOURCE_TASK_IMAGES)}, "
+            f"eason_posts_created={created}, eason_posts_updated={updated}, eason_posts_total={len(POST_SEEDS)}"
+        )
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--dry-run", action="store_true", help="Validate and print content without writing to the database")
+    parser.add_argument(
+        "--resources-dir",
+        type=Path,
+        default=RESOURCE_ROOT,
+        help=f"Local image directory (default: {RESOURCE_ROOT})",
+    )
     return parser.parse_args()
 
 
-async def main(*, dry_run: bool) -> None:
+async def main(*, dry_run: bool, resource_root: Path) -> None:
     try:
-        await seed_posts(dry_run=dry_run)
+        await seed_posts(dry_run=dry_run, resource_root=resource_root.expanduser().resolve())
     finally:
         await database_service.close()
 
 
 if __name__ == "__main__":
     arguments = parse_args()
-    asyncio.run(main(dry_run=arguments.dry_run))
+    asyncio.run(main(dry_run=arguments.dry_run, resource_root=arguments.resources_dir))
