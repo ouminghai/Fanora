@@ -34,6 +34,7 @@
 - 粉丝 NFT 广场、分类筛选、创作者集合、详情、点赞与收藏。
 - 正式会员发布限量 NFT，图片与 metadata 上传 Pinata。
 - 使用站内 FAN 购买 NFT，并在 Monad Testnet 铸造 ERC-1155 给买家。
+- FEAR and DREAMS 专属 Quest：AI 审核现场记忆，通过后发放 500 FAN，并编排 ERC-1155 纪念票铸造。
 
 主要页面：
 
@@ -45,6 +46,7 @@
 | 正式入会 | `http://localhost:3000/membership/join` | 支付 Gateway 当前链上会费 |
 | 官方社区 | `http://localhost:3000/community` | 签到、社区状态和内容入口 |
 | 任务中心 | `http://localhost:3000/community/tasks` | 领取并完成粉丝任务 |
+| FEAR and DREAMS | `http://localhost:3000/community/tasks/fear-and-dreams` | 提交现场记忆，查看 AI 审核和纪念票状态 |
 | 创作社区 | `http://localhost:3000/community/creations` | Markdown、多图、评论与互动 |
 | 我的收藏 | `http://localhost:3000/collection` | 会员证、链上身份和收藏品 |
 | NFT 广场 | `http://localhost:3000/collections` | 浏览、筛选、点赞粉丝 NFT |
@@ -56,7 +58,10 @@
 - PostgreSQL/SQLModel/Alembic 用户、钱包、社区、任务、FAN、会员、NFT 和链上操作模型。
 - 一次性 challenge、签名恢复、会话创建和退出登录。
 - FAN 可用余额与终身累计分离；消费不会降低已经获得的等级。
-- LangGraph 粉丝画像、结构化评分、解释和确定性降级结果。
+- LangGraph 粉丝画像完整工作流：数据库数据准备、结构化评分、分类、LLM 增强、任务推荐和结果保存。
+- LangGraph Quest 内容审核：tag、有效长度、防灌水、相关性、合规性、结构化结论与审核记录。
+- LangGraph 限量粉丝 NFT 草稿：metadata、图片提示词、建议属性与可选 Base64 图片生成。
+- FEAR and DREAMS 审核通过后，后端分别记录幂等 FAN 奖励与 ERC-1155 纪念票奖励。
 - Monad Adapter 读取交易、回执、事件并执行受控合约写入。
 - Pinata Adapter 上传 NFT 图片和 metadata，并保存 CID 与版本。
 
@@ -138,6 +143,10 @@ npm run dev
 | 正式入会 | 钱包调用 Gateway → Monad 交易 → 后端验证事件与确认数 → 激活会员 |
 | 社区互动 | FastAPI + PostgreSQL 保存帖子、回复、点赞、收藏和加入关系 |
 | 签到与任务 | 服务端验证、任务状态记录、幂等 FAN 流水 |
+| AI Quest 审核 | LangGraph 规则与可选 LLM 审核，结论写入数据库并决定是否发放任务 FAN |
+| 粉丝画像 | 从数据库聚合行为，运行 LangGraph，持久化结果并推荐当前可参与任务 |
+| FEAR and DREAMS | 固定纪念图、AI 审核、500 FAN、NFT 奖励状态和幂等铸造编排 |
+| NFT AI 草稿 | 生成可编辑 metadata；配置图片模型后可返回 Base64 图片草稿 |
 | FAN 与等级 | PostgreSQL 可用余额、终身累计和等级规则 |
 | 会员身份 | Pinata metadata + Monad ERC-721 SBT |
 | NFT 发布 | 正式会员校验 + FAN 发布费 + Pinata + ERC-1155 token type |
@@ -148,9 +157,10 @@ npm run dev
 
 - 首页部分粉丝画像卡片、介绍文案和展示数据仍是静态演示内容。
 - 本地开发数据库会写入种子社区帖子和任务，部分图片来自本地 `resources/`。
-- 未配置 OpenAI API 时，LangGraph 使用确定性规则返回画像，不代表真实 LLM 调用成功。
-- FEAR and DREAMS 任务页目前主要展示未来 NFT 奖励流程，任务限定 Badge 尚未完整铸造。
-- 演唱会纪念卡和任务 Badge 的运营创建、资格领取与前端状态尚未形成完整闭环。
+- 未配置 OpenAI API 时，粉丝画像、内容审核和 NFT metadata 使用确定性规则；这是真实降级链路，但不代表发生了模型调用。
+- OpenAI 图片模型未配置或调用失败时不生成 Base64 图片，创作者仍可自行上传图片。
+- FEAR and DREAMS 已完成奖励编排，但真实上传与铸造依赖 Pinata、Monad 合约地址和运营钱包；缺失配置时明确记录 `WAITING_CONFIGURATION`，不伪造成功。
+- `manual_review` 已有结构化状态和记录，暂未提供运营审核界面。
 - NFT 原始图片当前可作为 Base64 保存在 PostgreSQL，属于原型方案；生产环境应迁移对象存储。
 - 当前 NFT 市场是 FAN 驱动的一级发布/购买体验，不是链上二级市场、拍卖或版税系统。
 
@@ -160,32 +170,34 @@ npm run dev
 | --- | --- |
 | 前端启动与页面渲染 | 通过 |
 | 前端 TypeScript | 通过 |
-| 前端专项测试 | 通过 |
+| 前端全部已配置测试脚本 | 通过 |
 | 前端生产构建 | 通过，生成 16 个页面路由 |
 | 前端 ESLint | 0 error，4 warning |
-| 后端核心专项测试 | 21 项通过 |
+| 后端 LangGraph、Quest、NFT 与 `/profile/me` 专项测试 | 通过 |
 | 后端 Ruff | 通过 |
-| 后端全量 Pytest | 21 通过，16 项因种子图片缺失在 setup 阶段报错 |
-| 后端 Pyright | 4 个待处理错误 |
+| 后端全量 Pytest | 39 通过，3 个既有失败 |
+| 后端 LangGraph 相关 Pyright | 0 error |
 | 合约 Hardhat 测试 | 19 项通过 |
 
 ## 8. 目前还有什么问题
 
-1. 全新数据库初始化依赖被 Git 忽略的 `resources/` 图片；缺少素材时测试会在启动阶段失败。
-2. 首页加入流程仍残留“邮箱/社交账号创建钱包”的旧文案，与当前 RainbowKit 钱包登录不一致。
-3. 前端存在 4 条 Hook/图片优化 warning，浏览器还有图片比例、LCP 和 Lit 开发模式提示。
-4. 后端 Pyright 尚有 4 个错误，包括签到响应类型和可选依赖类型解析。
+1. `manual_review` 暂无运营审核界面，相关提交会保留为已领取状态。
+2. 全新 SQLite 从最早 Alembic 版本迁移会遇到历史 PostgreSQL 专用 `ALTER` 语句；部署应使用 PostgreSQL 并先在备份或临时库验证。
+3. 前端存在 4 条既有 Hook/图片优化 warning。
+4. 后端全量测试仍有 3 个既有失败：社区两级评论/互动 1 项、会员支付 2 项，与本次 LangGraph 改动无关。
 5. 链上写入主要在 HTTP 请求中等待确认，缺少可靠后台队列、自动重试、链重组处理和完整事件对账。
 6. NFT 发布/购买失败后的完整补偿、退款、下架和治理界面尚未完成。
 7. Testnet 运营角色目前共用部署钱包，生产环境需要拆分最小权限账户并迁移管理员权限到多签。
 
 ## 9. 建议演示范围
 
-Week 3 建议重点展示以下四条流程，不需要演示尚未完成的生产治理能力：
+Week 3 建议重点展示以下六条流程，不需要演示尚未完成的生产治理能力：
 
 1. 首页 → 连接钱包 → 签名登录 → 进入个人收藏。
 2. 官方社区 → 每日签到或任务 → FAN 余额与等级变化。
-3. 正式会员 → 生成/刷新 ERC-721 会员证 → 打开 MonadVision 链接。
-4. NFT 广场 → 查看详情 → 发布或使用 FAN 购买 → 在个人收藏查看 ERC-1155。
+3. FEAR and DREAMS → 提交现场记忆 → 查看 AI 审核、FAN 与纪念票状态。
+4. Profile → 查看数据库驱动的粉丝画像分数与任务推荐。
+5. NFT 广场 → AI 生成可编辑草稿与图片 → 确认后发布或使用 FAN 购买。
+6. 正式会员 → 生成/刷新 ERC-721 会员证 → 打开 MonadVision 链接。
 
-具体演示步骤见 [DEMO_GUIDE.md](./DEMO_GUIDE.md)。
+具体演示步骤见 [DEMO_GUIDE.md](./DEMO_GUIDE.md)，LangGraph 实现与部署边界见 [LANGGRAPH_IMPLEMENTATION.md](./LANGGRAPH_IMPLEMENTATION.md)。

@@ -34,7 +34,8 @@ def _matches(task: FanTask, event: TaskCompletionEvent) -> bool:
         return False
     if event.target_post_id is not None and task.target_post_id != event.target_post_id:
         return False
-    if event.reply_length is not None:
+    requires_review = task.task_type in {"content_publish", "post_reply", "page_action"}
+    if event.reply_length is not None and not requires_review:
         minimum_length = int(task.validation_rule.get("minimum_reply_length", 10))
         if event.reply_length < minimum_length:
             return False
@@ -44,7 +45,11 @@ def _matches(task: FanTask, event: TaskCompletionEvent) -> bool:
     required_tag = (
         (task.validation_rule.get("required_tag") or f"#{task.title}") if task.task_type == "content_publish" else None
     )
-    if required_tag and (event.content_text is None or required_tag.casefold() not in event.content_text.casefold()):
+    if (
+        required_tag
+        and not requires_review
+        and (event.content_text is None or required_tag.casefold() not in event.content_text.casefold())
+    ):
         return False
     return True
 

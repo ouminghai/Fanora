@@ -182,6 +182,23 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
     story_claim = client.post(f"/api/v1/tasks/{FAN_STORY_TASK_ID}/claim", headers=headers)
     assert story_claim.status_code == 200
     assert story_claim.json()["required_tag"] == "#粉丝故事图文征集"
+    missing_tag_post = client.post(
+        "/api/v1/community/posts",
+        headers=headers,
+        json={
+            "title": "一次没有带活动标签的现场记忆",
+            "body": "最后一首歌结束以后，灯光慢慢熄灭，但大家仍然留在座位上合唱。",
+            "category": "story",
+        },
+    )
+    assert missing_tag_post.status_code == 201
+    rejected_task = next(
+        item for item in client.get("/api/v1/tasks", headers=headers).json() if item["id"] == FAN_STORY_TASK_ID
+    )
+    assert rejected_task["participation_status"] == "claimed"
+    assert rejected_task["review_decision"] == "rejected"
+    assert any("缺少任务要求的标签" in reason for reason in rejected_task["review_reasons"])
+
     story_post = client.post(
         "/api/v1/community/posts",
         headers=headers,
@@ -213,8 +230,8 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
             .scalars()
             .all()
         )
-        assert len(post_publish_entries) == 1
-        assert post_publish_entries[0].delta == 5
+        assert len(post_publish_entries) == 2
+        assert all(entry.delta == 5 for entry in post_publish_entries)
     post_list = client.get("/api/v1/community/posts", headers=headers).json()
     story_summary = next(item for item in post_list if item["id"] == story_post.json()["id"])
     assert "##" not in story_summary["body_preview"]

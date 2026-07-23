@@ -118,11 +118,16 @@ test("home hot content and popular missions use live community APIs", () => {
   assert.match(collectionsSource, /participant_count/);
 });
 
-test("FEAR and DREAMS has a dedicated future-NFT task page", () => {
+test("FEAR and DREAMS uses AI review and an ERC-1155 memorial ticket reward", () => {
   assert.match(fearTicketSource, /MEMORIAL PASS/);
   assert.match(fearTicketSource, /interaction_note/);
   assert.match(fearTicketSource, /`\/tasks\/\$\{task\.id\}\/complete`/);
-  assert.match(fearTicketSource, /后续可在同一页面接入 NFT 合约/);
+  assert.match(fearTicketSource, /\/img\/fanora\/eason-concert\.webp/);
+  assert.match(fearTicketSource, /AI 内容审核/);
+  assert.match(fearTicketSource, /ERC-1155 纪念票/);
+  assert.match(fearTicketSource, /nft_reward_status === "CONFIRMED"/);
+  assert.match(fearTicketSource, /nft_explorer_url/);
+  assert.match(fearTicketSource, /不伪造交易/);
 });
 
 test("creation publishing supports Markdown, task tags and multiple images", () => {

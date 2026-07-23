@@ -44,6 +44,14 @@ def test_wallet_register_login_profile_and_logout(client):
     me_response = client.get("/api/v1/users/me", headers=headers)
     assert me_response.status_code == 200
 
+    fan_profile_response = client.get("/api/v1/profile/me", headers=headers)
+    assert fan_profile_response.status_code == 200
+    fan_profile = fan_profile_response.json()
+    assert fan_profile["wallet_address"] == Web3.to_checksum_address(account.address)
+    assert fan_profile["analysis_source"] == "rules"
+    assert fan_profile["scores"]["total"] == 0
+    assert fan_profile["recommended_tasks"] == []
+
     update_response = client.patch(
         "/api/v1/users/me",
         headers=headers,
