@@ -45,7 +45,7 @@ export default function Process() {
         </div>
 
         <p className="mx-auto mt-20 max-w-2xl text-center text-lg text-jacarta-700 dark:text-white">
-          非 Web3 用户无需理解助记词和 Gas。Fanora 会在注册流程中完成钱包创建与身份绑定，需要时你仍然可以完整接管自己的链上账户。
+          你始终使用自己的钱包管理链上账户。登录签名不消耗 Gas，也不会授权 Fanora 转移资产；Fanora 不读取或保存私钥与助记词。
         </p>
 
         <div className="mx-auto mt-7 max-w-md text-center">

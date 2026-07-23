@@ -9,6 +9,8 @@ function source(path: string) {
 const authProvider = source("../components/providers/AuthProvider.tsx");
 const loginExperience = source("../components/auth/LoginExperience.tsx");
 const walletButton = source("../components/web3/RainbowWalletLoginButton.tsx");
+const fanoraData = source("../data/fanora.ts");
+const processSection = source("../components/homes/common/Process.tsx");
 
 test("uses only the wallet challenge login endpoint", () => {
   assert.match(authProvider, /api\.post<AuthSession>\("\/auth\/wallet"/);
@@ -28,4 +30,14 @@ test("opens RainbowKit modals and signs immediately after connection", () => {
 test("redirects wallet login directly to collection", () => {
   assert.match(loginExperience, /router\.replace\("\/collection"\)/);
   assert.doesNotMatch(loginExperience, /wallet_type/);
+});
+
+test("homepage journey describes direct wallet ownership and deterministic FAN rewards", () => {
+  assert.match(fanoraData, /RainbowKit/);
+  assert.match(fanoraData, /Agent 只分析画像和解释结果/);
+  assert.match(processSection, /登录签名不消耗 Gas/);
+  assert.match(processSection, /Fanora 不读取或保存私钥与助记词/);
+  assert.doesNotMatch(fanoraData, /使用邮箱或社交账号快速加入/);
+  assert.doesNotMatch(processSection, /注册流程中完成钱包创建/);
+  assert.doesNotMatch(fanoraData, /Agent .*更新 Fan Token/);
 });

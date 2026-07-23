@@ -118,10 +118,10 @@ export const fanJourney = [
   {
     id: 1,
     iconSrc: "/img/process/process5.svg",
-    title: "1. 加入 Fans Club",
+    title: "1. 连接自有钱包",
     bgClass: "bg-accent",
     ringColor: "#CDBCFF",
-    description: "使用邮箱或社交账号快速加入，系统会在后台为你创建并绑定 Web3 钱包。",
+    description: "通过 RainbowKit 连接 MetaMask、WalletConnect 等自有钱包，完成一次无 Gas 的登录签名。",
   },
   {
     id: 2,
@@ -137,15 +137,15 @@ export const fanJourney = [
     title: "3. 积累 Fan Token",
     bgClass: "bg-blue",
     ringColor: "#CDDFFB",
-    description: "LangGraph Agent 综合分析活跃度、忠诚度与贡献，持续更新 Fan Token。",
+    description: "任务通过服务端规则验证后发放 FAN；Agent 只分析画像和解释结果，不直接修改余额。",
   },
   {
     id: 4,
     iconSrc: "/img/process/process8.svg",
-    title: "4. 解锁链上 Badge",
+    title: "4. 沉淀链上身份",
     bgClass: "bg-red",
     ringColor: "#FFD0D0",
-    description: "Fan Token 达到门槛后获得铸造资格，把长期支持沉淀为可验证的粉丝身份。",
+    description: "终身 FAN 达到门槛后刷新唯一的 ERC-721 会员身份，任务纪念品则使用 ERC-1155 记录。",
   },
 ];
 
