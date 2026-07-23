@@ -29,6 +29,17 @@ def _load_abi(name: str) -> list[dict[str, Any]]:
     return json.loads(path.read_text(encoding="utf-8"))["abi"]
 
 
+def bytes32_from_hex(value: str) -> bytes:
+    """Convert a prefixed or unprefixed 32-byte hex value for contract calls."""
+    normalized = value[2:] if value.startswith("0x") else value
+    if len(normalized) != 64:
+        raise ChainConfigurationError("Contract operation id must be exactly 32 bytes")
+    try:
+        return bytes.fromhex(normalized)
+    except ValueError as error:
+        raise ChainConfigurationError("Contract operation id must be hexadecimal") from error
+
+
 class MonadContractAdapter:
     def __init__(self) -> None:
         self._write_lock = asyncio.Lock()
@@ -43,6 +54,13 @@ class MonadContractAdapter:
     @property
     def identity_configured(self) -> bool:
         return bool(settings.membership_identity_contract_address and settings.identity_minter_private_key)
+
+    @property
+    def identity_uri_manager_configured(self) -> bool:
+        return bool(
+            settings.membership_identity_contract_address
+            and settings.identity_uri_manager_private_key
+        )
 
     @property
     def membership_gateway_configured(self) -> bool:
@@ -110,7 +128,7 @@ class MonadContractAdapter:
         events = getattr(contract.events, event_name)().process_receipt(receipt)
         event_args = dict(events[0]["args"]) if events else {}
         return ConfirmedContractTransaction(
-            transaction_hash=tx_hash.hex(),
+            transaction_hash=Web3.to_hex(tx_hash),
             block_number=int(receipt["blockNumber"]),
             confirmations=confirmations,
             event_args=event_args,
@@ -126,7 +144,7 @@ class MonadContractAdapter:
                 contract_address=settings.membership_identity_contract_address,
                 abi=self.identity_abi,
                 build_call=lambda contract: contract.functions.mintIdentity(
-                    Web3.to_checksum_address(wallet), level_id, metadata_uri, bytes.fromhex(operation_hash[2:])
+                    Web3.to_checksum_address(wallet), level_id, metadata_uri, bytes32_from_hex(operation_hash)
                 ),
                 event_name="IdentityMinted",
             )
@@ -141,9 +159,24 @@ class MonadContractAdapter:
                 contract_address=settings.membership_identity_contract_address,
                 abi=self.identity_abi,
                 build_call=lambda contract: contract.functions.updateMembershipLevel(
-                    token_id, level_id, metadata_uri, bytes.fromhex(operation_hash[2:])
+                    token_id, level_id, metadata_uri, bytes32_from_hex(operation_hash)
                 ),
                 event_name="MembershipLevelUpdated",
+            )
+
+    async def update_identity_metadata(
+        self, token_id: int, metadata_uri: str, operation_hash: str
+    ) -> ConfirmedContractTransaction:
+        async with self._write_lock:
+            return await asyncio.to_thread(
+                self._send,
+                private_key=settings.identity_uri_manager_private_key,
+                contract_address=settings.membership_identity_contract_address,
+                abi=self.identity_abi,
+                build_call=lambda contract: contract.functions.updateIdentityMetadata(
+                    token_id, metadata_uri, bytes32_from_hex(operation_hash)
+                ),
+                event_name="IdentityMetadataUpdated",
             )
 
     async def membership_gateway_balance(self) -> int:
@@ -209,6 +242,19 @@ class MonadContractAdapter:
                 event_name="TokenTypeCreated",
             )
 
+    async def update_collectible_metadata(
+        self, token_id: int, metadata_uri: str
+    ) -> ConfirmedContractTransaction:
+        async with self._write_lock:
+            return await asyncio.to_thread(
+                self._send,
+                private_key=settings.collectible_uri_manager_private_key,
+                contract_address=settings.collectibles_contract_address,
+                abi=self.collectibles_abi,
+                build_call=lambda contract: contract.functions.updateTokenMetadata(token_id, metadata_uri),
+                event_name="TokenMetadataUpdated",
+            )
+
     async def mint_collectible(
         self, wallet: str, token_id: int, amount: int, claim_hash: str
     ) -> ConfirmedContractTransaction:
@@ -219,7 +265,7 @@ class MonadContractAdapter:
                 contract_address=settings.collectibles_contract_address,
                 abi=self.collectibles_abi,
                 build_call=lambda contract: contract.functions.mintCollectible(
-                    Web3.to_checksum_address(wallet), token_id, amount, bytes.fromhex(claim_hash[2:])
+                    Web3.to_checksum_address(wallet), token_id, amount, bytes32_from_hex(claim_hash)
                 ),
                 event_name="CollectibleMinted",
             )

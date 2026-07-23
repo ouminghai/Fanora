@@ -53,6 +53,7 @@ class UserProfile(SQLModel, table=True):
     locale: str = Field(default="zh-CN", max_length=20)
     level: str = Field(default="新生儿", max_length=30)
     fan_token_balance: int = Field(default=0, ge=0)
+    fan_token_lifetime_earned: int = Field(default=0, ge=0)
     fan_type: str = Field(default="Newcomer", max_length=50)
     profile_visibility: str = Field(default="public", max_length=20)
     onboarding_completed: bool = Field(default=False)

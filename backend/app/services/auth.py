@@ -1,23 +1,19 @@
-"""Web3Auth token verification and Fanora session lifecycle."""
+"""Wallet signature authentication and Fanora session lifecycle."""
 
-import asyncio
 import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
-import jwt
 from eth_account import Account
 from eth_account.messages import encode_defunct
-from eth_keys import keys
 from fastapi import HTTPException, status
-from jwt import PyJWKClient
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 from web3 import Web3
 
 from app.core.config import settings
+from app.core.logging import logger
 from app.models.base import utc_now
 from app.models.user import (
     AuthIdentity,
@@ -30,7 +26,7 @@ from app.models.user import (
     UserSession,
     Wallet,
 )
-from app.schemas.auth import CommunitySummary, UserResponse, WalletResponse, Web3AuthLoginRequest
+from app.schemas.auth import CommunitySummary, UserResponse, WalletLoginRequest, WalletResponse
 
 
 def hash_session_token(token: str) -> str:
@@ -43,127 +39,7 @@ def as_utc(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
-class Web3AuthService:
-    def __init__(self) -> None:
-        self.jwks_client = PyJWKClient(
-            settings.web3auth_jwks_url,
-            cache_keys=True,
-            lifespan=settings.web3auth_jwks_cache_lifespan_seconds,
-            timeout=settings.web3auth_jwks_timeout_seconds,
-        )
-        self.legacy_jwks_client = PyJWKClient(
-            settings.web3auth_legacy_jwks_url,
-            cache_keys=True,
-            lifespan=settings.web3auth_jwks_cache_lifespan_seconds,
-            timeout=settings.web3auth_jwks_timeout_seconds,
-        )
-        self.external_jwks_client = PyJWKClient(
-            settings.web3auth_external_jwks_url,
-            cache_keys=True,
-            lifespan=settings.web3auth_jwks_cache_lifespan_seconds,
-            timeout=settings.web3auth_jwks_timeout_seconds,
-        )
-
-    @staticmethod
-    def _normalize_public_key(public_key: str) -> set[str]:
-        value = public_key.lower().removeprefix("0x")
-        keys_to_match = {value}
-        if len(value) == 130 and value.startswith("04"):
-            value = value[2:]
-            keys_to_match.add(value)
-        if len(value) == 128:
-            public_key_bytes = bytes.fromhex(value)
-            compressed = keys.PublicKey(public_key_bytes).to_compressed_bytes().hex()
-            keys_to_match.add(compressed)
-        return keys_to_match
-
-    @staticmethod
-    def _token_wallet_public_keys(claims: dict[str, Any]) -> set[str]:
-        public_keys: set[str] = set()
-        for wallet in claims.get("wallets") or []:
-            if not isinstance(wallet, dict):
-                continue
-            public_key = str(wallet.get("public_key") or "")
-            if not public_key:
-                continue
-            public_keys.update(Web3AuthService._normalize_public_key(public_key))
-        return public_keys
-
-    async def verify_identity_token(
-        self, id_token: str, expected_wallet: str, expected_app_pub_key: str | None = None
-    ) -> dict[str, Any]:
-        def decode() -> dict[str, Any]:
-            unverified_claims = jwt.decode(
-                id_token,
-                options={
-                    "verify_signature": False,
-                    "verify_exp": False,
-                    "verify_iat": False,
-                    "verify_aud": False,
-                    "verify_iss": False,
-                },
-            )
-            issuer = str(unverified_claims.get("iss") or "").strip()
-            if (
-                issuer == settings.web3auth_external_issuer
-                or issuer.lower() in settings.allowed_web3auth_external_issuers
-            ):
-                jwks_client = self.external_jwks_client
-            elif issuer == settings.web3auth_legacy_issuer:
-                jwks_client = self.legacy_jwks_client
-            else:
-                jwks_client = self.jwks_client
-            signing_key = jwks_client.get_signing_key_from_jwt(id_token)
-            claims = jwt.decode(
-                id_token,
-                signing_key.key,
-                algorithms=["ES256"],
-                options={
-                    "require": ["exp", "iat", "iss", "aud"],
-                    "verify_aud": False,
-                    "verify_iss": False,
-                },
-            )
-            issuer = str(claims.get("iss") or "").strip()
-            audience = claims.get("aud")
-            audiences = {str(value) for value in audience} if isinstance(audience, list) else {str(audience)}
-            if not issuer or not any(value and value != "None" for value in audiences):
-                raise jwt.InvalidTokenError("Web3Auth issuer or audience is missing")
-
-            if issuer in {settings.web3auth_issuer, settings.web3auth_legacy_issuer}:
-                provider_user_id = claims.get("sub") or claims.get("userId") or claims.get("verifierId")
-                if settings.web3auth_client_id not in audiences or not provider_user_id:
-                    raise jwt.InvalidAudienceError("Web3Auth client audience or subject does not match")
-                if not expected_app_pub_key:
-                    raise jwt.InvalidTokenError("Web3Auth app public key is required for embedded wallet login")
-                expected_keys = self._normalize_public_key(expected_app_pub_key)
-                if not expected_keys.intersection(self._token_wallet_public_keys(claims)):
-                    raise jwt.InvalidTokenError("Web3Auth token does not contain the embedded wallet public key")
-            else:
-                if issuer.lower() not in settings.allowed_web3auth_external_issuers:
-                    raise jwt.InvalidIssuerError("External wallet issuer is not allowed")
-                if not audiences.intersection(settings.allowed_web3auth_external_audiences):
-                    raise jwt.InvalidAudienceError("External wallet token audience does not match")
-                wallets = claims.get("wallets")
-                addresses = {
-                    Web3.to_checksum_address(str(wallet.get("address")))
-                    for wallet in wallets or []
-                    if isinstance(wallet, dict) and Web3.is_address(str(wallet.get("address") or ""))
-                }
-                if expected_wallet not in addresses:
-                    raise jwt.InvalidTokenError("External wallet token does not contain the signed wallet")
-            return claims
-
-        try:
-            return await asyncio.to_thread(decode)
-        except jwt.PyJWTError as error:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid Web3Auth identity token") from error
-        except Exception as error:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Web3Auth identity verification is temporarily unavailable",
-            ) from error
-
+class WalletAuthService:
     async def create_challenge(self, session: AsyncSession, wallet_address: str) -> LoginChallenge:
         address = Web3.to_checksum_address(wallet_address)
         now = utc_now()
@@ -181,11 +57,87 @@ class Web3AuthService:
         await session.refresh(challenge)
         return challenge
 
-    async def login(
-        self, session: AsyncSession, payload: Web3AuthLoginRequest
+    async def login_wallet(
+        self, session: AsyncSession, payload: WalletLoginRequest
     ) -> tuple[str, datetime, bool, UserResponse]:
-        address = Web3.to_checksum_address(payload.wallet_address)
-        challenge = await session.get(LoginChallenge, payload.challenge_id)
+        try:
+            return await self._login_wallet(session, payload)
+        except Exception as error:
+            logger.exception(
+                "wallet_service_login_failed",
+                error_type=type(error).__name__,
+                error_message=str(error),
+                status_code=getattr(error, "status_code", None),
+                error_detail=getattr(error, "detail", None),
+                wallet_address=payload.wallet_address,
+                challenge_id=payload.challenge_id,
+            )
+            raise
+
+    async def _login_wallet(
+        self, session: AsyncSession, payload: WalletLoginRequest
+    ) -> tuple[str, datetime, bool, UserResponse]:
+        address, challenge, now = await self._verify_wallet_challenge(
+            session,
+            payload.challenge_id,
+            payload.wallet_address,
+            payload.signature,
+        )
+        wallet = (await session.execute(select(Wallet).where(Wallet.address == address))).scalar_one_or_none()
+        identity = (
+            await session.execute(
+                select(AuthIdentity).where(AuthIdentity.provider == "wallet", AuthIdentity.subject == address.lower())
+            )
+        ).scalar_one_or_none()
+        is_new_user = wallet is None
+
+        if wallet is not None:
+            user = await session.get(User, wallet.user_id)
+            if user is None or user.status != "active":
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is not active")
+            if not wallet.is_primary:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Wallet is not the primary login wallet")
+            if identity is not None and identity.user_id != user.id:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Wallet identity belongs to another user")
+            if identity is None:
+                session.add(AuthIdentity(user_id=user.id, provider="wallet", subject=address.lower()))
+            if await session.get(UserProfile, user.id) is None:
+                session.add(UserProfile(user_id=user.id))
+        else:
+            if identity is not None:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Wallet identity is missing its wallet")
+            user = User()
+            session.add(user)
+            await session.flush()
+            session.add(AuthIdentity(user_id=user.id, provider="wallet", subject=address.lower()))
+            session.add(
+                Wallet(
+                    user_id=user.id,
+                    address=address,
+                    wallet_type="external",
+                    provider="rainbowkit",
+                    is_primary=True,
+                )
+            )
+            session.add(UserProfile(user_id=user.id))
+
+        role = (
+            await session.execute(select(UserRole).where(UserRole.user_id == user.id, UserRole.role == "fan"))
+        ).scalar_one_or_none()
+        if role is None:
+            session.add(UserRole(user_id=user.id, role="fan"))
+
+        return await self._create_session(session, user, challenge, now, is_new_user)
+
+    async def _verify_wallet_challenge(
+        self,
+        session: AsyncSession,
+        challenge_id: str,
+        wallet_address: str,
+        signature: str,
+    ) -> tuple[str, LoginChallenge, datetime]:
+        address = Web3.to_checksum_address(wallet_address)
+        challenge = await session.get(LoginChallenge, challenge_id)
         now = utc_now()
         if (
             challenge is None
@@ -196,81 +148,21 @@ class Web3AuthService:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Login challenge is invalid or expired")
 
         try:
-            recovered = Account.recover_message(encode_defunct(text=challenge.message), signature=payload.signature)
+            recovered = Account.recover_message(encode_defunct(text=challenge.message), signature=signature)
         except Exception as error:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid wallet signature") from error
         if Web3.to_checksum_address(recovered) != address:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Wallet signature does not match")
+        return address, challenge, now
 
-        claims = await self.verify_identity_token(payload.id_token, address, payload.app_pub_key)
-        issuer = str(claims.get("iss") or "").strip()
-        provider_user_id = claims.get("sub") or claims.get("userId") or claims.get("verifierId")
-        subject = str(provider_user_id or f"{issuer}:{address.lower()}").strip()
-        if not subject or len(subject) > 255:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Web3Auth user identifier is missing")
-
-        identity = (
-            await session.execute(
-                select(AuthIdentity).where(AuthIdentity.provider == "web3auth", AuthIdentity.subject == subject)
-            )
-        ).scalar_one_or_none()
-        wallet = (await session.execute(select(Wallet).where(Wallet.address == address))).scalar_one_or_none()
-        is_new_user = identity is None
-
-        if identity is not None:
-            user = await session.get(User, identity.user_id)
-            if user is None or user.status != "active":
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is not active")
-            if wallet is None or wallet.user_id != user.id or not wallet.is_primary:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="This login identity is already bound to a different primary wallet",
-                )
-            profile = await session.get(UserProfile, user.id)
-            if profile is None:
-                session.add(
-                    UserProfile(
-                        user_id=user.id,
-                        email=str(claims.get("email") or "").strip()[:320] or None,
-                        avatar_url=str(claims.get("picture") or claims.get("profileImage") or "").strip()[:2048]
-                        or None,
-                    )
-                )
-            role = (
-                await session.execute(
-                    select(UserRole).where(UserRole.user_id == user.id, UserRole.role == "fan")
-                )
-            ).scalar_one_or_none()
-            if role is None:
-                session.add(UserRole(user_id=user.id, role="fan"))
-        else:
-            if wallet is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="This wallet is already bound to another Fanora account",
-                )
-            display_name = str(claims.get("name") or "").strip()[:80] or None
-            user = User(display_name=display_name)
-            session.add(user)
-            await session.flush()
-            session.add(AuthIdentity(user_id=user.id, provider="web3auth", subject=subject))
-            wallet = Wallet(
-                user_id=user.id,
-                address=address,
-                wallet_type=payload.wallet_type,
-                provider="web3auth",
-                is_primary=True,
-            )
-            session.add(wallet)
-            session.add(
-                UserProfile(
-                    user_id=user.id,
-                    email=str(claims.get("email") or "").strip()[:320] or None,
-                    avatar_url=str(claims.get("picture") or claims.get("profileImage") or "").strip()[:2048] or None,
-                )
-            )
-            session.add(UserRole(user_id=user.id, role="fan"))
-
+    async def _create_session(
+        self,
+        session: AsyncSession,
+        user: User,
+        challenge: LoginChallenge,
+        now: datetime,
+        is_new_user: bool,
+    ) -> tuple[str, datetime, bool, UserResponse]:
         challenge.used_at = now
         user.updated_at = now
         raw_token = secrets.token_urlsafe(48)
@@ -326,6 +218,7 @@ async def build_user_response(session: AsyncSession, user_id: str, *, include_pr
         is_official_member=profile.is_official_member,
         official_member_since=profile.official_member_since,
         fan_token_balance=profile.fan_token_balance,
+        fan_token_lifetime_earned=profile.fan_token_lifetime_earned,
         fan_type=profile.fan_type,
         profile_visibility=profile.profile_visibility,
         onboarding_completed=profile.onboarding_completed,
@@ -354,4 +247,4 @@ async def build_user_response(session: AsyncSession, user_id: str, *, include_pr
     )
 
 
-web3auth_service = Web3AuthService()
+auth_service = WalletAuthService()

@@ -6,6 +6,7 @@ const navSource = readFileSync(new URL("../components/headers/component/Nav.tsx"
 const hubSource = readFileSync(new URL("../components/community/CommunityHub.tsx", import.meta.url), "utf8");
 const checkInCalendarSource = readFileSync(new URL("../components/community/CheckInCalendar.tsx", import.meta.url), "utf8");
 const postSource = readFileSync(new URL("../components/community/PostDetail.tsx", import.meta.url), "utf8");
+const imageGallerySource = readFileSync(new URL("../components/community/ImageGallery.tsx", import.meta.url), "utf8");
 const commentPhotoGallerySource = readFileSync(new URL("../components/community/CommentPhotoGallery.tsx", import.meta.url), "utf8");
 const taskGallerySource = readFileSync(new URL("../components/community/TaskGallery.tsx", import.meta.url), "utf8");
 const creationWallSource = readFileSync(new URL("../components/community/CreationWall.tsx", import.meta.url), "utf8");
@@ -26,6 +27,13 @@ test("header exposes the on-chain community and its requested modules", () => {
 test("community hub connects check-in and tasks, then routes creation to the full editor", () => {
   assert.match(hubSource, /api\.post<DailyCheckInStatus>\("\/check-ins"\)/);
   assert.match(hubSource, /`\/tasks\/\$\{task\.id\}\/claim`/);
+  assert.match(hubSource, /task\.presentation\.action_url/);
+  assert.match(hubSource, /catalog\?\.actionHref/);
+  assert.match(hubSource, /router\.push\(taskPreview\(response\.data\)\.actionUrl\)/);
+  assert.doesNotMatch(
+    hubSource,
+    /const taskAction = claimed \|\| rewarded\s*\? `\/community\/posts\/\$\{task\.target_post_id\}`/,
+  );
   assert.match(hubSource, /href="\/community\/creations\?composer=1"/);
   assert.match(hubSource, /<CheckInCalendar checkIn=\{checkIn\}/);
   assert.match(checkInCalendarSource, /monthly_reward_fan_tokens/);
@@ -52,6 +60,30 @@ test("separate task and creation pages expose gallery and masonry layouts", () =
   assert.match(creationWallSource, /offset=\$\{offset\}/);
   assert.match(creationWallSource, /IntersectionObserver/);
   assert.match(creationWallSource, /rootMargin: "600px 0px"/);
+});
+
+test("creation details open as a dismissible 3D letter drawer over the wall", () => {
+  assert.match(creationWallSource, /import PostDetail from/);
+  assert.match(creationWallSource, /window\.history\.pushState/);
+  assert.match(creationWallSource, /\/community\/posts\/\$\{postId\}/);
+  assert.match(creationWallSource, /backdrop-blur-md/);
+  assert.match(creationWallSource, /items-end justify-center/);
+  assert.doesNotMatch(creationWallSource, /border border-white\/20 bg-\[#111538\]/);
+  assert.match(creationWallSource, /event\.target === event\.currentTarget/);
+  assert.match(creationWallSource, /<PostDetail postId=\{selectedPostId\} variant="drawer"/);
+  assert.match(postSource, /variant\?: "page" \| "drawer"/);
+  assert.match(postSource, /community-letter-scroll/);
+  assert.doesNotMatch(postSource, /← 返回创作墙/);
+});
+
+test("portrait creation images remain fully visible on the wall and in post details", () => {
+  assert.match(creationWallSource, /className="block h-auto w-full/);
+  assert.doesNotMatch(creationWallSource, /post\.cover_url \? <div className=\{`relative overflow-hidden \$\{index % 3/);
+  assert.match(postSource, /mode="natural"/);
+  assert.doesNotMatch(postSource, /aspect-\[16\/9\]/);
+  assert.match(imageGallerySource, /mode\?: "cover" \| "natural"/);
+  assert.match(imageGallerySource, /autoHeight/);
+  assert.match(imageGallerySource, /max-h-\[80vh\].*object-contain/);
 });
 
 test("creation interactions include likes, bookmarks and two-level comments", () => {

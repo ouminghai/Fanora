@@ -30,7 +30,7 @@ async def create_official_member(raw_token: str) -> str:
                     user_id=user.id,
                     address=account.address,
                     wallet_type="embedded",
-                    provider="web3auth",
+                    provider="wallet",
                     is_primary=True,
                 ),
                 UserSession(

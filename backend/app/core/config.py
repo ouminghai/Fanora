@@ -2,7 +2,6 @@
 
 from enum import StrEnum
 from functools import lru_cache
-from urllib.parse import urlparse
 
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -25,16 +24,6 @@ class Settings(BaseSettings):
     api_prefix: str = "/api/v1"
     frontend_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
     internal_api_key: str = ""
-    web3auth_client_id: str = "BICxTe9MSpkkwRIrgNGa8cGgksO4VvNiBHqt694T88J_WecKTHn474CmkEtFvaOqfE0CxrtZUmUoZCPYiOf8r88"
-    web3auth_jwks_url: str = "https://api-auth.web3auth.io/jwks"
-    web3auth_issuer: str = "https://api-auth.web3auth.io"
-    web3auth_legacy_jwks_url: str = "https://api.openlogin.com/jwks"
-    web3auth_legacy_issuer: str = "https://api.openlogin.com/"
-    web3auth_external_jwks_url: str = "https://authjs.web3auth.io/jwks"
-    web3auth_external_issuer: str = "https://authjs.web3auth.io"
-    web3auth_external_issuers: str = "https://authjs.web3auth.io,metamask,wallet-connect-v2,coinbase"
-    web3auth_jwks_timeout_seconds: float = 5.0
-    web3auth_jwks_cache_lifespan_seconds: int = 3600
     auth_challenge_ttl_seconds: int = 300
     auth_session_ttl_seconds: int = 604800
 
@@ -100,6 +89,12 @@ class Settings(BaseSettings):
     nft_max_image_bytes: int = 5_000_000
     nft_min_image_dimension: int = 256
     nft_max_image_dimension: int = 4096
+    nft_publish_fee_fan_tokens: int = 100
+    membership_card_fee_fan_tokens: int = 0
+    nft_min_price_fan_tokens: int = 1
+    nft_max_price_fan_tokens: int = 1_000_000
+    nft_min_supply: int = 1
+    nft_max_supply: int = 1_000
     fanora_issuer_name: str = "Fanora Protocol"
 
     log_level: str = "INFO"
@@ -124,18 +119,6 @@ class Settings(BaseSettings):
     def llm_models(self) -> list[str]:
         values = [self.openai_model, *self.openai_fallback_models.split(",")]
         return list(dict.fromkeys(model.strip() for model in values if model.strip()))
-
-    @property
-    def allowed_web3auth_external_issuers(self) -> set[str]:
-        return {issuer.strip().lower() for issuer in self.web3auth_external_issuers.split(",") if issuer.strip()}
-
-    @property
-    def allowed_web3auth_external_audiences(self) -> set[str]:
-        return {
-            hostname.lower()
-            for origin in self.cors_origins
-            if (hostname := urlparse(origin).hostname)
-        }
 
     @property
     def llm_enabled(self) -> bool:

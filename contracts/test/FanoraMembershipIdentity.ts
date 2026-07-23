@@ -14,6 +14,24 @@ describe("FanoraMembershipIdentity", function () {
     return { identity, admin, minter, levelManager, uriManager, pauser, fan, anotherFan };
   }
 
+  it("exposes ERC-721 identity branding for wallets and marketplaces", async function () {
+    const { identity } = await fixture();
+    expect(await identity.name()).to.equal("Fanora Membership Identity");
+    expect(await identity.symbol()).to.equal("FANORA-ID");
+  });
+
+  it("refreshes a membership card URI without changing its token id", async function () {
+    const { identity, minter, uriManager, fan } = await fixture();
+    await identity.connect(minter).mintIdentity(fan.address, 1, "ipfs://member-card-v1", ethers.id("card-mint"));
+    await expect(
+      identity.connect(uriManager).updateIdentityMetadata(1, "ipfs://member-card-v2", ethers.id("card-refresh")),
+    )
+      .to.emit(identity, "IdentityMetadataUpdated")
+      .withArgs(fan.address, 1, ethers.id("card-refresh"), "ipfs://member-card-v2", 2);
+    expect(await identity.identityTokenOf(fan.address)).to.equal(1);
+    expect(await identity.tokenURI(1)).to.equal("ipfs://member-card-v2");
+  });
+
   it("mints one identity per wallet and permanently rejects duplicate operations", async function () {
     const { identity, minter, fan, anotherFan } = await fixture();
     const operation = ethers.id("membership:user-1");
@@ -30,16 +48,17 @@ describe("FanoraMembershipIdentity", function () {
     ).to.be.revertedWithCustomError(identity, "OperationAlreadyProcessed");
   });
 
-  it("keeps the token id stable during upgrades and blocks downgrades", async function () {
+  it("keeps the token id stable during membership level changes", async function () {
     const { identity, minter, levelManager, fan } = await fixture();
     await identity.connect(minter).mintIdentity(fan.address, 1, "ipfs://identity-v1", ethers.id("mint"));
     await identity.connect(levelManager).updateMembershipLevel(1, 2, "ipfs://identity-v2", ethers.id("upgrade"));
     expect(await identity.ownerOf(1)).to.equal(fan.address);
     expect(await identity.membershipLevelOf(1)).to.equal(2);
     expect(await identity.metadataVersionOf(1)).to.equal(2);
-    await expect(
-      identity.connect(levelManager).updateMembershipLevel(1, 1, "ipfs://identity-v3", ethers.id("downgrade")),
-    ).to.be.revertedWithCustomError(identity, "MembershipDowngradeNotAllowed");
+    await identity.connect(levelManager).updateMembershipLevel(1, 1, "ipfs://identity-v3", ethers.id("downgrade"));
+    expect(await identity.membershipLevelOf(1)).to.equal(1);
+    expect(await identity.metadataVersionOf(1)).to.equal(3);
+    expect(await identity.tokenURI(1)).to.equal("ipfs://identity-v3");
   });
 
   it("blocks approvals and every user transfer entry point", async function () {

@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
 import FanTokenAmount from "@/components/common/FanTokenAmount";
 import { useAuth } from "@/components/providers/AuthProvider";
-import PrivateKeyExportModal from "./PrivateKeyExportModal";
 import UserAvatar from "./UserAvatar";
 import { api } from "@/lib/api/client";
 import type { Community, FanoraUser } from "@/lib/api/types";
@@ -25,7 +24,7 @@ function shortAddress(address: string) {
 
 export default function ProfileDashboard() {
   const router = useRouter();
-  const { user, status, refreshUser, logout, exportPrivateKey } = useAuth();
+  const { user, status, refreshUser, logout } = useAuth();
   const [form, setForm] = useState({
     display_name: "",
     username: "",
@@ -38,7 +37,6 @@ export default function ProfileDashboard() {
   const [saving, setSaving] = useState(false);
   const [joining, setJoining] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
-  const [showPrivateKeyExport, setShowPrivateKeyExport] = useState(false);
 
   useEffect(() => {
     if (status === "anonymous" || status === "error") router.replace("/login");
@@ -230,24 +228,14 @@ export default function ProfileDashboard() {
                 <div className="flex items-center gap-3">
                   <span className="flex h-10 w-10 items-center justify-center rounded-full bg-green text-lg text-white">✓</span>
                   <div>
-                    <p className="font-semibold text-jacarta-700 dark:text-white">{user.primary_wallet.wallet_type === "embedded" ? "Web3Auth 嵌入式钱包" : "外部钱包"}</p>
+                    <p className="font-semibold text-jacarta-700 dark:text-white">RainbowKit 直连钱包</p>
                     <p className="mt-1 text-xs text-jacarta-500 dark:text-jacarta-300">私钥由钱包提供商管理，Fanora 不保存。</p>
                   </div>
                 </div>
               </div>
-              {user.primary_wallet.wallet_type === "embedded" ? (
-                <button
-                  type="button"
-                  onClick={() => setShowPrivateKeyExport(true)}
-                  className="mt-4 w-full rounded-xl border border-orange/30 bg-orange/5 py-3 text-sm font-semibold text-orange transition-all hover:-translate-y-0.5 hover:bg-orange/10"
-                >
-                  导出钱包私钥
-                </button>
-              ) : (
-                <p className="mt-4 rounded-xl bg-jacarta-50 px-4 py-3 text-center text-xs leading-5 text-jacarta-500 dark:bg-white/[.04] dark:text-jacarta-300">
-                  当前是外部钱包，请在钱包应用的账户设置中导出私钥。
-                </p>
-              )}
+              <p className="mt-4 rounded-xl bg-jacarta-50 px-4 py-3 text-center text-xs leading-5 text-jacarta-500 dark:bg-white/[.04] dark:text-jacarta-300">
+                钱包密钥由对应的钱包应用管理，账户备份或导出请前往钱包应用操作。
+              </p>
               <button type="button" onClick={() => void logout()} className="mt-4 w-full rounded-xl border border-jacarta-100 py-3 text-sm font-semibold text-jacarta-500 transition-colors hover:border-red/30 hover:bg-red/5 hover:text-red dark:border-white/10">退出当前身份</button>
             </section>
 
@@ -288,12 +276,6 @@ export default function ProfileDashboard() {
           <Link href="/" className="text-sm font-semibold text-jacarta-500 transition-colors hover:text-accent">← 返回 Fanora 首页</Link>
         </div>
       </div>
-      <PrivateKeyExportModal
-        open={showPrivateKeyExport}
-        walletAddress={user.primary_wallet.address}
-        onClose={() => setShowPrivateKeyExport(false)}
-        onExport={exportPrivateKey}
-      />
     </main>
   );
 }

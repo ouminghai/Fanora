@@ -1,36 +1,131 @@
 """Deterministic, idempotent Fan Token ledger operations."""
 
+import asyncio
 from datetime import UTC, datetime
 
 from fastapi import HTTPException, status
+from sqlalchemy import event
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import Session
 from sqlmodel import col, func, select
 
+from app.core.logging import logger
 from app.models.community import FanTokenLedger
 from app.models.membership import FanTokenRule, MembershipLevel
-from app.models.user import UserProfile
+from app.models.user import UserProfile, Wallet
+
+MEMBERSHIP_CARD_SYNC_KEY = "membership_card_sync_user_ids"
+_pending_card_sync_users: set[str] = set()
+_active_card_sync_users: set[str] = set()
+_card_sync_tasks: set[asyncio.Task[None]] = set()
+
+
+def request_membership_card_sync(session: AsyncSession, user_id: str) -> None:
+    session.info.setdefault(MEMBERSHIP_CARD_SYNC_KEY, set()).add(user_id)
+
+
+async def _sync_membership_card_after_commit(user_id: str) -> None:
+    from app.core.database import database_service
+    from app.services.identity import AuthenticatedIdentity
+    from app.services.nft import nft_service
+
+    try:
+        while user_id in _pending_card_sync_users:
+            _pending_card_sync_users.discard(user_id)
+            async with database_service.session_factory() as session:
+                profile = await session.get(UserProfile, user_id)
+                wallet = (
+                    await session.execute(
+                        select(Wallet).where(
+                            Wallet.user_id == user_id,
+                            col(Wallet.is_primary).is_(True),
+                        )
+                    )
+                ).scalar_one_or_none()
+                if profile is None or not profile.is_official_member or wallet is None:
+                    continue
+                wallet_type = wallet.wallet_type
+                if wallet_type not in ("embedded", "external"):
+                    logger.warning(
+                        "automatic_membership_card_sync_skipped_invalid_wallet_type",
+                        user_id=user_id,
+                        wallet_type=wallet_type,
+                    )
+                    continue
+                identity = AuthenticatedIdentity(
+                    user_id=user_id,
+                    primary_wallet=wallet.address,
+                    wallet_type=wallet_type,
+                    provider=wallet.provider or "fanora",
+                )
+                try:
+                    await nft_service.create_membership_card(session, identity)
+                except Exception:
+                    await session.rollback()
+                    logger.exception("automatic_membership_card_sync_failed", user_id=user_id)
+    finally:
+        _active_card_sync_users.discard(user_id)
+
+
+@event.listens_for(Session, "after_commit")
+def _schedule_membership_card_sync(sync_session: Session) -> None:
+    user_ids = sync_session.info.pop(MEMBERSHIP_CARD_SYNC_KEY, set())
+    if not user_ids:
+        return
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        return
+    for user_id in user_ids:
+        _pending_card_sync_users.add(user_id)
+        if user_id in _active_card_sync_users:
+            continue
+        _active_card_sync_users.add(user_id)
+        task = loop.create_task(_sync_membership_card_after_commit(user_id))
+        _card_sync_tasks.add(task)
+        task.add_done_callback(_card_sync_tasks.discard)
+
+
+@event.listens_for(Session, "after_rollback")
+def _discard_membership_card_sync(sync_session: Session) -> None:
+    sync_session.info.pop(MEMBERSHIP_CARD_SYNC_KEY, None)
 
 
 class FanTokenService:
     async def _sync_level(self, session: AsyncSession, profile: UserProfile) -> None:
         if profile.level == "神经领袖":
             return
-        level = (
+        earned_level = (
             await session.execute(
                 select(MembershipLevel)
                 .where(
                     col(MembershipLevel.is_active).is_(True),
                     col(MembershipLevel.is_management).is_(False),
-                    col(MembershipLevel.min_token_balance) <= profile.fan_token_balance,
+                    col(MembershipLevel.min_token_balance) <= profile.fan_token_lifetime_earned,
                     (col(MembershipLevel.max_token_balance).is_(None))
-                    | (col(MembershipLevel.max_token_balance) >= profile.fan_token_balance),
+                    | (col(MembershipLevel.max_token_balance) >= profile.fan_token_lifetime_earned),
                 )
                 .order_by(col(MembershipLevel.rank).desc())
                 .limit(1)
             )
         ).scalar_one_or_none()
-        if level is not None:
-            profile.level = level.name
+        if earned_level is None:
+            return
+        current_level = (
+            await session.execute(
+                select(MembershipLevel).where(MembershipLevel.name == profile.level)
+            )
+        ).scalar_one_or_none()
+        if current_level is None or earned_level.name != profile.level:
+            profile.level = earned_level.name
+
+    async def sync_level(self, session: AsyncSession, profile: UserProfile) -> bool:
+        """Sync a profile level from lifetime earned FAN, independent of spendable balance."""
+        previous_level = profile.level
+        await self._sync_level(session, profile)
+        if profile.is_official_member and profile.level != previous_level:
+            request_membership_card_sync(session, profile.user_id)
+        return profile.level != previous_level
 
     async def award(
         self,
@@ -59,7 +154,9 @@ class FanTokenService:
                 detail="Fan Token adjustment would make the balance negative",
             )
         profile.fan_token_balance = balance_after
-        await self._sync_level(session, profile)
+        if delta > 0:
+            profile.fan_token_lifetime_earned += delta
+        await self.sync_level(session, profile)
         entry = FanTokenLedger(
             user_id=user_id,
             delta=delta,

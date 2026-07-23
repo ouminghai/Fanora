@@ -178,11 +178,6 @@
     },
     {
       "inputs": [],
-      "name": "MembershipDowngradeNotAllowed",
-      "type": "error"
-    },
-    {
-      "inputs": [],
       "name": "OperationAlreadyProcessed",
       "type": "error"
     },

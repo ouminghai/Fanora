@@ -10,6 +10,11 @@ import {Pausable} from "@openzeppelin/contracts/utils/Pausable.sol";
 /// @dev 每个 Token 类型都可独立配置供应量、单钱包上限、铸造时间和可转移性。
 ///      后端使用平台运营钱包发放收藏品，用户不需要提供自己的私钥。
 contract FanoraCollectibles is ERC1155, AccessControl, Pausable {
+    /// @notice 钱包、市场和区块浏览器展示时读取的收藏品集合名称。
+    string public constant name = "Fanora Collectibles";
+    /// @notice 钱包、市场和区块浏览器展示时读取的收藏品集合符号。
+    string public constant symbol = "FANORA";
+
     /// @notice 可创建、启用或停用收藏品类型的角色。
     bytes32 public constant TOKEN_TYPE_MANAGER_ROLE = keccak256("TOKEN_TYPE_MANAGER_ROLE");
     /// @notice 可向符合条件的用户铸造收藏品的角色。
@@ -26,7 +31,9 @@ contract FanoraCollectibles is ERC1155, AccessControl, Pausable {
         /// 用户定制徽章，固定总量 1、单钱包 1 且不可转移。
         CUSTOM_BADGE,
         /// 任务限量徽章，每个钱包最多 1 枚且不可转移。
-        TASK_LIMITED_BADGE
+        TASK_LIMITED_BADGE,
+        /// 粉丝发布的限量 NFT，可设置供应量、单钱包上限和转让策略。
+        FAN_LIMITED_NFT
     }
 
     /// @notice 单个 ERC-1155 tokenId 的发行规则和当前状态。
@@ -103,6 +110,7 @@ contract FanoraCollectibles is ERC1155, AccessControl, Pausable {
 
     /// @notice 创建一个新的收藏品类型。
     /// @dev CUSTOM_BADGE 和 TASK_LIMITED_BADGE 会强制执行产品定义的不可转移和数量限制。
+    ///      FAN_LIMITED_NFT 用于粉丝直接发布的限量 NFT，供应量与单钱包上限由后端业务校验。
     function createTokenType(
         uint256 tokenId,
         TokenCategory category,

@@ -23,7 +23,9 @@ api.interceptors.response.use(
     if (
       typeof window !== "undefined" &&
       error.response?.status === 401 &&
-      !String(error.config?.url || "").includes("/auth/web3auth")
+      !["/auth/wallet"].some((path) =>
+        String(error.config?.url || "").includes(path),
+      )
     ) {
       window.localStorage.removeItem(SESSION_TOKEN_KEY);
     }

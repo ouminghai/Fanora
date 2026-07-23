@@ -3,6 +3,7 @@
 import axios from "axios";
 import Image from "next/image";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import FanTokenAmount from "@/components/common/FanTokenAmount";
 import CheckInCalendar from "@/components/community/CheckInCalendar";
@@ -43,6 +44,10 @@ function taskPreview(task: FanTask) {
 
   return {
     imageUrl: task.presentation.image_url || catalog?.imageSrc || "/img/fanora/activity-community.jpg",
+    actionUrl:
+      task.presentation.action_url ||
+      catalog?.actionHref ||
+      (task.target_post_id ? `/community/posts/${task.target_post_id}` : "/community/tasks"),
     order: catalog?.order ?? Number.MAX_SAFE_INTEGER,
   };
 }
@@ -61,6 +66,7 @@ function formatDate(value: string) {
 }
 
 export default function CommunityHub() {
+  const router = useRouter();
   const { user, status, refreshUser } = useAuth();
   const [community, setCommunity] = useState<OfficialCommunity | null>(null);
   const [posts, setPosts] = useState<CommunityPostSummary[]>([]);
@@ -183,6 +189,7 @@ export default function CommunityHub() {
       const response = await api.post<FanTask>(`/tasks/${task.id}/claim`);
       setTasks((current) => current.map((item) => (item.id === task.id ? response.data : item)));
       setNotice({ kind: "success", text: "任务已领取。进入指定帖子回复，发布后会立即完成。" });
+      router.push(taskPreview(response.data).actionUrl);
     } catch (error) {
       setNotice({ kind: "error", text: getErrorMessage(error) });
     } finally {
@@ -311,7 +318,7 @@ export default function CommunityHub() {
                   const active = task.status === "published";
                   const view = taskPreview(task);
                   const taskAction = claimed || rewarded
-                    ? `/community/posts/${task.target_post_id}`
+                    ? view.actionUrl
                     : !user
                       ? "/login"
                       : !user.is_official_member

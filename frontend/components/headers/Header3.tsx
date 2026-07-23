@@ -10,7 +10,7 @@ import {
   addMobileMenuToggle,
   removeMenuActive,
 } from "@/utlis/mobileMenuToggle";
-import WalletButton from "../web3/WalletButton";
+import RainbowWalletLoginButton from "../web3/RainbowWalletLoginButton";
 import {
   VIDEO_SOUND_STATE_EVENT,
   VIDEO_SOUND_TOGGLE_EVENT,
@@ -115,7 +115,7 @@ export function VideoSoundToggle() {
       aria-pressed={!isMuted}
       title={label}
       data-video-sound-toggle
-      className="group ml-2 flex h-10 w-10 items-center justify-center rounded-full border border-jacarta-100 bg-white transition-colors hover:border-transparent hover:bg-accent focus:border-transparent focus:bg-accent dark:border-transparent dark:bg-white/[.15] dark:hover:bg-accent"
+      className="group ml-2 hidden h-10 w-10 items-center justify-center rounded-full border border-jacarta-100 bg-white transition-colors hover:border-transparent hover:bg-accent focus:border-transparent focus:bg-accent sm:flex dark:border-transparent dark:bg-white/[.15] dark:hover:bg-accent"
     >
       {isMuted ? (
         <svg
@@ -235,11 +235,7 @@ export default function Header3({ showVideoSoundControl = false }: Header3Props)
 
             {/* Mobile Connect Wallet / Socials */}
             <div className="mt-10 w-full lg:hidden">
-              <WalletButton>
-                <a className="js-wallet block w-full rounded-full bg-accent py-3 px-8 text-center font-semibold text-white shadow-accent-volume transition-all hover:bg-accent-dark">
-                  Connect Wallet
-                </a>
-              </WalletButton>
+              <RainbowWalletLoginButton variant="full" />
 
               <hr className="my-5 h-px border-0 bg-jacarta-100 dark:bg-jacarta-600" />
 
@@ -320,22 +316,7 @@ export default function Header3({ showVideoSoundControl = false }: Header3Props)
 
             {/* Actions */}
             <div className="ml-8 hidden lg:flex xl:ml-12">
-              {/* Wallet */}
-
-              {/* <WalletButton>
-                <a className="js-wallet group flex h-10 w-10 items-center justify-center rounded-full border border-jacarta-100 bg-white transition-colors hover:border-transparent hover:bg-accent focus:border-transparent focus:bg-accent dark:border-transparent dark:bg-white/[.15] dark:hover:bg-accent">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    width="24"
-                    height="24"
-                    className="h-4 w-4 fill-jacarta-700 transition-colors group-hover:fill-white group-focus:fill-white dark:fill-white"
-                  >
-                    <path fill="none" d="M0 0h24v24H0z" />
-                    <path d="M22 6h-7a6 6 0 1 0 0 12h7v2a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h18a1 1 0 0 1 1 1v2zm-7 2h8v8h-8a4 4 0 1 1 0-8zm0 3v2h3v-2h-3z" />
-                  </svg>
-                </a>
-              </WalletButton> */}
+              <RainbowWalletLoginButton />
 
               {/* Profile */}
               <Profile />
@@ -373,6 +354,8 @@ export default function Header3({ showVideoSoundControl = false }: Header3Props)
 
           {/* Mobile Menu Actions */}
           <div className="ml-auto flex lg:hidden">
+            <RainbowWalletLoginButton />
+
             {/* Profile */}
             <Profile />
 

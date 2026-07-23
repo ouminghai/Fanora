@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const navigation = [
-  { href: "/", label: "首页" },
-  { href: "/community/creations", label: "链上社区" },
-  { href: "/community#check-in", label: "每日签到" },
-  { href: "/community/tasks", label: "粉丝任务" },
-  { href: "/collection", label: "我的收藏" },
+  { href: "/", label: "Explore" },
+  { href: "/community/creations", label: "Echo" },
+  { href: "/community#check-in", label: "Check In" },
+  { href: "/community/tasks", label: "Quests" },
+  { href: "/collections", label: "Gallery" },
+  { href: "/collection", label: "Collection" },
 ];
 
 export default function Nav() {

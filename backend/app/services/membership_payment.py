@@ -9,12 +9,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 from web3 import Web3
-from web3.exceptions import TimeExhausted, TransactionNotFound
+from web3.exceptions import TransactionNotFound
 
 from app.adapters.monad import monad_contract_adapter
 from app.core.config import settings
 from app.models.base import utc_now
 from app.models.user import OfficialMembershipPayment, UserProfile
+from app.services.fan_tokens import fan_token_service, request_membership_card_sync
 from app.services.identity import AuthenticatedIdentity
 
 
@@ -44,7 +45,7 @@ class OfficialMembershipPaymentService:
 
     @staticmethod
     def payment_id_for_user(user_id: str) -> str:
-        return Web3.keccak(text=f"fanora-membership:{user_id}").hex()
+        return Web3.to_hex(Web3.keccak(text=f"fanora-membership:{user_id}"))
 
     async def _load_chain_payment(self, transaction_hash: str) -> ConfirmedChainPayment:
         def load() -> ConfirmedChainPayment:
@@ -56,21 +57,12 @@ class OfficialMembershipPaymentService:
                 )
             try:
                 transaction_hash_bytes = HexBytes(transaction_hash)
-                receipt = web3.eth.wait_for_transaction_receipt(
-                    transaction_hash_bytes,
-                    timeout=45,
-                    poll_latency=2,
-                )
+                receipt = web3.eth.get_transaction_receipt(transaction_hash_bytes)
                 transaction = web3.eth.get_transaction(transaction_hash_bytes)
-            except TimeExhausted as error:
+            except TransactionNotFound as error:
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
                     detail="Membership payment is still waiting for confirmation",
-                ) from error
-            except TransactionNotFound as error:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Membership payment transaction was not found",
                 ) from error
 
             if int(receipt["status"]) != 1:
@@ -114,7 +106,7 @@ class OfficialMembershipPaymentService:
                 from_address=Web3.to_checksum_address(from_address),
                 to_address=Web3.to_checksum_address(to_address),
                 treasury_address=Web3.to_checksum_address(event["treasury"]),
-                payment_id=event["paymentId"].hex(),
+                payment_id=Web3.to_hex(event["paymentId"]),
                 value_wei=int(value_wei),
                 chain_id=int(web3.eth.chain_id),
                 block_number=block_number,
@@ -140,6 +132,11 @@ class OfficialMembershipPaymentService:
             )
         ).scalar_one_or_none()
         if profile.is_official_member and existing_payment is not None:
+            if existing_payment.transaction_hash != transaction_hash.lower():
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Official membership is already linked to another transaction",
+                )
             return existing_payment
 
         reused_payment = (
@@ -187,6 +184,8 @@ class OfficialMembershipPaymentService:
         session.add(record)
         profile.is_official_member = True
         profile.official_member_since = now
+        await fan_token_service.sync_level(session, profile)
+        request_membership_card_sync(session, identity.user_id)
         profile.updated_at = now
         try:
             await session.commit()

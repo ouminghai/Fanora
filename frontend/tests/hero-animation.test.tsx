@@ -57,7 +57,7 @@ test("hero join button points to login and only appears for anonymous users", ()
   assert.equal(shouldShowHeroJoinButton("authenticated", true), false);
 });
 
-test("authenticated unpaid users see the 1 MON official membership button", () => {
+test("authenticated unpaid users see the dynamic-fee official membership button", () => {
   const button = renderToStaticMarkup(<OfficialMembershipJoinButton />);
   const pendingMember = renderToStaticMarkup(
     <HeroView status="authenticated" hasUser isOfficialMember={false} />,
@@ -67,9 +67,9 @@ test("authenticated unpaid users see the 1 MON official membership button", () =
   );
 
   assert.match(button, /href="\/membership\/join"/);
-  assert.match(button, /缴纳 1 MON 正式加入/);
-  assert.match(pendingMember, /缴纳 1 MON 正式加入/);
-  assert.doesNotMatch(officialMember, /缴纳 1 MON 正式加入/);
+  assert.match(button, /缴纳会费正式加入/);
+  assert.match(pendingMember, /缴纳会费正式加入/);
+  assert.doesNotMatch(officialMember, /缴纳会费正式加入/);
   assert.equal(shouldShowOfficialMembershipButton("authenticated", true, false), true);
   assert.equal(shouldShowOfficialMembershipButton("authenticated", true, true), false);
 });

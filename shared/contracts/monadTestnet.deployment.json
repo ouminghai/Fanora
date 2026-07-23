@@ -1,7 +1,7 @@
 {
   "network": "monadTestnet",
   "chainId": 10143,
-  "deployedAt": "2026-07-21T12:30:48.471Z",
+  "deployedAt": "2026-07-22T06:07:55.584Z",
   "deployer": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
   "admin": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
   "treasury": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
@@ -35,14 +35,14 @@
       "startBlock": 46839663
     },
     "FanoraMembershipIdentity": {
-      "address": "0x14bE25042ac73Eb984aa60b8f0b49D78c79FcfEf",
-      "transactionHash": "0xce9614bdcce6f6bdd7c6a951938949f683cb07ea7e3694a494456df3c01272fe",
-      "startBlock": 46839671
+      "address": "0xeE3c3F36fF43aCB44F0F8271fbE7cdbAAcaF5c85",
+      "transactionHash": "0x31e4fd7670fd93021e8067312393a5b3c3ca2d9d3ea7ce81e764f69fd3fd323e",
+      "startBlock": 47021846
     },
     "FanoraCollectibles": {
-      "address": "0xb8Eea4B312c58E6Cb1d142c8705fF766F03eD19f",
-      "transactionHash": "0x0a3794d7289bfe176dd5edddb256350db17eab27906c0c5215dfa00d1cb2e37c",
-      "startBlock": 46839678
+      "address": "0xB2ffc47D5a9407f0118e12749847821530533A84",
+      "transactionHash": "0x2bc9713047531368dd54628f2679e2810e40f5b29b8c4e36a7830e3f987ad288",
+      "startBlock": 47047912
     }
   }
 }

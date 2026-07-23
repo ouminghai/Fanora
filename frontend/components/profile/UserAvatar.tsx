@@ -15,7 +15,12 @@ type UserAvatarProps = {
 function normalizeAvatarUrl(value?: string | null) {
   const normalized = value?.trim();
   if (!normalized || ["null", "undefined", "none"].includes(normalized.toLowerCase())) return null;
-  if (normalized.startsWith("https://") || normalized.startsWith("http://") || normalized.startsWith("data:image/")) {
+  if (
+    normalized.startsWith("https://")
+    || normalized.startsWith("http://")
+    || normalized.startsWith("data:image/")
+    || normalized.startsWith("/")
+  ) {
     return normalized;
   }
   return null;

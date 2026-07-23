@@ -21,6 +21,7 @@ const toolbar = [
   { label: "•", title: "无序列表", before: "- ", after: "", placeholder: "列表内容" },
   { label: "1.", title: "有序列表", before: "1. ", after: "", placeholder: "列表内容" },
   { label: "↗", title: "链接", before: "[", after: "](https://)", placeholder: "链接文字" },
+  { label: "IMG", title: "图片", before: "![", after: "](https://)", placeholder: "图片说明" },
   { label: "</>", title: "代码", before: "`", after: "`", placeholder: "代码" },
 ];
 

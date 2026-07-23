@@ -1,6 +1,6 @@
 # Fanora 本地开发说明
 
-> 更新日期：2026-07-21\
+> 更新日期：2026-07-23\
 > 本文描述当前代码可执行的前后端、数据库、Pinata、Monad 合约和发布同步流程。
 
 ## 1. 前置环境
@@ -100,6 +100,9 @@ npm run dev
 - 粉丝任务中心：`http://localhost:3000/community/tasks`
 - FEAR and DREAMS 纪念票任务：`http://localhost:3000/community/tasks/fear-and-dreams`
 - 创作社区瀑布流：`http://localhost:3000/community/creations`
+- 粉丝 NFT 广场：`http://localhost:3000/collections`
+- 发布粉丝 NFT：`http://localhost:3000/collections/create`
+- 我的会员证与收藏：`http://localhost:3000/collection`
 
 前端业务请求统一通过 Axios 访问 `NEXT_PUBLIC_API_URL`。
 
@@ -108,7 +111,7 @@ npm run dev
 ### 3.1 认证与用户
 
 - `POST /api/v1/auth/challenge`
-- `POST /api/v1/auth/web3auth`
+- `POST /api/v1/auth/wallet`
 - `POST /api/v1/auth/logout`
 - `GET /api/v1/users/me`
 - `PATCH /api/v1/users/me`
@@ -143,6 +146,17 @@ npm run dev
 - `POST /api/v1/fan-tokens/admin/adjustments`：管理员通过新增流水做正负纠错。
 - `PUT /api/v1/admin/users/{user_id}/roles/creator`：管理员授予创作者角色。
 
+### 3.4 会员证、收藏与粉丝 NFT 市场
+
+- `GET /api/v1/nft/me`：读取当前用户的 ERC-721 会员证、ERC-1155 收藏和历史发布记录。
+- `POST /api/v1/nft/identity/sync`：按当前正式会员等级创建或同步同一个 ERC-721 身份 token。
+- `POST /api/v1/nft/identity/card`、`POST /api/v1/nft/identity/card/refresh`：生成或刷新会员证图片与 metadata，tokenId 不变。
+- `GET /api/v1/nft/creations`、`GET /api/v1/nft/creations/{creation_id}`：读取公开粉丝 NFT 市场和详情。
+- `POST /api/v1/nft/creations`：正式会员发布限量 NFT，成功后扣除发布费并创建 `FAN_LIMITED_NFT` token type。
+- `POST /api/v1/nft/creations/{creation_id}/like`、`/favorite`：切换点赞与收藏。
+- `POST /api/v1/nft/creations/{creation_id}/buy`：使用 FAN 购买，买家扣 FAN、创作者得 FAN，后端铸造 ERC-1155 给买家。
+- `POST /api/v1/nft/collectibles/{token_type_id}/avatar`：将已持有收藏品设置为个人头像。
+
 任务完成统一收敛到任务完成模块：`post_reply` 由有效回复触发，`daily_check_in` 由签到触发，`content_publish` 由符合分类的社区创作触发，`page_action` 由专属活动页触发；`streak`、`event_check_in` 和 `future` 用于即将开放任务。所有已支持模式均不需要人工审核，奖励使用领取时快照，FAN 流水使用唯一幂等键，重放请求不会重复发奖。`frontend/data/fanora.ts` 的 `fanTaskCatalog` 是首页活动、热门任务和任务中心共用的展示目录，后端仍是领取状态、验证结果和积分流水的事实来源。
 
 当前代码仍保留通用社区表和部分复数路由，但不要在 MVP 中创建第二个社区，也不要继续开发社区搜索、分页、独立积分、独立任务、独立等级、Badge 命名空间或多管理员能力。目标 API 将逐步收敛为单数 `/community` 路径。
@@ -151,7 +165,7 @@ npm run dev
 
 开发种子从仓库根目录 `resources/` 及其子目录读取选定图片，转换为 Base64 Data URL 后写入 PostgreSQL：社区帖子写入 `community_posts.cover_url`，任务卡图片写入 `fan_tasks.validation_rule.presentation.image_url`。迁移 `20260720_0012` 会将现有官方帖子和任务一并更新；当前方案用于原型阶段，生产环境应迁移到对象存储并在数据库保存 URL、哈希和媒体元数据。
 
-ERC-721 身份、ERC-1155 纪念资产、自定义 NFT 申请和 Pinata 适配器已经接入。链上资产任务、任务限定 Badge 自动领取、后台重试和常驻事件对账仍属于待完成范围。
+ERC-721 身份、ERC-1155 纪念资产、粉丝限量 NFT 发布/购买和 Pinata 适配器已经接入。链上资产任务、任务限定 Badge 自动领取、后台重试和常驻事件对账仍属于待完成范围。
 
 ## 4. 正式入会本地配置
 
@@ -168,8 +182,8 @@ MEMBERSHIP_MIN_CONFIRMATIONS=1
 
 ## 5. 钱包与私钥安全
 
-- Web3Auth 嵌入式钱包私钥导出只在 Profile 中由用户主动确认后执行。
-- 导出请求由浏览器直接调用钱包 Provider，不经过 FastAPI、Axios、数据库或 Agent。
+- 钱包私钥、助记词和账户备份只由用户的钱包应用管理，Fanora 前后端不读取或导出。
+- Fanora 页面不提供私钥或助记词导出入口。
 - 开发与测试时禁止输出、截图、复制到日志或持久化真实私钥。
 - `OPERATOR_PRIVATE_KEY` 与 `DEPLOYER_PRIVATE_KEY` 只能使用独立 Monad Testnet 钱包。
 - 不要使用持有真实资产的主钱包进行测试。
@@ -182,7 +196,7 @@ MEMBERSHIP_MIN_CONFIRMATIONS=1
 
 - `FanoraMembershipGateway`：精确收取当前会费、付款防重、资金托管、管理员改价与提现。
 - `FanoraMembershipIdentity`：ERC-721 SBT 会员身份、等级和 metadata 版本。
-- `FanoraCollectibles`：ERC-1155 演唱会纪念卡、自定义徽章和任务限定 Badge。
+- `FanoraCollectibles`：ERC-1155 演唱会纪念卡、粉丝限量 NFT、自定义徽章和任务限定 Badge。
 
 ### 6.2 编译与测试正式合约
 
@@ -223,15 +237,21 @@ PINATA_MAX_RETRIES
 NFT_MAX_IMAGE_BYTES
 NFT_MIN_IMAGE_DIMENSION
 NFT_MAX_IMAGE_DIMENSION
+NFT_PUBLISH_FEE_FAN_TOKENS
+NFT_MIN_PRICE_FAN_TOKENS
+NFT_MAX_PRICE_FAN_TOKENS
+NFT_MIN_SUPPLY
+NFT_MAX_SUPPLY
 ```
 
 要求：
 
 - Pinata JWT 只能存在后端密钥环境。
-- 当前未审核自定义图片保存在数据库受控字段中；生产环境仍需迁移到独立临时审核存储。
+- 粉丝发布 NFT 不再经过管理员审核；发布成功后图片和 metadata 直接固定到 Pinata。
 - 后端先上传图片，再生成引用图片 CID 的 metadata JSON。
 - 合约保存 `ipfs://metadataCid`，Gateway URL 只用于展示。
 - Pinata 上传成功不等于链上铸造成功，两者分别记录状态。
+- 发布限量 NFT 成功消耗 100 FAN；购买成功后买家扣 FAN、创作者得 FAN，并由后端调用 ERC-1155 mint 给买家。
 
 ## 8. 测试与检查
 
@@ -254,8 +274,9 @@ npm run test:hero-animation
 npm run test:fan-token
 npm run test:membership
 npm run test:official-membership
+npm run test:community
 npm run test:video-sound
-npm run test:key-export
+npm run test:wallet-login
 ```
 
 ### 8.2 后端
@@ -281,9 +302,13 @@ npm run compile
 npm test
 ```
 
-当前正式合约已有 16 项测试，覆盖 ERC-721 SBT、operationId、ERC-1155 供应量、钱包限额、时间窗、claimKey、metadata 冻结和恶意 receiver。
+当前正式合约已有 19 项测试，覆盖 ERC-721 SBT、会员证 metadata 刷新、operationId、ERC-1155 供应量、钱包限额、时间窗、claimKey、metadata 冻结和恶意 receiver。
 
 ## 9. 常见问题
+
+### 新测试数据库初始化时报种子图片缺失
+
+`backend/app/services/product_seed.py` 当前会从仓库根目录、但被 Git 忽略的 `resources/` 读取原型图片。缺少任一被引用文件时，`make test` 或开启自动建表的新环境会在启动阶段抛出 `FileNotFoundError`。2026-07-23 已确认缺少 `resources/Eason-Concert-Horizontal-01-2-3c-2048x1025.webp` 会导致 16 项接口测试在 fixture setup 阶段失败。修复前需补齐本地素材；生产方案应改为已提交的可再分发资源或对象存储，并为缺失素材提供回退。
 
 ### 数据库连接等待时间长
 
@@ -315,3 +340,4 @@ npm test
 - [MVP 路线图](./MVP_ROADMAP.md)
 - [合约发布指南](./CONTRACT_DEPLOYMENT.md)
 - [2026-07-21 交付总结](./DELIVERY_SUMMARY_2026-07-21.md)
+- [2026-07-23 交付总结](./DELIVERY_SUMMARY_2026-07-23.md)

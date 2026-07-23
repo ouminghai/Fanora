@@ -22,6 +22,8 @@ def setup_logging() -> None:
     """Configure console logs for local development and JSON logs for production."""
     level = getattr(logging, settings.log_level.upper(), logging.INFO)
     logging.basicConfig(format="%(message)s", stream=sys.stdout, level=level, force=True)
+    for noisy_logger in ("httpcore", "httpx", "urllib3", "web3", "web3.RequestManager"):
+        logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
     processors: list[Any] = [
         structlog.contextvars.merge_contextvars,

@@ -55,7 +55,7 @@ export default function Auction() {
           粉丝等级与 Badge 成长
         </h2>
         <p className="mx-auto mb-10 max-w-2xl text-center text-sm leading-6 text-white/70">
-          等级门槛、Badge 图片与成长规则均来自 Fanora 后端数据库，Token 变化后自动同步会员身份。
+          等级按历史累计获得的 FAN 成长且只升不降，消费可用余额不会影响已获得的会员身份。
         </p>
 
         {levels === null && !error && (
@@ -153,7 +153,7 @@ export default function Auction() {
                             <div className="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center justify-center rounded-full bg-white py-2.5 px-5 text-2xs font-semibold whitespace-nowrap text-jacarta-700 shadow-lg">
                               {getMembershipProgress(
                                 level,
-                                user?.fan_token_balance ?? null,
+                                user?.fan_token_lifetime_earned ?? null,
                                 user?.level ?? null,
                                 user ? user.is_official_member : null,
                               )}

@@ -11,6 +11,28 @@ import type { OfficialMembershipStatus } from "@/lib/api/types";
 
 type PaymentPhase = "idle" | "wallet" | "verifying" | "success";
 
+const VERIFY_ATTEMPTS = 20;
+const VERIFY_INTERVAL_MS = 3_000;
+
+function pendingPaymentKey(userId: string) {
+  return `fanora.membership.pending.${userId}`;
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, milliseconds));
+}
+
+function isRetryableVerificationError(error: unknown) {
+  if (!axios.isAxiosError(error)) return false;
+  if (!error.response) return true;
+  if ([404, 502, 503, 504].includes(error.response.status)) return true;
+  if (error.response.status !== 409) return false;
+  const detail = String(error.response.data?.detail || "").toLowerCase();
+  return ["waiting for confirmation", "enough confirmations", "activated by another request"].some(
+    (message) => detail.includes(message),
+  );
+}
+
 function paymentErrorMessage(error: unknown) {
   if (axios.isAxiosError(error)) {
     return error.response?.data?.detail || "入会交易暂时无法验证，请稍后重试。";
@@ -33,6 +55,37 @@ export default function OfficialMembershipCheckout() {
   const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const verifyTransaction = useCallback(
+    async (hash: string) => {
+      if (!user) return;
+      setError(null);
+      setPhase("verifying");
+      for (let attempt = 0; attempt < VERIFY_ATTEMPTS; attempt += 1) {
+        try {
+          const response = await api.post<OfficialMembershipStatus>("/membership/verify", {
+            transaction_hash: hash,
+          });
+          setMembership(response.data);
+          window.localStorage.removeItem(pendingPaymentKey(user.id));
+          await refreshUser();
+          setPhase("success");
+          return;
+        } catch (verificationError) {
+          if (!isRetryableVerificationError(verificationError)) {
+            window.localStorage.removeItem(pendingPaymentKey(user.id));
+            setTransactionHash(null);
+            setPhase("idle");
+            throw verificationError;
+          }
+          if (attempt < VERIFY_ATTEMPTS - 1) await wait(VERIFY_INTERVAL_MS);
+        }
+      }
+      setPhase("idle");
+      throw new Error("交易已经提交，Monad 暂时还未确认。页面会保留交易记录，请稍后点击继续确认，无需再次支付。");
+    },
+    [refreshUser, user],
+  );
+
   const loadMembership = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -54,6 +107,16 @@ export default function OfficialMembershipCheckout() {
     if (authStatus === "authenticated") void loadMembership();
   }, [authStatus, loadMembership, router]);
 
+  useEffect(() => {
+    if (!user || loading || !membership || membership.is_official_member || transactionHash) return;
+    const pendingHash = window.localStorage.getItem(pendingPaymentKey(user.id));
+    if (!pendingHash) return;
+    setTransactionHash(pendingHash);
+    void verifyTransaction(pendingHash).catch((verificationError) => {
+      setError(paymentErrorMessage(verificationError));
+    });
+  }, [loading, membership, transactionHash, user, verifyTransaction]);
+
   const pay = async () => {
     if (!membership?.payment_contract_address || !membership.payment_id || !user) return;
     setError(null);
@@ -66,13 +129,8 @@ export default function OfficialMembershipCheckout() {
         chainId: membership.chain_id,
       });
       setTransactionHash(hash);
-      setPhase("verifying");
-      const response = await api.post<OfficialMembershipStatus>("/membership/verify", {
-        transaction_hash: hash,
-      });
-      setMembership(response.data);
-      await refreshUser();
-      setPhase("success");
+      window.localStorage.setItem(pendingPaymentKey(user.id), hash);
+      await verifyTransaction(hash);
     } catch (paymentError) {
       setError(paymentErrorMessage(paymentError));
       setPhase("idle");
@@ -91,6 +149,7 @@ export default function OfficialMembershipCheckout() {
   const isActive = membership?.is_official_member || phase === "success";
   const isPaying = phase === "wallet" || phase === "verifying";
   const feeLabel = membership?.fee_mon ? `${membership.fee_mon} MON` : "当前会费";
+  const walletLabel = "RainbowKit 直连钱包";
 
   return (
     <main className="relative isolate min-h-screen overflow-hidden bg-[#09051c] pb-24 pt-32 text-white">
@@ -117,8 +176,8 @@ export default function OfficialMembershipCheckout() {
               {isActive ? "你已成为正式会员" : "Activate your on-chain identity and become part of Fanora."}
             </h1>
             <p className="mx-auto mt-4 max-w-xl leading-7 text-white/65">
-              请在 Web3Auth Modal 中连接 MetaMask，再由 MetaMask 弹窗确认 {feeLabel}
-              入会交易。Fanora 不会读取、保存或上传你的钱包私钥。
+              使用{walletLabel}确认 {feeLabel} 入会交易。
+              交易由你的钱包直接签名，Fanora 不会读取、保存或上传你的钱包私钥。
             </p>
           </div>
 
@@ -177,25 +236,43 @@ export default function OfficialMembershipCheckout() {
                 </Link>
               </div>
             ) : (
-              <button
-                type="button"
-                disabled={isPaying || !membership?.payment_contract_address || !membership.payment_id}
-                onClick={() => void pay()}
-                className="mt-8 flex w-full items-center justify-center rounded-full bg-accent px-8 py-4 text-lg font-semibold text-white shadow-accent-volume transition-all hover:-translate-y-0.5 hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-45"
-              >
-                {isPaying && (
-                  <span className="mr-3 h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+              <div className="mt-8">
+                <button
+                  type="button"
+                  disabled={
+                    isPaying ||
+                    !membership?.payment_contract_address ||
+                    !membership.payment_id
+                  }
+                  onClick={() => {
+                    const action = transactionHash ? verifyTransaction(transactionHash) : pay();
+                    void action.catch((verificationError) => {
+                      setError(paymentErrorMessage(verificationError));
+                    });
+                  }}
+                  className="flex w-full items-center justify-center rounded-full bg-accent px-8 py-4 text-lg font-semibold text-white shadow-accent-volume transition-all hover:-translate-y-0.5 hover:bg-accent-dark disabled:cursor-not-allowed disabled:opacity-45"
+                >
+                  {isPaying && (
+                    <span className="mr-3 h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+                  )}
+                  {phase === "wallet"
+                    ? `请在钱包中确认 ${feeLabel} 交易`
+                    : phase === "verifying"
+                      ? "正在等待 Monad 确认…"
+                      : transactionHash
+                        ? "继续确认已提交的交易"
+                        : `使用钱包确认支付 ${feeLabel}`}
+                </button>
+                {transactionHash && phase === "idle" && (
+                  <p className="mt-3 text-center text-sm text-white/55">
+                    已保留这笔交易，无需再次支付。
+                  </p>
                 )}
-                {phase === "wallet"
-                  ? `请在 MetaMask 中确认 ${feeLabel} 交易`
-                  : phase === "verifying"
-                    ? "正在等待 Monad 确认…"
-                    : `使用 MetaMask 确认支付 ${feeLabel}`}
-              </button>
+              </div>
             )}
 
             <div className="mt-8 grid gap-3 text-sm leading-6 text-white/55 sm:grid-cols-3">
-              <p>✓ 交易由当前登录主钱包的 MetaMask 弹窗签名</p>
+              <p>✓ 支持 RainbowKit、MetaMask、WalletConnect 等直连钱包</p>
               <p>✓ 合约精确校验并托管当前会费，管理员可审计提现</p>
               <p>✓ Fanora 不接触用户私钥，paymentId 与钱包仅可入会一次</p>
             </div>

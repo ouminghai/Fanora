@@ -2,13 +2,14 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlmodel import col, select
+from sqlmodel import col, func, select
 
 from app.adapters.monad import ChainConfigurationError, monad_contract_adapter
 from app.adapters.pinata import pinata_adapter
 from app.core.config import settings
 from app.core.database import get_database_session
-from app.core.security import get_current_identity, require_official_member
+from app.core.logging import logger
+from app.core.security import get_current_identity, get_optional_identity, require_official_member
 from app.models.base import utc_now
 from app.models.nft import (
     ChainOperation,
@@ -16,17 +17,25 @@ from app.models.nft import (
     CollectibleTokenType,
     MembershipIdentityNft,
     NftApplication,
+    NftCreationReaction,
     NftMetadataVersion,
 )
-from app.models.user import UserRole
+from app.models.user import User, UserProfile
 from app.schemas.nft import (
     ChainOperationResponse,
+    CollectibleAvatarResponse,
     CollectibleResponse,
+    FanNftCreateResponse,
+    FanNftEngagementResponse,
+    FanNftListingResponse,
+    FanNftMintRecordResponse,
+    FanNftPurchaseResponse,
+    MembershipCardActionResponse,
     MembershipIdentityResponse,
     MyCollectionResponse,
     NftApplicationCreate,
     NftApplicationResponse,
-    NftApplicationReview,
+    NftCreatorResponse,
 )
 from app.services.identity import AuthenticatedIdentity
 from app.services.nft import NftValidationError, nft_service
@@ -39,9 +48,13 @@ def _application_response(application: NftApplication) -> NftApplicationResponse
         id=application.id,
         name=application.name,
         description=application.description,
+        story_image_urls=application.story_image_urls,
         theme=application.theme,
         public_attributes=application.public_attributes,
         copyright_declaration=application.copyright_declaration,
+        price_fan_tokens=application.price_fan_tokens,
+        max_supply=application.max_supply,
+        publish_fee_fan_tokens=application.publish_fee_fan_tokens,
         image_data_url=application.image_data,
         status=application.status,
         rejection_reason=application.rejection_reason,
@@ -54,14 +67,143 @@ def _application_response(application: NftApplication) -> NftApplicationResponse
     )
 
 
-async def _require_reviewer(session: AsyncSession, user_id: str) -> None:
-    role = (
+async def _creator_response(session: AsyncSession, user_id: str) -> NftCreatorResponse:
+    user = await session.get(User, user_id)
+    profile = await session.get(UserProfile, user_id)
+    if user is None or profile is None:
+        return NftCreatorResponse(id=user_id, display_name="Fanora Creator", avatar_url=None, level="Fan")
+    return NftCreatorResponse(
+        id=user_id,
+        display_name=user.display_name or profile.username or "Fanora Creator",
+        avatar_url=profile.avatar_url,
+        level=profile.level,
+    )
+
+
+async def _fan_nft_engagement(
+    session: AsyncSession,
+    application_id: str,
+    user_id: str | None,
+) -> tuple[int, int, bool, bool]:
+    like_count = (
         await session.execute(
-            select(UserRole.id).where(UserRole.user_id == user_id, col(UserRole.role).in_(["creator", "admin"]))
+            select(func.count(col(NftCreationReaction.id))).where(
+                NftCreationReaction.application_id == application_id,
+                col(NftCreationReaction.liked).is_(True),
+            )
+        )
+    ).scalar_one()
+    favorite_count = (
+        await session.execute(
+            select(func.count(col(NftCreationReaction.id))).where(
+                NftCreationReaction.application_id == application_id,
+                col(NftCreationReaction.favorited).is_(True),
+            )
+        )
+    ).scalar_one()
+    reaction = None
+    if user_id is not None:
+        reaction = (
+            await session.execute(
+                select(NftCreationReaction).where(
+                    NftCreationReaction.application_id == application_id,
+                    NftCreationReaction.user_id == user_id,
+                )
+            )
+        ).scalar_one_or_none()
+    return int(like_count), int(favorite_count), bool(reaction and reaction.liked), bool(
+        reaction and reaction.favorited
+    )
+
+
+async def _fan_nft_mint_records(
+    session: AsyncSession,
+    token_type: CollectibleTokenType | None,
+) -> list[FanNftMintRecordResponse]:
+    if token_type is None:
+        return []
+    rows = (
+        await session.execute(
+            select(CollectibleOwnership, ChainOperation)
+            .join(ChainOperation, col(ChainOperation.id) == CollectibleOwnership.chain_operation_id, isouter=True)
+            .where(
+                CollectibleOwnership.token_type_id == token_type.id,
+                CollectibleOwnership.amount > 0,
+            )
+            .order_by(col(CollectibleOwnership.created_at).desc())
+        )
+    ).all()
+    records: list[FanNftMintRecordResponse] = []
+    for ownership, operation in rows:
+        records.append(
+            FanNftMintRecordResponse(
+                id=ownership.id,
+                wallet_address=ownership.wallet_address,
+                amount=ownership.amount,
+                status=ownership.status,
+                transaction_hash=operation.transaction_hash if operation else None,
+                block_number=operation.block_number if operation else None,
+                minted_at=ownership.minted_at,
+                created_at=ownership.created_at,
+                buyer=await _creator_response(session, ownership.user_id),
+            )
+        )
+    return records
+
+
+async def _fan_nft_listing_response(
+    session: AsyncSession,
+    application: NftApplication,
+    *,
+    user_id: str | None = None,
+    include_mint_records: bool = False,
+) -> FanNftListingResponse:
+    token_type = (
+        await session.execute(
+            select(CollectibleTokenType).where(CollectibleTokenType.id == application.collectible_token_type_id)
         )
     ).scalar_one_or_none()
-    if role is None:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Creator or admin role required")
+    metadata = (
+        await session.execute(
+            select(NftMetadataVersion).where(NftMetadataVersion.id == application.metadata_version_id)
+        )
+    ).scalar_one_or_none()
+    minted_supply = int(token_type.minted_supply) if token_type else 0
+    token_id = int(token_type.token_id) if token_type else None
+    contract_address = token_type.contract_address if token_type else None
+    like_count, favorite_count, liked, favorited = await _fan_nft_engagement(session, application.id, user_id)
+    return FanNftListingResponse(
+        id=application.id,
+        token_type_id=token_type.id if token_type else None,
+        token_id=token_id,
+        name=application.name,
+        description=application.description,
+        story_image_urls=application.story_image_urls,
+        theme=application.theme,
+        public_attributes=application.public_attributes,
+        price_fan_tokens=application.price_fan_tokens,
+        max_supply=application.max_supply,
+        minted_supply=minted_supply,
+        remaining_supply=max(application.max_supply - minted_supply, 0),
+        image_url=pinata_adapter.gateway_url(metadata.image_cid) if metadata else application.image_data,
+        metadata_uri=pinata_adapter.ipfs_uri(token_type.metadata_cid) if token_type else None,
+        status=application.status,
+        contract_address=contract_address,
+        chain_id=token_type.chain_id if token_type else settings.monad_chain_id,
+        explorer_url=(
+            f"https://testnet.monadvision.com/nft/{contract_address}/{token_id}?tab=Overview"
+            if contract_address and token_id
+            else None
+        ),
+        like_count=like_count,
+        favorite_count=favorite_count,
+        liked=liked,
+        favorited=favorited,
+        mint_records=await _fan_nft_mint_records(session, token_type) if include_mint_records else [],
+        creator=await _creator_response(session, application.user_id),
+        created_at=application.created_at,
+        updated_at=application.updated_at,
+    )
 
 
 @router.get("/me", response_model=MyCollectionResponse)
@@ -74,7 +216,20 @@ async def my_collection(
     ).scalar_one_or_none()
     identity_response = None
     if identity_nft is not None:
+        user = await session.get(User, identity.user_id)
+        profile = await session.get(UserProfile, identity.user_id)
         operation = await session.get(ChainOperation, identity_nft.chain_operation_id) if identity_nft.chain_operation_id else None
+        mint_operation = (
+            await session.execute(
+                select(ChainOperation)
+                .where(
+                    ChainOperation.user_id == identity.user_id,
+                    ChainOperation.operation_type == "IDENTITY_MINT",
+                    ChainOperation.contract_address == identity_nft.contract_address,
+                )
+                .order_by(col(ChainOperation.created_at).desc())
+            )
+        ).scalars().first()
         metadata = (
             await session.execute(
                 select(NftMetadataVersion).where(
@@ -84,21 +239,46 @@ async def my_collection(
                 )
             )
         ).scalar_one_or_none()
+        image_url = pinata_adapter.gateway_url(metadata.image_cid) if metadata else None
+        card_needs_refresh = False
+        if identity_nft.is_member_card and user is not None and profile is not None:
+            level = await nft_service._identity_level_for_profile(session, profile)
+            if level is not None:
+                current_hash = nft_service.membership_card_content_hash(
+                    user=user,
+                    profile=profile,
+                    level=level,
+                    record=identity_nft,
+                )
+                card_needs_refresh = (
+                    identity_nft.card_content_hash != current_hash
+                    or identity_nft.card_level_code != level.code
+                    or identity_nft.level_id != level.rank
+                )
         identity_response = MembershipIdentityResponse(
             token_id=identity_nft.token_id,
             level_id=identity_nft.level_id,
             level_code=identity_nft.level_code,
             metadata_version=identity_nft.metadata_version,
             metadata_uri=pinata_adapter.ipfs_uri(identity_nft.metadata_cid),
-            image_url=pinata_adapter.gateway_url(metadata.image_cid) if metadata else None,
+            metadata_gateway_url=pinata_adapter.gateway_url(identity_nft.metadata_cid),
+            image_url=image_url,
+            download_url=image_url if identity_nft.is_member_card else None,
+            is_member_card=identity_nft.is_member_card,
+            card_needs_refresh=card_needs_refresh,
+            card_fee_fan_tokens=settings.membership_card_fee_fan_tokens,
+            card_created_at=identity_nft.card_created_at,
+            card_updated_at=identity_nft.card_updated_at,
             status=identity_nft.status,
             contract_address=identity_nft.contract_address,
             chain_id=identity_nft.chain_id,
             explorer_url=(
-                f"https://testnet.monadexplorer.com/address/{identity_nft.contract_address}"
-                if identity_nft.contract_address
+                f"https://testnet.monadvision.com/nft/{identity_nft.contract_address}/{identity_nft.token_id}?tab=Overview"
+                if identity_nft.contract_address and identity_nft.token_id is not None
                 else None
             ),
+            minted_at=identity_nft.minted_at,
+            mint_operation=ChainOperationResponse.model_validate(mint_operation) if mint_operation else None,
             operation=ChainOperationResponse.model_validate(operation) if operation else None,
         )
 
@@ -114,11 +294,17 @@ async def my_collection(
     for ownership, token_type in rows:
         operation = await session.get(ChainOperation, ownership.chain_operation_id) if ownership.chain_operation_id else None
         metadata = (
-            await session.execute(select(NftMetadataVersion).where(NftMetadataVersion.metadata_cid == token_type.metadata_cid))
-        ).scalar_one_or_none()
+            await session.execute(
+                select(NftMetadataVersion)
+                .where(NftMetadataVersion.metadata_cid == token_type.metadata_cid)
+                .order_by(col(NftMetadataVersion.created_at).desc())
+                .limit(1)
+            )
+        ).scalars().first()
         collectibles.append(
             CollectibleResponse(
                 token_type_id=token_type.id,
+                fan_nft_creation_id=token_type.source_id if token_type.source_type == "FAN_NFT" else None,
                 token_id=token_type.token_id,
                 category=token_type.category,
                 name=token_type.name,
@@ -132,7 +318,7 @@ async def my_collection(
                 status=ownership.status,
                 contract_address=token_type.contract_address,
                 chain_id=token_type.chain_id,
-                explorer_url=f"https://testnet.monadexplorer.com/address/{token_type.contract_address}",
+                explorer_url=f"https://testnet.monadvision.com/nft/{token_type.contract_address}/{token_type.token_id}?tab=Overview",
                 operation=ChainOperationResponse.model_validate(operation) if operation else None,
             )
         )
@@ -163,76 +349,257 @@ async def sync_identity(
     return await my_collection(identity, session)
 
 
-@router.post("/applications", response_model=NftApplicationResponse, status_code=status.HTTP_201_CREATED)
-async def create_application(
+async def _membership_card_action_response(
+    session: AsyncSession,
+    identity: AuthenticatedIdentity,
+    *,
+    changed: bool,
+    fee_charged: int,
+) -> MembershipCardActionResponse:
+    profile = await session.get(UserProfile, identity.user_id)
+    if profile is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found")
+    return MembershipCardActionResponse(
+        collection=await my_collection(identity, session),
+        fan_token_balance=profile.fan_token_balance,
+        fee_charged=fee_charged,
+        changed=changed,
+    )
+
+
+@router.post("/identity/card", response_model=MembershipCardActionResponse)
+async def create_membership_card(
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> MembershipCardActionResponse:
+    try:
+        _, changed, fee_charged = await nft_service.create_membership_card(session, identity)
+    except (NftValidationError, ChainConfigurationError) as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    return await _membership_card_action_response(
+        session,
+        identity,
+        changed=changed,
+        fee_charged=fee_charged,
+    )
+
+
+@router.post("/identity/card/refresh", response_model=MembershipCardActionResponse)
+async def refresh_membership_card(
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> MembershipCardActionResponse:
+    try:
+        _, changed, fee_charged = await nft_service.refresh_membership_card(session, identity)
+    except (NftValidationError, ChainConfigurationError) as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    return await _membership_card_action_response(
+        session,
+        identity,
+        changed=changed,
+        fee_charged=fee_charged,
+    )
+
+
+@router.get("/creations", response_model=list[FanNftListingResponse])
+async def fan_nft_marketplace(
+    limit: int = 24,
+    offset: int = 0,
+    identity: AuthenticatedIdentity | None = Depends(get_optional_identity),
+    session: AsyncSession = Depends(get_database_session),
+) -> list[FanNftListingResponse]:
+    limit = min(max(limit, 1), 60)
+    offset = max(offset, 0)
+    applications = list(
+        (
+            await session.execute(
+                select(NftApplication)
+                .where(col(NftApplication.status).in_(["MINTED", "MINTING", "FAILED"]))
+                .order_by(col(NftApplication.created_at).desc())
+                .offset(offset)
+                .limit(limit)
+            )
+        )
+        .scalars()
+        .all()
+    )
+    user_id = identity.user_id if identity else None
+    return [await _fan_nft_listing_response(session, item, user_id=user_id) for item in applications]
+
+
+@router.get("/creations/{creation_id}", response_model=FanNftListingResponse)
+async def fan_nft_detail(
+    creation_id: str,
+    identity: AuthenticatedIdentity | None = Depends(get_optional_identity),
+    session: AsyncSession = Depends(get_database_session),
+) -> FanNftListingResponse:
+    application = await session.get(NftApplication, creation_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="NFT not found")
+    return await _fan_nft_listing_response(
+        session,
+        application,
+        user_id=identity.user_id if identity else None,
+        include_mint_records=True,
+    )
+
+
+async def _toggle_nft_reaction(
+    session: AsyncSession,
+    *,
+    application: NftApplication,
+    user_id: str,
+    field: str,
+) -> FanNftEngagementResponse:
+    reaction = (
+        await session.execute(
+            select(NftCreationReaction).where(
+                NftCreationReaction.application_id == application.id,
+                NftCreationReaction.user_id == user_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if reaction is None:
+        reaction = NftCreationReaction(application_id=application.id, user_id=user_id)
+        session.add(reaction)
+    setattr(reaction, field, not bool(getattr(reaction, field)))
+    reaction.updated_at = utc_now()
+    await session.commit()
+    like_count, favorite_count, liked, favorited = await _fan_nft_engagement(session, application.id, user_id)
+    return FanNftEngagementResponse(
+        creation_id=application.id,
+        liked=liked,
+        favorited=favorited,
+        like_count=like_count,
+        favorite_count=favorite_count,
+    )
+
+
+@router.post("/creations/{creation_id}/like", response_model=FanNftEngagementResponse)
+async def toggle_fan_nft_like(
+    creation_id: str,
+    identity: AuthenticatedIdentity = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_database_session),
+) -> FanNftEngagementResponse:
+    application = await session.get(NftApplication, creation_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="NFT not found")
+    return await _toggle_nft_reaction(session, application=application, user_id=identity.user_id, field="liked")
+
+
+@router.post("/creations/{creation_id}/favorite", response_model=FanNftEngagementResponse)
+async def toggle_fan_nft_favorite(
+    creation_id: str,
+    identity: AuthenticatedIdentity = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_database_session),
+) -> FanNftEngagementResponse:
+    application = await session.get(NftApplication, creation_id)
+    if application is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="NFT not found")
+    return await _toggle_nft_reaction(session, application=application, user_id=identity.user_id, field="favorited")
+
+
+@router.post("/creations", response_model=FanNftCreateResponse, status_code=status.HTTP_201_CREATED)
+async def publish_fan_nft(
     payload: NftApplicationCreate,
     identity: AuthenticatedIdentity = Depends(require_official_member),
     session: AsyncSession = Depends(get_database_session),
-) -> NftApplicationResponse:
+) -> FanNftCreateResponse:
     try:
-        application = await nft_service.create_application(session, identity, payload)
+        application = await nft_service.publish_fan_nft(session, identity, payload)
+        profile = await session.get(UserProfile, identity.user_id)
     except NftValidationError as error:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
-    return _application_response(application)
+    except ChainConfigurationError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    except Exception as error:
+        logger.exception("fan_nft_publish_failed", user_id=identity.user_id, error=str(error))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"NFT publishing failed: {error}",
+        ) from error
+    return FanNftCreateResponse(
+        listing=await _fan_nft_listing_response(
+            session,
+            application,
+            user_id=identity.user_id,
+            include_mint_records=True,
+        ),
+        fan_token_balance=profile.fan_token_balance if profile else 0,
+    )
 
 
-@router.post("/applications/{application_id}/submit", response_model=NftApplicationResponse)
-async def submit_application(
-    application_id: str,
-    identity: AuthenticatedIdentity = Depends(require_official_member),
-    session: AsyncSession = Depends(get_database_session),
-) -> NftApplicationResponse:
-    application = await session.get(NftApplication, application_id)
-    if application is None or application.user_id != identity.user_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="NFT application not found")
-    if application.status != "DRAFT":
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Only draft applications can be submitted")
-    application.status = "SUBMITTED"
-    application.submitted_at = utc_now()
-    application.updated_at = utc_now()
-    await session.commit()
-    return _application_response(application)
-
-
-@router.put("/applications/{application_id}/review", response_model=NftApplicationResponse)
-async def review_application(
-    application_id: str,
-    payload: NftApplicationReview,
+@router.post("/creations/{creation_id}/buy", response_model=FanNftPurchaseResponse)
+async def buy_fan_nft(
+    creation_id: str,
     identity: AuthenticatedIdentity = Depends(get_current_identity),
     session: AsyncSession = Depends(get_database_session),
-) -> NftApplicationResponse:
-    await _require_reviewer(session, identity.user_id)
-    application = await session.get(NftApplication, application_id)
+) -> FanNftPurchaseResponse:
+    application = await session.get(NftApplication, creation_id)
     if application is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="NFT application not found")
-    if application.status not in {"SUBMITTED", "UNDER_REVIEW"}:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Application is not awaiting review")
-    if payload.decision == "REJECTED" and not payload.reason:
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Rejection reason is required")
-    application.status = payload.decision
-    application.rejection_reason = payload.reason if payload.decision == "REJECTED" else None
-    application.internal_review_note = payload.internal_note
-    application.reviewed_by_user_id = identity.user_id
-    application.reviewed_at = utc_now()
-    application.updated_at = utc_now()
-    await session.commit()
-    return _application_response(application)
-
-
-@router.post("/applications/{application_id}/process", response_model=NftApplicationResponse)
-async def process_application(
-    application_id: str,
-    identity: AuthenticatedIdentity = Depends(get_current_identity),
-    session: AsyncSession = Depends(get_database_session),
-) -> NftApplicationResponse:
-    await _require_reviewer(session, identity.user_id)
-    application = await session.get(NftApplication, application_id)
-    if application is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="NFT application not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="NFT not found")
     try:
-        await nft_service.process_custom_badge(session, application)
+        ownership = await nft_service.buy_fan_nft(session, identity, application)
     except (NftValidationError, ChainConfigurationError) as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
     except Exception as error:
-        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="NFT pinning or minting failed") from error
-    return _application_response(application)
+        logger.exception("fan_nft_purchase_failed", user_id=identity.user_id, creation_id=creation_id, error=str(error))
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"NFT purchase minting failed: {error}",
+        ) from error
+    profile = await session.get(UserProfile, identity.user_id)
+    token_type = await session.get(CollectibleTokenType, ownership.token_type_id)
+    operation = await session.get(ChainOperation, ownership.chain_operation_id) if ownership.chain_operation_id else None
+    if token_type is None:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="NFT token type is missing")
+    metadata = (
+        await session.execute(
+            select(NftMetadataVersion)
+            .where(NftMetadataVersion.metadata_cid == token_type.metadata_cid)
+            .order_by(col(NftMetadataVersion.created_at).desc())
+            .limit(1)
+        )
+    ).scalars().first()
+    collectible = CollectibleResponse(
+        token_type_id=token_type.id,
+        fan_nft_creation_id=token_type.source_id if token_type.source_type == "FAN_NFT" else None,
+        token_id=token_type.token_id,
+        category=token_type.category,
+        name=token_type.name,
+        description=token_type.description,
+        metadata_uri=pinata_adapter.ipfs_uri(token_type.metadata_cid),
+        image_url=pinata_adapter.gateway_url(metadata.image_cid) if metadata else None,
+        amount=ownership.amount,
+        max_supply=token_type.max_supply,
+        minted_supply=token_type.minted_supply,
+        transferable=token_type.transferable,
+        status=ownership.status,
+        contract_address=token_type.contract_address,
+        chain_id=token_type.chain_id,
+        explorer_url=f"https://testnet.monadvision.com/nft/{token_type.contract_address}/{token_type.token_id}?tab=Overview",
+        operation=ChainOperationResponse.model_validate(operation) if operation else None,
+    )
+    return FanNftPurchaseResponse(
+        listing=await _fan_nft_listing_response(
+            session,
+            application,
+            user_id=identity.user_id,
+            include_mint_records=True,
+        ),
+        collectible=collectible,
+        fan_token_balance=profile.fan_token_balance if profile else 0,
+    )
+
+
+@router.post("/collectibles/{token_type_id}/avatar", response_model=CollectibleAvatarResponse)
+async def set_collectible_avatar(
+    token_type_id: str,
+    identity: AuthenticatedIdentity = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_database_session),
+) -> CollectibleAvatarResponse:
+    try:
+        avatar_url = await nft_service.set_collectible_avatar(session, identity, token_type_id)
+    except NftValidationError as error:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
+    return CollectibleAvatarResponse(token_type_id=token_type_id, avatar_url=avatar_url)

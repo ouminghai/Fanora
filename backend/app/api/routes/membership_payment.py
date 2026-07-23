@@ -6,6 +6,7 @@ from sqlmodel import select
 from web3 import Web3
 
 from app.adapters.monad import ChainConfigurationError, monad_contract_adapter
+from app.adapters.pinata import pinata_adapter
 from app.core.config import settings
 from app.core.database import get_database_session
 from app.core.logging import logger
@@ -109,12 +110,21 @@ async def verify_membership_payment(
     )
     profile = await session.get(UserProfile, identity.user_id)
     assert profile is not None
-    try:
-        identity_nft = await nft_service.ensure_membership_identity(session, identity)
-        identity_nft_status = identity_nft.status if identity_nft else "NOT_CONFIGURED"
-    except Exception:
-        logger.exception("membership_identity_sync_deferred", user_id=identity.user_id)
-        identity_nft_status = "RETRYABLE"
+    identity_configured = pinata_adapter.configured and monad_contract_adapter.identity_configured
+    if identity_configured:
+        try:
+            identity_nft = await nft_service.ensure_membership_identity(session, identity)
+            identity_nft_status = identity_nft.status if identity_nft else "PENDING"
+        except Exception:
+            logger.exception("membership_identity_sync_failed", user_id=identity.user_id)
+            await session.rollback()
+            identity_nft_status = (
+                await session.execute(
+                    select(MembershipIdentityNft.status).where(MembershipIdentityNft.user_id == identity.user_id)
+                )
+            ).scalar_one_or_none() or "RETRYABLE"
+    else:
+        identity_nft_status = "NOT_CONFIGURED"
     return await status_response(profile, payment, identity_nft_status)
 
 

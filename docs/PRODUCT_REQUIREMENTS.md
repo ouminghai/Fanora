@@ -2,8 +2,8 @@
 
 > 项目名称：Fanora Protocol（凡诺拉协议 / 粉环协议）\
 > 项目定位：AI Agent 驱动的 Web3 链上粉丝身份与互动平台\
-> 文档版本：v1.4\
-> 文档日期：2026-07-21\
+> 文档版本：v1.6\
+> 文档日期：2026-07-23\
 > 需求状态：社区、Fan Token、AI 画像、三合约与 NFT 核心链路已完成并部署 Monad Testnet；事件对账、任务 Badge 和生产治理持续开发\
 > 核心网络：Monad Testnet（MVP）\
 > 文档入口：[README.md](./README.md)
@@ -16,22 +16,24 @@
 - `MVP` 表示首个可演示版本必须完成，`P1` 表示增强版本，`P2` 表示远期能力。
 - 需求只有在功能实现、验收标准满足、相关测试通过后才能核销。
 
-### 1.0 2026-07-21 完成记录
+### 1.0 2026-07-23 完成记录
 
-- 已完成 Web3Auth Modal + MetaMask 入会付款，用户签名调用 Gateway，平台不接触用户私钥。
+- 已删除前后端 Web3Auth 登录、Identity Token 校验、嵌入式钱包和私钥导出逻辑，登录统一使用 RainbowKit 直连钱包。
+- 已完成连接钱包、一次性 challenge、钱包签名、`POST /auth/wallet` 会话创建和 Gateway 入会付款，平台不接触用户私钥。
 - 已完成社区创作、多图 Markdown、评论回复、图片预览、分页加载、任务动画和首页动态内容。
 - 已完成 Fan Token 发布/回复/点赞/收藏规则、签到月历与积分等级联动。
-- 已完成 Gateway、ERC-721 会员身份和 ERC-1155 纪念资产合约及 16 项 Hardhat 测试。
-- 已完成 Monad/Pinata 适配器、NFT 数据模型、身份同步、自定义徽章申请处理和统一收藏页。
+- 已完成 Gateway、ERC-721 会员身份和 ERC-1155 纪念资产合约及 19 项 Hardhat 测试。
+- 已完成可用 FAN 与终身累计 FAN 分离，消费不降低已经获得的会员等级。
+- 已完成会员证生成/刷新、粉丝限量 NFT 发布、点赞/收藏、创作者集合、FAN 购买、ERC-1155 铸造和收藏品头像设置。
 - 三个合约已部署 Monad Testnet，并通过脚本同步 ABI、地址、角色、区块和前后端环境变量。
-- 完整证据与剩余工作见 [DELIVERY_SUMMARY_2026-07-21.md](./DELIVERY_SUMMARY_2026-07-21.md)。
+- 完整证据与剩余工作见 [DELIVERY_SUMMARY_2026-07-23.md](./DELIVERY_SUMMARY_2026-07-23.md)。
 
 ### 1.1 2026-07-20 完成记录
 
-- 已完成 Web3Auth 邮箱/社交快捷登录、嵌入式钱包创建或恢复、钱包签名挑战、Identity Token 服务端验证、统一用户注册与会话恢复。
+- 该阶段曾实现第三方快捷登录；2026-07-22 已由 RainbowKit 直连钱包签名登录替代。
 - 已完成用户、登录身份、主钱包、用户资料、角色、登录挑战、会话、社区和社区成员的数据模型，并将 PostgreSQL 迁移同步至 `20260720_0002`。
 - 已完成 `/login` 与 `/profile` 前端页面、Axios 统一请求、个人资料维护、公开范围控制、公开社区浏览和加入社区交互。
-- 已完成 Web3Auth 嵌入式钱包私钥导出：仅在用户明确确认后由浏览器端钱包 Provider 返回，Fanora 后端、数据库、日志与持久化存储均不接触明文私钥；弹窗关闭或 60 秒后清除组件状态。
+- 该阶段曾实现嵌入式钱包私钥导出；2026-07-22 已随第三方快捷登录一并删除，钱包备份只在用户钱包应用中操作。
 - 已完成首页会员等级与 Badge 成长真实数据链路：`membership_levels` 保存 Badge 图片地址，`GET /api/v1/membership-levels` 返回启用等级，前端通过 Axios 展示数据库门槛、图片、当前等级和下一等级差额，不再使用 Badge mock 数据；展示层参考模板 `CharecterSlider`，使用动态彩色描边、Coverflow、加载渐入和自动循环轮播。
 - 已将模板 `Intro` 的漂浮 Web3 图标用于热门粉丝任务模块，并将 `Statictis` 的紫色渐变素材用于会员等级与 Badge 成长背景。
 - 已新增链上会费正式入会门槛（默认 1 MON，可由资金管理员调整）：注册用户默认为“待入会”，后端验证 Monad Testnet 付款的发送主钱包、Gateway 合约、事件金额、链 ID、交易状态和确认数后才激活正式会员；未入会用户在首页看到缴费按钮，签到和任务入口统一跳转缴纳页。
@@ -55,14 +57,14 @@
 
 ## 2. 产品定位与目标
 
-- [ ] `OBJ-001 [MVP]` 建立“登录无感、钱包必备”的身份体系；验收：非 Web3 用户通过邮箱、社交账号或 Passkey 登录时自动获得嵌入式钱包，Web3 用户可连接外部钱包，所有已激活账户都必须绑定至少一个唯一钱包地址。
-- [ ] `OBJ-002 [MVP]` 建立创作者与粉丝之间可验证的互动任务体系；验收：创作者可发布任务，粉丝可参与，后端可验证并记录结果。
-- [ ] `OBJ-003 [MVP]` 建立积分、等级和会员身份联动的成长体系；验收：完成任务后产生积分流水，积分达到阈值后更新用户唯一的 ERC-721 会员身份等级与 metadata。
-- [ ] `OBJ-004 [MVP]` 建立 AI 粉丝身份画像 Agent；验收：Agent 能根据结构化行为数据输出身份评分、粉丝类型和解释。
-- [ ] `OBJ-005 [MVP]` 实现 Proof of Fandom 粉丝证明；验收：用户可通过不可转让的 ERC-721 会员身份 NFT 证明正式会员状态、当前等级和长期贡献摘要。
+- [x] `OBJ-001 [MVP]` 建立“直连钱包、签名登录”的身份体系；验收：用户通过 RainbowKit 连接受支持钱包，签署一次性 challenge 后创建会话，所有已激活账户都绑定一个唯一主钱包地址。
+- [x] `OBJ-002 [MVP]` 建立创作者与粉丝之间可验证的互动任务体系；验收：创作者可发布任务，粉丝可参与，后端可验证并记录结果。
+- [x] `OBJ-003 [MVP]` 建立积分、等级和会员身份联动的成长体系；验收：完成任务后产生积分流水，终身累计达到阈值后可同步用户唯一的 ERC-721 会员身份等级与 metadata。
+- [x] `OBJ-004 [MVP]` 建立 AI 粉丝身份画像 Agent；验收：Agent 能根据结构化行为数据输出身份评分、粉丝类型和解释。
+- [x] `OBJ-005 [MVP]` 实现 Proof of Fandom 粉丝证明；验收：用户可通过不可转让的 ERC-721 会员身份 NFT 证明正式会员状态、当前等级和长期贡献摘要。
 - [ ] `OBJ-006 [P1]` 为创作者提供轻量任务管理、粉丝查询和基础数据统计；验收：创作者可管理自己的任务并查看真实统计数据，不提供 Agent 运营决策后台。
 - [ ] `OBJ-007 [P2]` 将 Fanora 身份凭证开放给第三方应用组合使用；验收：外部应用可通过合约或公开接口查询用户 Badge 和公开身份摘要。
-- [ ] `OBJ-008 [MVP]` 建立 ERC-1155 粉丝纪念资产体系；验收：可发行演唱会纪念卡、用户申请的自定义纪念徽章和任务限定 Badge，并在链上执行发行量与单钱包领取限制。
+- [x] `OBJ-008 [MVP]` 建立 ERC-1155 粉丝纪念资产体系；验收：合约支持演唱会纪念卡、粉丝限量 NFT、自定义纪念徽章和任务限定 Badge，并在链上执行发行量与单钱包领取限制；其中任务 Badge 和演唱会卡业务领取流程仍单独跟踪。
 
 ## 3. 核心概念
 
@@ -72,13 +74,13 @@
 | Proof of Fandom   | 将长期参与、真实互动、早期支持和贡献记录组合成可验证身份凭证的机制。       |
 | Fan Profile       | Agent 生成的粉丝画像，包括活跃度、忠诚度、影响力、贡献度、风险和粉丝类型。 |
 | Membership Identity NFT | 基于 ERC-721 的唯一会员身份；tokenId 稳定，等级升级时只更新等级状态和 metadata。 |
-| Fan Collectible   | 基于 ERC-1155 的演唱会纪念卡、自定义纪念徽章或任务限定 Badge。 |
+| Fan Collectible   | 基于 ERC-1155 的演唱会纪念卡、粉丝限量 NFT、自定义纪念徽章或任务限定 Badge。 |
 | Limited Badge     | 用户完成指定任务后获得的限量 ERC-1155 Badge，受总量、时间和单钱包次数限制。 |
 | SBT               | 不允许普通用户转让的灵魂绑定身份凭证；Fanora ERC-721 会员身份必须为 SBT。 |
 | NFT Metadata      | 描述 NFT 名称、图片、属性、来源和公开证明摘要的 JSON 文档，以 IPFS CID 标识版本。 |
 | Pinata IPFS Platform | Fanora 使用的 IPFS 文件上传、固定与 Gateway 服务；平台密钥只由后端持有。 |
 | Official Community | Fanora MVP 只运营一个固定的官方粉丝社区；任务、积分、等级和 Badge 均使用平台全局配置。 |
-| Embedded Wallet   | 用户快捷登录后由专业钱包提供商自动创建的钱包，不要求用户安装插件。     |
+| Direct Wallet     | 用户通过 RainbowKit 连接的 MetaMask、WalletConnect 或其他兼容钱包。 |
 | Primary Wallet    | Fanora 用于接收 Badge 和标识链上身份的主钱包。              |
 | Identity Abstraction | 业务模块只识别统一用户和主钱包，不感知具体登录方式。             |
 
@@ -101,8 +103,8 @@
 
 ## 5. MVP 核心业务闭环
 
-- [ ] `FLOW-001 [MVP]` 用户选择快捷登录，或选择连接已有 Web3 钱包。
-- [ ] `FLOW-002 [MVP]` 快捷登录用户自动创建或恢复嵌入式钱包；外部钱包用户通过 nonce 完成签名验证。（嵌入式钱包链路已完成；外部钱包完整端到端验收待完成）
+- [x] `FLOW-001 [MVP]` 用户通过 RainbowKit 选择并连接已有 Web3 钱包。
+- [x] `FLOW-002 [MVP]` 钱包用户通过一次性 challenge 完成签名验证，验证成功后直接进入 `/collection`。
 - [x] `FLOW-003 [MVP]` 后端验证登录凭证，确保账户绑定唯一主钱包后创建统一会话。
 - [ ] `FLOW-004 [MVP]` 用户加入 Fanora 官方社区并领取一个签到或链上验证任务。
 - [ ] `FLOW-005 [MVP]` 用户提交任务结果，后端通过规则或链上数据进行验证。
@@ -115,25 +117,25 @@
 
 ## 6. 功能需求
 
-### 6.1 无感登录与强制钱包身份
+### 6.1 直连钱包与签名身份
 
-- [x] `AUTH-001 [MVP]` 提供面向普通用户的快捷登录入口；验收：至少支持邮箱验证码、社交账号或 Passkey 中的一种方式，默认不要求安装钱包插件。
-- [x] `AUTH-002 [MVP]` 快捷登录成功后自动创建或恢复嵌入式钱包；验收：用户首次进入核心功能前已经拥有 Monad 兼容地址。
+- [x] `AUTH-001 [MVP]` 提供 RainbowKit 直连钱包入口；验收：支持 MetaMask、WalletConnect 等多个兼容钱包。
+- [x] `AUTH-002 [MVP]` 钱包连接后自动发起登录 challenge 签名；验收：无需再次点击独立的“钱包签名登录”按钮。
 - [x] `AUTH-003 [MVP]` 强制执行钱包绑定不变量；验收：没有主钱包地址的账户不能激活，也不能领取任务、获得积分或接收 Badge。
-- [x] `AUTH-004 [MVP]` 嵌入式钱包创建过程对非 Web3 用户保持无感；验收：默认流程不展示助记词、RPC、Gas、切链或复杂签名术语。
-- [x] `AUTH-005 [MVP]` Fanora 后端不得生成、保存或记录用户嵌入式钱包私钥；验收：密钥托管、MPC 或 Passkey 签名由专业钱包提供商完成。
-- [x] `AUTH-006 [MVP]` 后端验证嵌入式钱包提供商签发的身份令牌；验收：校验签名、签发者、受众、过期时间和用户标识，并通过同一登录会话的钱包签名证明地址所有权。
+- [x] `AUTH-004 [MVP]` 登录签名使用普通用户可理解的说明；验收：明确该签名不产生 Gas，也不会授权资产转移。
+- [x] `AUTH-005 [MVP]` Fanora 前后端不得生成、索取、保存或记录用户钱包私钥与助记词；验收：密钥完全由用户钱包应用管理。
+- [x] `AUTH-006 [MVP]` 后端独立验证钱包签名；验收：恢复地址必须与 challenge 绑定钱包一致，不信任前端声明的地址。
 - [x] `AUTH-011 [MVP]` 后端为登录钱包生成一次性随机挑战；验收：挑战具备过期时间、绑定钱包地址并在使用后立即失效。
 - [x] `AUTH-012 [MVP]` 钱包签名消息包含域名、钱包地址、nonce、链 ID、签发时间和过期时间。
 - [x] `AUTH-013 [MVP]` 后端验证钱包签名；验收：签名地址、消息内容、nonce 和有效期全部正确时才允许登录。
-- [x] `AUTH-014 [MVP]` 嵌入式钱包和外部钱包统一创建 Fanora 会话；验收：业务模块只读取统一用户 ID 与主钱包，不判断登录提供商。
+- [x] `AUTH-014 [MVP]` 所有 RainbowKit 钱包统一创建 Fanora 会话；验收：业务模块只读取统一用户 ID 与主钱包，不判断具体钱包品牌。
 - [x] `AUTH-015 [MVP]` 同一钱包地址只能绑定一个 Fanora 用户；验收：并发注册、大小写差异和重复关联不能创建多份身份。
 - [ ] `AUTH-016 [P1]` 支持登录后关联外部钱包；验收：关联前必须重新认证，且目标钱包需要签名证明所有权。
 - [ ] `AUTH-017 [P1]` 支持切换主钱包；验收：切换需要高风险操作确认，并明确提示已有 ERC-721 会员身份 SBT 和不可转让 Badge 不能自动迁移。
-- [x] `AUTH-018 [P1]` 支持嵌入式钱包恢复或导出策略；验收：恢复由 Web3Auth 实现；导出仅在用户输入风险确认文本后通过浏览器 Provider 执行，明文私钥不得进入后端、数据库、日志、Axios、LocalStorage 或 Agent 上下文，并在弹窗关闭或 60 秒后清除组件状态。
+- [x] `AUTH-018 [P1]` 钱包恢复与导出由用户钱包应用负责；验收：Fanora 页面不提供私钥导出入口，也不接触任何明文密钥材料。
 - [ ] `AUTH-019 [P1]` 支持 Gas 赞助或账户抽象；验收：普通用户领取会员证或 Badge 时无需理解或准备 MON，费用与限额受到服务端策略控制。
 - [x] `AUTH-020 [MVP]` 支持退出登录；验收：退出后服务端会话和提供商会话按策略失效。
-- [x] `AUTH-021 [MVP]` 对快捷登录、nonce、签名验证和钱包关联实施速率限制，并记录安全事件。
+- [x] `AUTH-021 [MVP]` 对 challenge、签名验证和钱包登录实施速率限制，并记录安全事件。
 
 ### 6.2 用户、创作者与官方社区
 
@@ -152,9 +154,9 @@
 - [x] `MEMBERSHIP-002 [MVP]` 用户缴纳 Gateway 当前设定的会费后，由后端读取 Monad 交易并验证发送方为当前主钱包、目标为付款合约、事件金额与交易金额一致、交易成功且确认数满足要求。
 - [x] `MEMBERSHIP-003 [MVP]` 同一交易哈希和同一用户只能激活一次正式会员，确认记录保存于数据库。
 - [x] `MEMBERSHIP-004 [MVP]` 未缴费用户不能通过当前前端入口参与签到或任务，入口统一跳转 `/membership/join`；后端提供 `require_official_member` 依赖供后续任务接口强制校验。
-- [x] `MEMBERSHIP-005 [MVP]` 首页、Header 和缴纳页根据后端 `is_official_member` 显示“缴纳 1 MON 正式加入”或正式等级状态。
-- [ ] `MEMBERSHIP-006 [MVP]` 用户成为正式会员后创建 ERC-721 身份铸造任务；验收：同一 Fanora 用户和同一主钱包最多存在一个有效会员身份 token。
-- [ ] `MEMBERSHIP-007 [MVP]` Fan Token 达到新等级阈值后创建身份升级任务；验收：更新原 token 的等级与 metadata URI，tokenId 和持有人不变，重复事件不产生重复升级交易。
+- [x] `MEMBERSHIP-005 [MVP]` 首页、Header 和缴纳页根据后端 `is_official_member` 显示动态会费加入入口或正式等级状态。
+- [x] `MEMBERSHIP-006 [MVP]` 用户成为正式会员后创建 ERC-721 身份；验收：同一 Fanora 用户和同一主钱包最多存在一个有效会员身份 token。
+- [x] `MEMBERSHIP-007 [MVP]` 终身累计 FAN 达到新等级阈值后可同步身份升级；验收：更新原 token 的等级与 metadata URI，tokenId 和持有人不变，重复 operationId 不产生重复升级交易。
 - [x] `MEMBERSHIP-008 [MVP]` PostgreSQL 是积分和等级的业务事实源；验收：合约只保存可公开验证的当前等级/版本，不保存完整积分流水或频繁变化的实时积分余额。
 
 ### 6.3 粉丝互动任务
@@ -250,13 +252,13 @@
 
 #### 6.5.2 ERC-1155 粉丝纪念资产
 
-- [x] `COLLECTIBLE-001 [MVP]` 使用 ERC-1155 统一发行演唱会纪念卡、用户自定义 NFT 纪念徽章和任务限定 Badge。
-- [x] `COLLECTIBLE-002 [MVP]` 每个 token 类型必须记录 `category`；验收：只允许 `CONCERT_CARD`、`CUSTOM_BADGE`、`TASK_LIMITED_BADGE` 三种 MVP 枚举值。
+- [x] `COLLECTIBLE-001 [MVP]` 使用 ERC-1155 统一发行演唱会纪念卡、粉丝限量 NFT、用户自定义纪念徽章和任务限定 Badge。
+- [x] `COLLECTIBLE-002 [MVP]` 每个 token 类型必须记录 `category`；验收：允许 `CONCERT_CARD`、`CUSTOM_BADGE`、`TASK_LIMITED_BADGE`、`FAN_LIMITED_NFT` 四种 MVP 枚举值。
 - [x] `COLLECTIBLE-003 [MVP]` 创建 token 类型时必须配置 metadata URI、最大供应量、单钱包上限、铸造起止时间和是否可转让；验收：这些发行约束在首次铸造后不可被放宽。
 - [x] `COLLECTIBLE-004 [MVP]` 合约必须在链上校验总供应量；验收：任何铸造路径都不能使累计铸造量超过 `maxSupply`。
 - [x] `COLLECTIBLE-005 [MVP]` 合约必须在链上校验单钱包持有或领取上限；验收：拆分请求和重复请求不能绕过限制。
 - [ ] `COLLECTIBLE-006 [MVP]` 演唱会纪念卡由创作者或运营人员配置活动、场次、城市、日期和发行量；验收：同一场次可以发行同一 tokenId 的多份纪念卡。
-- [x] `COLLECTIBLE-007 [MVP]` 用户自定义纪念徽章必须对应一个已批准申请；验收：MVP 默认 `maxSupply = 1`、单钱包上限为 1，只铸造给申请人的主钱包。
+- [x] `COLLECTIBLE-007 [MVP]` 粉丝限量 NFT 不需要管理员审核；验收：正式会员可设置 FAN 定价与总供应量，发布成功后创建 `FAN_LIMITED_NFT` token type，单钱包购买上限为 1。
 - [ ] `COLLECTIBLE-008 [MVP]` 任务限定 Badge 必须绑定任务与奖励版本；验收：只有任务验证成功且处于领取时间窗内的用户可以获得，同一任务奖励版本每钱包最多领取一次。
 - [x] `COLLECTIBLE-009 [MVP]` 每次后端铸造必须传入唯一 `claimKey`；验收：合约记录已处理的 `claimKey`，重复提交回滚，数据库重试不会重复铸造。
 - [x] `COLLECTIBLE-010 [MVP]` 与身份或任务证明有关的 Badge 默认不可转让；演唱会纪念卡只有在创建 token 类型时显式声明后才可转让，转让策略在首次铸造后不可更改。
@@ -264,19 +266,18 @@
 - [x] `COLLECTIBLE-012 [MVP]` 前端提供统一收藏页；验收：分别展示会员身份 NFT、演唱会纪念卡、自定义纪念徽章和任务限定 Badge，并提供 Monad 区块浏览器链接。
 - [ ] `COLLECTIBLE-013 [MVP]` 演唱会纪念卡必须通过已验证的演唱会打卡任务或经审计的领取名单发放；验收：每位领取者均有可追踪业务来源和唯一 claimKey，前端不能任意指定铸造地址。
 - [ ] `COLLECTIBLE-014 [P1]` 支持 ERC-1155 批量铸造；验收：仍执行供应量、钱包限额、时间窗和幂等键检查。
-- [ ] `COLLECTIBLE-015 [P2]` 在安全和产品规则明确后评估二级市场与版税；MVP 不实现交易市场或 ERC-2981 版税。
+- [x] `COLLECTIBLE-015 [MVP]` 提供站内 FAN Token 购买市场；验收：购买成功后买家扣除 FAN、创作者获得 FAN、后端调用 ERC-1155 mint 给买家，合约校验库存和钱包上限。
 
-#### 6.5.3 用户自定义 NFT 申请
+#### 6.5.3 粉丝限量 NFT 发布与购买
 
-- [x] `NFT-APPLICATION-001 [MVP]` 正式会员可申请创建自定义 NFT 纪念徽章；验收：申请包含名称、描述、图片、纪念主题、公开属性和版权声明，不要求选择社区。
-- [ ] `NFT-APPLICATION-002 [MVP]` 后端校验申请人身份、字段长度、图片 MIME、文件大小、图片尺寸和恶意内容；验收：前端校验不能替代服务端校验。
-- [x] `NFT-APPLICATION-003 [MVP]` 申请状态支持 `DRAFT`、`SUBMITTED`、`UNDER_REVIEW`、`APPROVED`、`REJECTED`、`PINNING`、`MINTING`、`MINTED`、`FAILED`。
-- [x] `NFT-APPLICATION-004 [MVP]` 用户可查看申请状态和拒绝原因；验收：内部审核备注、运营账户和密钥信息不返回给用户。
-- [ ] `NFT-APPLICATION-005 [MVP]` 只有创作者、运营人员或管理员可以批准/拒绝申请；验收：审批执行资源归属校验并写入审计日志。
-- [x] `NFT-APPLICATION-006 [MVP]` 申请批准后才允许上传最终 metadata 并创建 ERC-1155 token 类型；验收：未批准申请不能触发 Pinata 固定或链上铸造。
-- [ ] `NFT-APPLICATION-007 [MVP]` 用户修改已批准内容时必须创建新 metadata 版本并重新审核；验收：不能静默替换已铸造 NFT 的内容。
-- [ ] `NFT-APPLICATION-008 [P1]` 支持申请频率、每日数量和存储配额限制；验收：重复、垃圾或超额申请被明确拒绝并记录原因。
-- [ ] `NFT-APPLICATION-009 [MVP]` 未审核图片保存在受访问控制的临时审核存储中；验收：只有申请批准后的最终图片与 metadata 才固定到公开 IPFS，拒绝或过期草稿按保留策略清理。
+- [x] `FAN-NFT-001 [MVP]` 正式会员可直接发布自定义限量 NFT；验收：发布表单包含名称、描述、图片、主题、FAN 定价、发行数量和版权声明，不需要管理员审核。
+- [x] `FAN-NFT-002 [MVP]` 发布 NFT 消耗 100 FAN；验收：后端先校验余额，链上 token type 创建成功后写入负数 FAN 流水，余额不足时拒绝发布。
+- [x] `FAN-NFT-003 [MVP]` 后端校验发布人身份、字段长度、图片 MIME、文件大小和图片尺寸；验收：前端校验不能替代服务端校验。
+- [x] `FAN-NFT-004 [MVP]` 图片上传后直接固定到 Pinata；验收：metadata 引用 `ipfs://imageCid`，合约保存 `ipfs://metadataCid`。
+- [x] `FAN-NFT-005 [MVP]` 限量规则由合约执行；验收：`maxSupply`、`perWalletLimit = 1`、铸造窗口和 claimKey 幂等均在 ERC-1155 合约校验。
+- [x] `FAN-NFT-006 [MVP]` 购买使用站内 FAN Token；验收：买家扣除定价 FAN，链上铸造成功后创作者获得同额 FAN，失败时买家自动退款。
+- [x] `FAN-NFT-007 [MVP]` 前端提供 NFT 广场、粉丝集合页和 NFT 详情页；验收：列表展示图片、价格、剩余量、创作者和 MonadVision 链接，详情页可购买并铸造。
+- [ ] `FAN-NFT-008 [P1]` 支持发布频率、每日数量和存储配额限制；验收：重复、垃圾或超额发布被明确拒绝并记录原因。
 
 #### 6.5.4 Pinata IPFS 与 NFT 数据流
 
@@ -284,7 +285,7 @@
 flowchart TB
     BACKEND["Fanora Backend"] --> DB["PostgreSQL"]
     DB --> POINTS["用户积分 / 成长规则<br/>业务事实源"]
-    DB --> META["NFT Metadata 草稿 / 版本 / 审核状态"]
+    DB --> META["NFT 发布记录 / Metadata 版本 / 购买状态"]
     POINTS --> ELIGIBILITY["确定性资格判断"]
     META --> PINATA["Pinata IPFS Platform"]
     PINATA --> CID["Image CID + Metadata CID"]
@@ -474,17 +475,16 @@ MVP 不建设独立的 AI 运营后台、聊天助手、复杂风控工作台或
 - [x] `BE-CHAIN-001 [MVP]` 实现 Monad 区块链适配器，集中处理读取、交易和事件解析。
 - [ ] `BE-NFT-001 [MVP]` 已实现 ERC-721 身份铸造/升级、ERC-1155 类型创建/铸造、幂等键和交易状态，仍需补常驻事件监听与完整对账。
 - [ ] `BE-IPFS-001 [MVP]` 已实现图片/metadata 上传、Gateway URL、超时和有限重试，仍需补独立 pin 状态查询能力。
-- [x] `BE-NFT-APPLICATION-001 [MVP]` 实现自定义 NFT 申请服务，统一执行申请状态转换、内容校验、审批、metadata 版本和铸造编排。
+- [x] `BE-NFT-APPLICATION-001 [MVP]` 已由粉丝限量 NFT 直接发布服务取代：保留 `nft_applications` 作为发布记录，正式会员提交后由后端校验、固定 Pinata、创建 token type 并扣发布费，不再执行管理员审批状态机。
 - [ ] `BE-DB-001 [MVP]` 实现数据库仓储接口，业务模块不直接散落数据库查询。
 - [ ] `BE-JOB-001 [P1]` 实现后台任务执行器；验收：Agent 分析和链上写入不阻塞普通 HTTP 请求。
 
 ### 8.2 HTTP 接口
 
-- [x] `API-EMBEDDED-001 [MVP]` `POST /api/v1/auth/web3auth`：验证 Web3Auth Identity Token、钱包签名与挑战，读取钱包地址并创建统一会话。
 - [x] `API-001 [MVP]` `POST /api/v1/auth/challenge`：为登录钱包生成一次性签名挑战。
-- [x] `API-002 [MVP]` `POST /api/v1/auth/web3auth`：验证嵌入式或外部钱包签名并创建统一会话。
+- [x] `API-002 [MVP]` `POST /api/v1/auth/wallet`：验证钱包地址、签名与一次性挑战并创建统一会话。
 - [x] `API-003 [MVP]` `POST /api/v1/auth/logout`：注销当前会话。
-- [ ] `API-WALLET-001 [MVP]` `GET /api/v1/me/wallets`：查询当前用户的嵌入式钱包、外部钱包和主钱包状态。
+- [ ] `API-WALLET-001 [MVP]` `GET /api/v1/me/wallets`：查询当前用户的关联钱包和主钱包状态。
 - [ ] `API-WALLET-002 [P1]` `POST /api/v1/me/wallets/link`：验证并关联外部钱包。
 - [ ] `API-WALLET-003 [P1]` `POST /api/v1/me/wallets/primary`：经过高风险确认后切换主钱包。
 - [x] `API-004 [MVP]` `GET /api/v1/users/me`：读取当前用户资料、角色、主钱包和社区身份摘要。
@@ -501,12 +501,12 @@ MVP 不建设独立的 AI 运营后台、聊天助手、复杂风控工作台或
 - [ ] `API-015 [MVP]` `GET /api/v1/profile/me`：查询个人粉丝画像。
 - [ ] `API-016 [MVP]` `POST /api/v1/profile/analyze`：触发或请求更新个人画像。
 - [ ] `API-017 [MVP]` `GET /api/v1/badges/me`：查询当前用户的限定 Badge 资格、领取状态和链上同步状态。
-- [ ] `API-NFT-001 [MVP]` `GET /api/v1/nfts/me`：查询当前用户 ERC-721 会员身份、ERC-1155 纪念资产、限定 Badge 和链上同步状态。
-- [ ] `API-NFT-002 [MVP]` `GET /api/v1/membership/identity/me`：返回会员身份 tokenId、当前等级、metadata CID、合约地址、交易状态和区块浏览器链接。
+- [x] `API-NFT-001 [MVP]` `GET /api/v1/nft/me`：查询当前用户 ERC-721 会员身份、ERC-1155 纪念资产、发布记录和链上同步状态。
+- [x] `API-NFT-002 [MVP]` `POST /api/v1/nft/identity/sync` 与会员证接口：返回并同步 tokenId、当前等级、metadata、合约地址、交易状态和区块浏览器链接。
 - [ ] `API-NFT-003 [MVP]` `GET /api/v1/collectibles`：分页查询公开的演唱会纪念卡和任务限定 Badge 类型，支持类别和活动筛选。
-- [ ] `API-NFT-004 [MVP]` `POST /api/v1/nft-applications`：正式会员提交自定义 NFT 纪念徽章申请；接口只接收业务字段与受控文件上传，不接收任意 Pinata 凭证或合约参数。
-- [ ] `API-NFT-005 [MVP]` `GET /api/v1/nft-applications/me`：分页查询当前用户申请状态、公开审核结果、Pinata 固定状态和铸造状态。
-- [ ] `API-NFT-006 [MVP]` `PATCH /api/v1/creator/nft-applications/{application_id}`：创作者、运营人员或管理员批准/拒绝申请，并记录审核意见与审计日志。
+- [x] `API-NFT-004 [MVP]` `POST /api/v1/nft/creations`：正式会员直接发布粉丝限量 NFT；接口只接收业务字段与图片 Data URL，不接收 Pinata 凭证、任意合约地址或铸造地址。
+- [x] `API-NFT-005 [MVP]` `GET /api/v1/nft/creations` 与 `GET /api/v1/nft/creations/{creation_id}`：读取市场列表、详情、创作者、互动、供应量和铸造记录。
+- [x] `API-NFT-006 [MVP]` `POST /api/v1/nft/creations/{creation_id}/buy|like|favorite`：完成 FAN 购买、ERC-1155 铸造及互动切换。早期管理员审批接口已废弃。
 - [ ] `API-NFT-007 [MVP]` `POST /api/v1/tasks/{task_id}/badge/claim`：为已验证完成的任务幂等创建限定 Badge 铸造请求；重复调用返回同一业务结果。
 - [ ] `API-NFT-008 [MVP]` 铸造和升级提交接口不得允许前端指定任意收款地址、合约地址、levelId、tokenId、URI 或角色；这些参数必须由后端根据当前用户、数据库配置和已批准记录生成。
 - [ ] `API-NFT-009 [MVP]` `POST /api/v1/creator/collectibles`：创作者创建演唱会纪念卡或任务限定 Badge 草稿；发布前必须完成 metadata 审核、Pinata 固定和链上 token 类型创建。
@@ -519,7 +519,7 @@ MVP 不建设独立的 AI 运营后台、聊天助手、复杂风控工作台或
 - [x] `API-MEMBERSHIP-002 [MVP]` `GET /api/v1/membership/me`：返回当前用户正式会员状态、Gateway 链上当前会费、Monad 链 ID、付款合约地址和已确认交易。
 - [x] `API-MEMBERSHIP-003 [MVP]` `POST /api/v1/membership/verify`：验证用户提交的 Monad 交易哈希并原子激活正式会员。
 
-当前 NFT 接口已按统一 `/api/v1/nft` 前缀落地：`GET /nft/me`、`POST /nft/identity/sync`、`POST /nft/applications`、申请提交/审核/处理接口。PRD 中早期拆分的 `/nfts/me`、`/membership/identity/me` 和 `/nft-applications` 路径仍保留为目标命名讨论，不重复实现同义接口。
+当前 NFT 接口已按统一 `/api/v1/nft` 前缀落地：`GET /nft/me`、`POST /nft/identity/sync`、`POST /nft/identity/card`、`POST /nft/identity/card/refresh`、`GET|POST /nft/creations`、`GET /nft/creations/{id}`、点赞/收藏、购买和收藏品头像接口。早期 `/nft-applications` 审核接口方案已废弃，不应继续作为当前实现描述。
 - [ ] `API-019 [MVP]` 所有列表接口支持分页；验收：请求和响应使用统一分页结构。
 - [ ] `API-020 [MVP]` 所有错误使用统一响应格式；验收：包含错误代码、用户可读信息和请求追踪 ID。
 
@@ -550,14 +550,14 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 - [x] `DB-MEMBERSHIP-001 [MVP]` `user_profiles` 保存正式会员状态和入会时间，`official_membership_payments` 保存唯一用户、唯一交易哈希、钱包、收款地址、金额、区块和确认结果。
 - [x] `DB-FAN-TOKEN-001 [MVP]` 建立 `fan_token_config` 单例配置，保存 Fan Token 名称、FAN 符号、ETH 菱形图标、精度和链上发行状态，并为未来配置合约地址保留字段。
 - [x] `DB-FAN-TOKEN-002 [MVP]` 数据库统一使用 Fan Token 命名：`fan_token_balance`、`min_token_balance`、`max_token_balance`、`fan_token_rules` 和 `token_delta`，迁移保留已有数据。
-- [ ] `DB-NFT-001 [MVP]` 建立 `membership_identity_nfts` 表，保存用户、主钱包、ERC-721 tokenId、当前 levelId、metadata 版本/CID、链上同步状态，并对用户、钱包和 tokenId 分别建立唯一约束。
-- [ ] `DB-NFT-002 [MVP]` 建立 `nft_token_types` 表，保存 ERC-1155 tokenId、类别、活动/任务来源、供应量、钱包上限、时间窗、转让策略、metadata CID、冻结和启用状态；不增加社区命名空间。
-- [ ] `DB-NFT-003 [MVP]` 建立 `nft_claims` 表，保存用户、token 类型、来源任务/申请、claimKey、数量和铸造状态；对 claimKey 及业务来源组合建立唯一约束。
-- [ ] `DB-NFT-004 [MVP]` 建立 `nft_applications` 表，保存自定义纪念徽章申请内容、状态、申请人、审核人、公开拒绝原因、内部备注和状态时间戳。
-- [ ] `DB-NFT-005 [MVP]` 建立 `nft_metadata_versions` 表，保存所属身份/类型/申请、版本、metadata JSON 摘要、image CID、metadata CID、内容哈希、创建者和审批记录。
+- [x] `DB-NFT-001 [MVP]` 建立 `membership_identity_nfts` 表，保存用户、主钱包、ERC-721 tokenId、当前 levelId、metadata 版本/CID、会员证状态和链上同步状态，并建立唯一约束。
+- [x] `DB-NFT-002 [MVP]` 建立 `collectible_token_types` 表，保存 ERC-1155 tokenId、类别、来源、供应量、钱包上限、时间窗、转让策略、metadata CID、冻结和启用状态；不增加社区命名空间。
+- [x] `DB-NFT-003 [MVP]` 建立 `collectible_ownerships` 表，保存用户、token 类型、claimKey、数量和铸造状态；claimKey 与用户持有关系均有唯一约束。
+- [x] `DB-NFT-004 [MVP]` 建立 `nft_applications` 表作为粉丝限量 NFT 发布记录，保存发布内容、图片、故事图片、FAN 定价、供应量、发布费、Pinata/链上关联和状态时间戳。
+- [x] `DB-NFT-005 [MVP]` 建立 `nft_metadata_versions` 表，保存所属身份/类型/发布记录、版本、metadata JSON、image CID、metadata CID、内容哈希和创建者。
 - [ ] `DB-IPFS-001 [MVP]` 建立 `ipfs_pins` 表，保存 Pinata pinId、CID、文件类型、大小、MIME、固定状态、重试次数、最后错误和最近状态检查时间。
 - [ ] `DB-NFT-006 [MVP]` NFT 申请、Pinata 固定、链上交易和事件对账的状态转换必须写入审计或状态历史表；验收：可还原每次失败、重试、审批和最终链上结果。
-- [ ] `DB-NFT-007 [MVP]` 建立受控申请文件记录，保存临时审核存储对象键、上传者、MIME、大小、内容哈希、扫描状态和清理时间；未批准文件不得直接使用公开 IPFS URL。
+- [ ] `DB-NFT-007 [MVP]` 将当前数据库 Base64 原图迁移到独立对象存储，保存对象键、上传者、MIME、大小、内容哈希、扫描状态和清理时间；校验未通过的文件不得固定到公开 IPFS。
 - [ ] `DB-015 [P1]` 建立外部平台授权和验证证据表；验收：令牌加密，授权可撤销。
 
 ## 10. 前端工程需求
@@ -565,20 +565,20 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 - [x] `FE-BASE-001 [MVP]` 将原 `xhibiter-ts` 模板整理为独立 `frontend` 模块。
 - [x] `FE-BASE-002 [MVP]` 接入 RainbowKit、wagmi 和 viem 钱包基础能力。
 - [x] `FE-BASE-003 [MVP]` 配置 Monad 与 Monad Testnet 网络。
-- [x] `FE-BASE-004 [MVP]` 已具备 ERC-1155 原型合约读取基础；新的 ERC-721 会员身份与 ERC-1155 纪念资产 ABI/地址联调尚未完成。
+- [x] `FE-BASE-004 [MVP]` ERC-721 会员身份与 ERC-1155 纪念资产 ABI、地址、Monad Testnet 和后端接口已经联调。
 - [x] `FE-BASE-005 [MVP]` 当前模板可完成生产构建。
 - [x] `FE-ARCH-001 [MVP]` 建立统一 Axios 后端请求模块；验收：基础 URL、Bearer Token、认证失败处理和通用错误处理集中配置。
-- [x] `FE-ARCH-002 [MVP]` 建立统一身份会话状态；验收：Web3Auth 嵌入式钱包和外部钱包最终返回相同用户与主钱包结构，钱包连接后仍需完成后端挑战与签名验证。
-- [ ] `FE-ARCH-003 [MVP]` 建立统一合约配置和 ABI 同步方式。
+- [x] `FE-ARCH-002 [MVP]` 建立统一身份会话状态；验收：RainbowKit 钱包连接后完成后端挑战与签名验证，最终返回统一用户与主钱包结构。
+- [x] `FE-ARCH-003 [MVP]` 建立统一合约配置和 ABI 同步方式。
 - [ ] `FE-ARCH-004 [MVP]` 将模板演示数据逐步替换为真实接口，禁止在正式页面混用无法区分的假数据。
 - [x] `FE-HOME-MEMBERSHIP-001 [MVP]` 首页“粉丝等级与 Badge 成长”通过统一 Axios 客户端读取后端数据库数据，提供加载、失败和重试状态，不使用 Badge mock；卡片具备动态彩色包边、Coverflow、加载渐入和自动循环轮播，鼠标交互时可暂停。
 - [x] `FE-HOME-VISUAL-001 [MVP]` 首页热门粉丝任务复用模板漂浮图标动画，会员等级区块复用 `Statictis` 紫色渐变背景素材。
-- [x] `FE-MEMBERSHIP-001 [MVP]` 新增 `/membership/join` 缴纳页，通过当前 Web3Auth/外部钱包发送 1 MON，等待后端确认后刷新统一用户状态；收款地址未配置时禁止发起交易。
+- [x] `FE-MEMBERSHIP-001 [MVP]` 新增 `/membership/join` 缴纳页，通过当前 RainbowKit 直连钱包发送链上当前会费，等待后端确认后刷新统一用户状态；付款合约未配置时禁止发起交易。
 - [ ] `FE-ARCH-005 [MVP]` 删除或隐藏与 Fanora 无关的 NFT 市场模板页面。
 - [ ] `FE-ARCH-006 [MVP]` 默认使用普通用户可理解的“登录 / 账户”文案；验收：钱包地址、网络和 Gas 等信息放入可展开的 Web3 设置区域。
 - [ ] `FE-TEST-001 [MVP]` 为钱包状态、任务状态和 Badge 读取添加关键前端测试。
 - [ ] `FE-TEST-002 [P1]` 为 MVP 主流程添加浏览器端到端测试。
-- [x] `FE-AUTH-001 [MVP]` 完成 `/login` Web3Auth 快捷登录页面，包含初始化、连接、签名、成功跳转和错误状态动画反馈。
+- [x] `FE-AUTH-001 [MVP]` 完成 `/login` RainbowKit 直连钱包登录页面，包含连接、自动签名、成功跳转和错误状态反馈。
 - [x] `FE-PROFILE-001 [MVP]` 完成 `/profile` 用户资料维护页面，支持昵称、用户名、头像、简介、语言、公开范围、主钱包和社区身份展示。
 - [x] `FE-AVATAR-001 [MVP]` 接入 Boring Avatars React，为未上传头像的用户在 Profile 和顶部账户入口生成一致的默认头像；空白、无效占位值或加载失败的自定义头像不得遮蔽默认 SVG。
 - [x] `FE-HEADER-001 [MVP]` Header 钱包按钮只在未登录时显示并负责跳转登录页；登录后隐藏钱包图标，用户头像菜单展示主钱包地址、积分和粉丝等级，并提供 My Profile 与退出登录操作。
@@ -587,12 +587,12 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 - [x] `FE-HERO-TYPEWRITER-001 [MVP]` 首页两行英文主标题采用依次输入的打字机动画，并提供同步闪烁光标、小屏幕自适应和减少动态效果兼容。
 - [x] `FE-HERO-SOUND-001 [MVP]` 首页 Header 提供与深浅色模式按钮一致的视频声音图标开关；默认静音保证自动播放，用户交互后可开启或关闭声音，并同步展示当前状态。
 - [x] `FE-HERO-CTA-001 [MVP]` 首页“加入 Eason Fans Club”按钮仅对未登录、未连接钱包的匿名用户显示，登录初始化和处理中不闪现，点击统一跳转 `/login`。
-- [x] `FE-WALLET-EXPORT-001 [P1]` 在 Profile 为 Web3Auth 嵌入式钱包提供高风险私钥导出交互；外部钱包只提示前往对应钱包应用操作。
-- [ ] `FE-NFT-001 [MVP]` 用户 Dashboard 展示唯一 ERC-721 会员证、当前等级、升级同步状态、metadata 和区块浏览器链接。
-- [ ] `FE-NFT-002 [MVP]` 收藏页按演唱会纪念卡、自定义纪念徽章和任务限定 Badge 分类展示 ERC-1155 资产，并区分数据库待同步与链上已确认状态。
-- [ ] `FE-NFT-003 [MVP]` 提供自定义 NFT 纪念徽章申请页；验收：支持图片预览、字段校验、版权确认、提交状态、审核结果和失败重试提示。
+- [x] `FE-WALLET-EXPORT-001 [P1]` Profile 不提供私钥导出交互，统一提示用户前往对应钱包应用完成账户备份或导出。
+- [x] `FE-NFT-001 [MVP]` `/collection` 展示唯一 ERC-721 会员证、当前等级、升级同步状态、metadata、会员证刷新和区块浏览器链接。
+- [x] `FE-NFT-002 [MVP]` `/collection` 展示 ERC-1155 个人收藏，并区分链上操作状态、供应量、类别和区块浏览器链接。
+- [x] `FE-NFT-003 [MVP]` `/collections/create` 提供粉丝限量 NFT 发布页；支持图片预览、Markdown 描述、故事图片、FAN 定价、供应量、版权声明、发布进度和失败提示，不经过管理员审核。
 - [ ] `FE-NFT-004 [MVP]` 任务页面展示限定 Badge 的发行量、剩余量、领取时间窗、单钱包上限和当前领取/铸造状态。
-- [ ] `FE-NFT-005 [MVP]` 前端通过 Pinata Gateway 或备用 Gateway 读取公开 IPFS 内容，但不得持有或请求 Pinata JWT/API Secret。
+- [x] `FE-NFT-005 [MVP]` 前端通过 Pinata Gateway 读取公开 IPFS 内容，且不持有或请求 Pinata JWT/API Secret。
 
 ## 11. 安全与隐私需求
 
@@ -608,8 +608,8 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 - [ ] `SEC-010 [MVP]` 合约管理员和运营权限分离。
 - [ ] `SEC-011 [P1]` 建立数据导出和删除申请流程。
 - [ ] `SEC-012 [P1]` 对关键依赖执行安全告警检查，并评估后再升级，禁止无验证执行破坏性强制升级。
-- [x] `SEC-AUTH-001 [MVP]` 嵌入式钱包私钥不得进入 Fanora 后端、数据库、日志、Axios、LocalStorage 或 Agent 上下文；导出时仅短暂存在于用户当前浏览器组件状态。
-- [x] `SEC-AUTH-002 [MVP]` 快捷登录提供商令牌必须由后端独立验证，不能只相信前端传入的钱包地址。
+- [x] `SEC-AUTH-001 [MVP]` 钱包私钥和助记词不得进入 Fanora 前端业务状态、后端、数据库、日志、Axios、LocalStorage 或 Agent 上下文。
+- [x] `SEC-AUTH-002 [MVP]` 钱包签名必须由后端独立恢复并验证，不能只相信前端传入的钱包地址。
 - [ ] `SEC-AUTH-003 [P1]` 钱包关联、解绑和主钱包切换必须重新认证，并写入审计日志。
 - [ ] `SEC-NFT-001 [MVP]` 用户上传的 NFT 图片必须验证 MIME、扩展名、文件签名、尺寸与大小，并进行恶意文件和不当内容检查；SVG 在完成安全清洗前不得作为 MVP 用户上传格式。
 - [ ] `SEC-NFT-002 [MVP]` 自定义 NFT 名称、描述和属性在生成 JSON 与页面渲染时执行长度限制和转义，防止脚本注入、恶意链接和 metadata 污染。
@@ -626,7 +626,7 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 - [ ] `NFR-003 [MVP]` 外部 RPC、Pinata 和模型调用具备超时、有限重试和失败降级。（模型与 Pinata 已完成；Monad RPC 已有超时和错误处理，仍需有限重试）
 - [ ] `NFR-004 [MVP]` 所有关键写入具备幂等能力。
 - [ ] `NFR-005 [P1]` 支持至少 100 个并发读取请求的基础压力测试。
-- [x] `NFR-AUTH-TIMEOUT-001 [MVP]` 前端 API 客户端、FastAPI/Uvicorn 空闲连接和 PostgreSQL 新连接等待时间统一配置为 60 秒，避免 Web3Auth 登录在远程数据库延迟时被 15 秒客户端超时提前中断。
+- [x] `NFR-AUTH-TIMEOUT-001 [MVP]` 前端 API 客户端、FastAPI/Uvicorn 空闲连接和 PostgreSQL 新连接等待时间统一配置为 60 秒，避免钱包登录在远程数据库延迟时被客户端提前中断。
 
 ### 12.2 可观测性
 
@@ -649,8 +649,8 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 - [x] `TEST-BASE-002 [MVP]` LangGraph 示例评分与分类测试通过。
 - [x] `TEST-BASE-003 [MVP]` 三个正式合约的 Hardhat 测试通过，共 16 项，覆盖付款、提现、动态会费、ERC-721 SBT、等级升级和 ERC-1155 发行约束。
 - [x] `TEST-BASE-004 [MVP]` 前端生产构建通过。
-- [ ] `TEST-AUTH-001 [MVP]` 快捷登录首次创建、重复登录恢复、令牌过期和伪造令牌测试通过。（首次创建已覆盖；恢复、过期和伪造令牌边界待补）
-- [ ] `TEST-AUTH-002 [MVP]` 嵌入式钱包地址唯一性、缺失主钱包和重复绑定测试通过。（数据库约束与冲突处理已实现，专项测试待补）
+- [x] `TEST-AUTH-001 [MVP]` 钱包签名首次创建、重复登录恢复和错误签名测试通过。
+- [ ] `TEST-AUTH-002 [MVP]` 钱包地址唯一性、缺失主钱包和重复绑定测试通过。（数据库约束与冲突处理已实现，专项测试待补）
 - [ ] `TEST-001 [MVP]` 钱包 nonce 生成、过期、重复使用和错误签名测试通过。（重复使用和错误签名已覆盖，过期边界待补）
 - [ ] `TEST-002 [MVP]` 粉丝、创作者、运营人员和管理员的角色权限与越权测试通过。
 - [ ] `TEST-003 [MVP]` 任务状态转换和重复提交测试通过。
@@ -661,10 +661,10 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 - [ ] `TEST-008 [MVP]` 后端链上写入的成功、失败、超时、重试、链重组和事件对账测试通过，并证明积分成功与 NFT 待同步可以独立恢复。
 - [ ] `TEST-NFT-001 [MVP]` Pinata 图片上传、metadata 上传、CID 持久化、固定失败、有限重试、重复请求和 Gateway 降级测试通过。
 - [ ] `TEST-NFT-002 [MVP]` 自定义 NFT 申请的身份限制、文件校验、状态转换、越权审批、重新审核和铸造幂等测试通过。
-- [ ] `TEST-NFT-003 [MVP]` 分别完成快捷登录和外部钱包登录到 ERC-721 会员证、演唱会纪念卡、任务限定 Badge 与自定义申请展示的端到端人工验收。
+- [ ] `TEST-NFT-003 [MVP]` 完成 RainbowKit 钱包登录到 ERC-721 会员证、粉丝 NFT 发布/购买、演唱会纪念卡和任务限定 Badge 的端到端人工验收。
 - [ ] `TEST-009 [P1]` 完成外部社交平台授权失效和限流测试。
 - [ ] `TEST-010 [P1]` 完成基础性能和安全测试。
-- [x] `TEST-AUTH-UI-001 [MVP]` 前端 ESLint、TypeScript、生产构建、Web3Auth 项目网络初始化及私钥导出 RPC 回归测试通过；测试使用占位私钥，真实私钥不进入自动化测试输出。
+- [x] `TEST-AUTH-UI-001 [MVP]` 前端钱包登录专项测试覆盖 RainbowKit Modal Hooks、连接后自动签名、`/auth/wallet` 路由和 `/collection` 跳转；真实私钥不进入自动化测试。
 
 ## 14. 部署需求
 
@@ -674,7 +674,7 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 - [x] `DEPLOY-004 [MVP]` `FanoraMembershipGateway`、`FanoraMembershipIdentity` 与 `FanoraCollectibles` 已部署至 Monad Testnet。
 - [x] `DEPLOY-005 [MVP]` 前端、后端、合约使用一致的 chainId、三个合约地址、起始区块和 ABI，发布脚本自动同步环境变量和公开部署清单。
 - [x] `DEPLOY-006 [MVP]` 配置通过环境变量或密钥系统注入，不硬编码数据库凭证、运营私钥、管理员私钥或 Pinata JWT。
-- [ ] `DEPLOY-007 [MVP]` 部署后执行健康检查、快捷登录、外部钱包登录、会员身份铸造/升级、Pinata metadata、任务限定 Badge 和收藏页查询冒烟测试。
+- [ ] `DEPLOY-007 [MVP]` 部署后执行健康检查、RainbowKit 钱包登录、会员身份铸造/升级、Pinata metadata、粉丝 NFT 发布/购买、任务限定 Badge 和收藏页查询冒烟测试。
 - [ ] `DEPLOY-NFT-001 [MVP]` 配置独立 Pinata 项目、最小权限 JWT、专用 Gateway 域名或 Gateway Token，并验证服务端上传与公开读取链路。
 - [ ] `DEPLOY-008 [P1]` 建立数据库备份与恢复流程。
 - [ ] `DEPLOY-009 [P2]` 安全评估完成后再规划 Monad 主网部署。
@@ -692,10 +692,10 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 ### M1：身份与登录
 
 - [x] `M1-001` 完成数据库和迁移基础设施，PostgreSQL 当前版本为 `20260720_0002`。
-- [x] `M1-002` 接入 Web3Auth 嵌入式钱包快捷登录，并完成提供商令牌验证。
-- [ ] `M1-003` 完成外部钱包 nonce、签名验证和统一会话。（后端挑战与签名验证已完成，外部钱包端到端联调待完成）
+- [x] `M1-002` 接入 RainbowKit 多钱包连接与 Monad 网络配置。
+- [x] `M1-003` 完成钱包 nonce、签名验证、统一会话和前端自动跳转。
 - [x] `M1-004` 完成用户、用户资料、角色、登录身份、钱包、主钱包、挑战和会话数据模型。
-- [ ] `M1-005` 完成前端无感登录、外部钱包登录和账户设置联动。（无感登录和 Profile 账户设置已完成，外部钱包联动待完成）
+- [x] `M1-005` 完成前端直连钱包登录、Profile 账户展示和退出时断开钱包联动。
 
 ### M2：官方社区、任务与积分
 
@@ -715,15 +715,15 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 
 - [x] `M4-001` 完成 ERC-721 `FanoraMembershipIdentity`，覆盖唯一身份、SBT、等级更新、metadata 版本、operationId 和权限测试。
 - [x] `M4-002` 完成 ERC-1155 `FanoraCollectibles`，覆盖三类资产、供应/钱包/时间限制、claimKey、转让策略和 metadata 冻结测试。
-- [x] `M4-003` 完成 Pinata 适配器、metadata 版本表、自定义 NFT 申请审核和图片/JSON 固定流程。
+- [x] `M4-003` 完成 Pinata 适配器、metadata 版本表、粉丝限量 NFT 直接发布和图片/JSON 固定流程。
 - [x] `M4-004` 部署三个合约至 Monad Testnet，并完成 ABI、地址、角色和起始区块同步。
-- [ ] `M4-005` 完成后端身份铸造/升级、纪念资产铸造、交易状态、失败重试和事件对账。
-- [ ] `M4-006` 完成前端会员证、收藏页、任务限定 Badge 状态和自定义 NFT 申请页面。
+- [ ] `M4-005` 已完成后端身份铸造/升级、会员证、粉丝 NFT token type 与购买铸造、交易状态；仍需完成后台失败重试和常驻事件对账。
+- [ ] `M4-006` 已完成前端会员证、个人收藏、粉丝 NFT 广场、发布、详情和购买；任务限定 Badge 状态仍待完成。
 
 ### M5：轻量创作者控制台与演示
 
 - [ ] `M5-001` 完成创作者基础统计页面和粉丝列表筛选。
-- [ ] `M5-002` 完成全局排行榜、官方社区基础统计、ERC-1155 草案确认和自定义 NFT 申请审核。
+- [ ] `M5-002` 完成全局排行榜、官方社区基础统计、ERC-1155 草案确认和粉丝 NFT 治理页面。
 - [ ] `M5-003` 完成 MVP 端到端测试和演示数据。
 - [ ] `M5-004` 完成 README、系统架构图、接口文档和答辩演示材料。
 
@@ -731,7 +731,7 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 
 以下项目全部核销后，Fanora MVP 才视为完成：
 
-- [ ] `DOD-001` 非 Web3 新用户可通过快捷登录无感获得 Monad 钱包并进入产品，Web3 用户可使用外部钱包签名登录，所有已激活账户均拥有唯一主钱包。
+- [x] `DOD-001` 用户可通过 RainbowKit 连接已有钱包并签名登录，所有已激活账户均拥有唯一主钱包；Fanora 不生成嵌入式钱包或接触用户私钥。
 - [ ] `DOD-002` 系统使用唯一的 Fanora 官方社区，创作者可以维护其基础资料并发布至少一种可自动验证的全局任务。
 - [x] `DOD-003` 粉丝可以领取、提交并完成已支持类型的任务，且重复请求不会重复奖励。
 - [x] `DOD-004` 用户可以查看准确的积分流水、当前等级和升级进度。
@@ -739,7 +739,7 @@ MVP 本地开发可以使用 SQLite，联调和部署环境使用 PostgreSQL。�
 - [x] `DOD-006` 正式会员可以在 Monad Testnet 获得唯一、不可转让的 ERC-721 会员身份，并在积分升级后保持同一 tokenId 更新等级与 metadata。
 - [ ] `DOD-007` 创作者可以发行演唱会纪念卡，任务可以发放限定 Badge，正式会员可以提交并完成一次自定义 NFT 纪念徽章申请。
 - [ ] `DOD-008` 图片和 metadata 通过后端固定到 Pinata，合约使用 `ipfs://CID`，用户可以在前端查看两类链上资产和对应区块浏览器记录。
-- [ ] `DOD-009` 创作者可以查看 Fanora 全局基础数据、任务完成情况、粉丝列表和 NFT 申请审核队列。
+- [ ] `DOD-009` 创作者可以查看 Fanora 全局基础数据、任务完成情况、粉丝列表和粉丝 NFT 治理队列。
 - [ ] `DOD-010` 关键权限、上传安全、Pinata、operationId/claimKey 幂等、交易对账和三合约测试全部通过。
 - [x] `DOD-011` 项目可以根据开发文档完成本地启动、合约发布、三端配置同步和测试网演示。
 

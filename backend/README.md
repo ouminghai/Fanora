@@ -132,11 +132,11 @@ OPENAI_FALLBACK_MODELS=provider/fallback-model,provider/another-model
 
 模型只能生成画像解释和 Badge 草案，不能直接修改积分、授予权限或调用合约。
 
-## Web3Auth 登录与用户资料
+## 钱包签名登录与用户资料
 
-前端先调用 `POST /api/v1/auth/challenge` 获取一次性消息并用当前钱包签名，再将签名和 Web3Auth Identity Token 提交到 `POST /api/v1/auth/web3auth`。后端同时校验 Web3Auth JWT 的签名、签发者、受众、有效期和用户标识，以及钱包签名和挑战有效期。
+前端通过 RainbowKit 连接用户钱包，调用 `POST /api/v1/auth/challenge` 获取一次性消息并由当前钱包签名，再将 challenge、钱包地址和签名提交到 `POST /api/v1/auth/wallet`。后端校验签名、钱包地址、挑战有效期和一次性使用状态。
 
-首次验证成功会自动创建统一用户、登录身份、唯一主钱包、用户资料和 `fan` 角色；再次验证会恢复同一个用户。后端只保存钱包地址，不生成或保存用户私钥。
+首次验证成功会自动创建统一用户、钱包登录身份、唯一主钱包、用户资料和 `fan` 角色；再次验证会恢复同一个用户。后端只保存钱包地址，不生成、索取或保存用户私钥。
 
 登录后使用 Bearer Token 调用：
 
@@ -146,6 +146,27 @@ OPENAI_FALLBACK_MODELS=provider/fallback-model,provider/another-model
 - `POST /api/v1/communities/{community_id}/join`
 
 无需登录即可调用 `GET /api/v1/membership-levels`，按 `rank` 返回所有启用的会员等级、Fan Token 门槛、管理身份标记和 Badge 图片地址，供首页成长模块读取。
+
+### 批量上传会员等级图片到 Pinata
+
+配置 `backend/.env` 中的 `PINATA_JWT` 后执行：
+
+```bash
+cd backend
+PYTHONPATH=. .venv/bin/python scripts/pin_membership_levels.py
+```
+
+脚本默认跳过已经存在 `badge_image_cid` 的等级，并将成功上传后的 CID、Pinata 文件 ID 和图片内容哈希写回 `membership_levels`。图片更新后可使用 `--force` 重新上传全部等级：
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/pin_membership_levels.py --force
+```
+
+需要同时更新所有已铸造会员身份的链上图片时，追加 `--refresh-identities`。脚本会为每位会员生成新版 metadata，并调用 `FanoraMembershipIdentity.updateIdentityMetadata()` 更新原 Token ID；Owner、会员等级和 Token ID 均不会变化：
+
+```bash
+PYTHONPATH=. .venv/bin/python scripts/pin_membership_levels.py --force --refresh-identities
+```
 
 注册用户默认为待入会状态，不会对外显示神经萌新等级。配置付款合约后，用户可通过 `GET /api/v1/membership/me` 获取链上当前会费（默认 1 MON），并向 `POST /api/v1/membership/verify` 提交交易哈希。后端会验证 Monad 链 ID、交易成功状态、确认数、发送主钱包、付款合约和 `MembershipPaid` 事件金额，再写入 `official_membership_payments` 并激活 `user_profiles.is_official_member`。签到和任务接口应使用 `require_official_member` 依赖。
 
@@ -157,7 +178,7 @@ OPENAI_FALLBACK_MODELS=provider/fallback-model,provider/another-model
 
 Fan Token 规则包含注册、资料完善、每日签到、连续签到、内容互动、活动打卡、社区共创、邀请和链上行为，并为高价值操作设置每日/月度上限或人工审核。违规内容、刷屏骚扰、任务作弊通过负 Token 规则处理。PostgreSQL 触发器会在 `user_profiles.fan_token_balance` 变化时自动重新计算普通会员等级。
 
-系统统一使用 `Fan Token`，符号为 `FAN`，视觉上使用 ETH 菱形图标。余额字段为 `user_profiles.fan_token_balance`，规则变化量字段为 `fan_token_rules.token_delta`。Token 配置保存在 `fan_token_config` 表中；当前 `is_onchain=false`、精度为 0，表示它仍是可审计的站内 Token 单位，而不是真实 ETH 或已发行 ERC-20。未来发行链上 Token 时可补充 `chain_id` 和 `contract_address`。
+系统统一使用 `Fan Token`，符号为 `FAN`，视觉上使用 ETH 菱形图标。`user_profiles.fan_token_balance` 是可消费余额，`user_profiles.fan_token_lifetime_earned` 是只累计正向奖励的历史成长值，会员等级由历史成长值决定且只升不降；兑换、消费和负数调整只减少可用余额。规则变化量字段为 `fan_token_rules.token_delta`。Token 配置保存在 `fan_token_config` 表中；当前 `is_onchain=false`、精度为 0，表示它仍是可审计的站内 Token 单位，而不是真实 ETH 或已发行 ERC-20。未来发行链上 Token 时可补充 `chain_id` 和 `contract_address`。
 
 ### 删除测试用户
 

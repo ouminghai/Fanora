@@ -28,6 +28,7 @@ export type FanoraUser = {
   is_official_member: boolean;
   official_member_since: string | null;
   fan_token_balance: number;
+  fan_token_lifetime_earned: number;
   fan_type: string;
   profile_visibility: "public" | "private";
   onboarding_completed: boolean;
@@ -228,16 +229,33 @@ export type MembershipIdentityNft = {
   level_code: string;
   metadata_version: number;
   metadata_uri: string;
+  metadata_gateway_url: string;
   image_url: string | null;
+  download_url: string | null;
+  is_member_card: boolean;
+  card_needs_refresh: boolean;
+  card_fee_fan_tokens: number;
+  card_created_at: string | null;
+  card_updated_at: string | null;
   status: string;
   contract_address: string;
   chain_id: number;
   explorer_url: string | null;
+  minted_at: string | null;
+  mint_operation: ChainOperation | null;
   operation: ChainOperation | null;
+};
+
+export type MembershipCardAction = {
+  collection: MyCollection;
+  fan_token_balance: number;
+  fee_charged: number;
+  changed: boolean;
 };
 
 export type CollectibleNft = {
   token_type_id: string;
+  fan_nft_creation_id: string | null;
   token_id: number;
   category: string;
   name: string;
@@ -255,13 +273,89 @@ export type CollectibleNft = {
   operation: ChainOperation | null;
 };
 
+export type CollectibleAvatarResponse = {
+  token_type_id: string;
+  avatar_url: string;
+};
+
+export type FanNftCreator = {
+  id: string;
+  display_name: string;
+  avatar_url: string | null;
+  level: string;
+};
+
+export type FanNftMintRecord = {
+  id: string;
+  wallet_address: string;
+  amount: number;
+  status: string;
+  transaction_hash: string | null;
+  block_number: number | null;
+  minted_at: string | null;
+  created_at: string;
+  buyer: FanNftCreator;
+};
+
+export type FanNftListing = {
+  id: string;
+  token_type_id: string | null;
+  token_id: number | null;
+  name: string;
+  description: string;
+  story_image_urls: string[];
+  theme: string;
+  public_attributes: Array<{ trait_type: string; value: string }>;
+  price_fan_tokens: number;
+  max_supply: number;
+  minted_supply: number;
+  remaining_supply: number;
+  image_url: string | null;
+  metadata_uri: string | null;
+  status: string;
+  contract_address: string | null;
+  chain_id: number;
+  explorer_url: string | null;
+  like_count: number;
+  favorite_count: number;
+  liked: boolean;
+  favorited: boolean;
+  mint_records: FanNftMintRecord[];
+  creator: FanNftCreator;
+  created_at: string;
+  updated_at: string;
+};
+
+export type FanNftEngagement = {
+  creation_id: string;
+  liked: boolean;
+  favorited: boolean;
+  like_count: number;
+  favorite_count: number;
+};
+
+export type FanNftCreateResponse = {
+  listing: FanNftListing;
+  fan_token_balance: number;
+};
+
+export type FanNftPurchaseResponse = {
+  listing: FanNftListing;
+  collectible: CollectibleNft;
+  fan_token_balance: number;
+};
+
 export type NftApplication = {
   id: string;
   name: string;
   description: string;
+  story_image_urls: string[];
   theme: string;
   public_attributes: Array<{ trait_type: string; value: string }>;
   copyright_declaration: string;
+  price_fan_tokens: number;
+  max_supply: number;
+  publish_fee_fan_tokens: number;
   image_data_url: string | null;
   status: string;
   rejection_reason: string | null;

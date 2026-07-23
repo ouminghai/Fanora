@@ -4,6 +4,7 @@ import axios from "axios";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import MarkdownEditor from "@/components/community/MarkdownEditor";
+import PostDetail from "@/components/community/PostDetail";
 import UserAvatar from "@/components/profile/UserAvatar";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { api } from "@/lib/api/client";
@@ -42,6 +43,9 @@ export default function CreationWall() {
   const loadMoreSentinel = useRef<HTMLDivElement | null>(null);
   const [hasMorePosts, setHasMorePosts] = useState(true);
   const [loadingMorePosts, setLoadingMorePosts] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [drawerClosing, setDrawerClosing] = useState(false);
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadContext = useCallback(async () => {
     const [communityResponse, taskResponse] = await Promise.all([
@@ -80,6 +84,25 @@ export default function CreationWall() {
   }, [loadContext, loadPostPage]);
 
   useEffect(() => { void reload().catch((error) => setNotice(message(error))); }, [reload, user]);
+  useEffect(() => {
+    const handlePopState = () => {
+      if (!window.location.pathname.startsWith("/community/posts/")) {
+        setSelectedPostId(null);
+        setDrawerClosing(false);
+      }
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+  useEffect(() => {
+    if (!selectedPostId) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [selectedPostId]);
+  useEffect(() => () => {
+    if (closeTimer.current) clearTimeout(closeTimer.current);
+  }, []);
   useEffect(() => {
     const updateColumns = () => {
       const width = window.innerWidth;
@@ -138,6 +161,34 @@ export default function CreationWall() {
     } catch (error) { setNotice(message(error)); } finally { setBusy(null); }
   };
 
+  const openPost = (postId: string, section?: "comments") => {
+    const suffix = section ? `#${section}` : "";
+    window.history.pushState({ communityDrawer: true, postId }, "", `/community/posts/${postId}${suffix}`);
+    setDrawerClosing(false);
+    setSelectedPostId(postId);
+  };
+
+  const closePost = useCallback(() => {
+    if (!selectedPostId || drawerClosing) return;
+    setDrawerClosing(true);
+    closeTimer.current = setTimeout(() => {
+      if (window.location.pathname.startsWith("/community/posts/")) window.history.back();
+      else {
+        setSelectedPostId(null);
+        setDrawerClosing(false);
+      }
+    }, 220);
+  }, [drawerClosing, selectedPostId]);
+
+  useEffect(() => {
+    if (!selectedPostId) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") closePost();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [closePost, selectedPostId]);
+
   const requiredTags = tasks.filter((task) => task.task_type === "content_publish" && task.participation_status === "claimed")
     .map((task) => task.required_tag)
     .filter((tag): tag is string => Boolean(tag));
@@ -190,17 +241,17 @@ export default function CreationWall() {
         <section className="mt-6 grid items-start gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {masonryColumns.map((column, columnIndex) => <div key={columnIndex} className="space-y-5">{column.map(({ post, index }) => (
             <article key={post.id} className="web3-interactive-card community-reveal mb-5 inline-block w-full break-inside-avoid overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#111538] text-white" style={{ animationDelay: `${Math.min(index, 12) * 55}ms` }}>
-              <Link href={`/community/posts/${post.id}`} className="group block overflow-hidden">
-                {post.cover_url ? <div className={`relative overflow-hidden ${index % 3 === 0 ? "aspect-[4/5]" : index % 3 === 1 ? "aspect-square" : "aspect-[4/3]"}`}><img src={post.cover_url} alt="" className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" /></div> : <div className={`flex ${index % 2 ? "min-h-72" : "min-h-52"} items-center bg-gradient-to-br from-accent/25 via-[#45BFEF]/10 to-[#111538] p-7`}><p className="font-display text-2xl font-semibold leading-relaxed text-white/90">{post.title}</p></div>}
+              <Link href={`/community/posts/${post.id}`} onClick={(event) => { event.preventDefault(); openPost(post.id); }} className="group block overflow-hidden">
+                {post.cover_url ? <div className="overflow-hidden bg-[#090c24]"><img src={post.cover_url} alt="" className="block h-auto w-full transition-opacity duration-300 group-hover:opacity-95" /></div> : <div className={`flex ${index % 2 ? "min-h-72" : "min-h-52"} items-center bg-gradient-to-br from-accent/25 via-[#45BFEF]/10 to-[#111538] p-7`}><p className="font-display text-2xl font-semibold leading-relaxed text-white/90">{post.title}</p></div>}
               </Link>
               <div className="p-4">
                 <span className="rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent-lighter">{labels[post.category] || post.category}</span>
-                <Link href={`/community/posts/${post.id}`}><h2 className="mt-3 font-display text-base font-semibold leading-6 transition-colors hover:text-accent-light">{post.title}</h2></Link>
+                <Link href={`/community/posts/${post.id}`} onClick={(event) => { event.preventDefault(); openPost(post.id); }}><h2 className="mt-3 font-display text-base font-semibold leading-6 transition-colors hover:text-accent-light">{post.title}</h2></Link>
                 <p className="mt-2 line-clamp-2 text-xs leading-5 text-white/45">{post.body_preview}</p>
                 <div className="mt-4 flex items-center gap-2"><UserAvatar avatarUrl={post.author.avatar_url} seed={post.author.id} displayName={post.author.display_name} className="h-7 w-7 rounded-full" /><span className="min-w-0 flex-1 truncate text-xs text-white/55">{post.author.display_name}</span></div>
                 <div className="mt-4 flex items-center gap-1 border-t border-white/5 pt-3">
                   <button onClick={() => void toggle(post, "like")} disabled={busy === `like:${post.id}`} aria-label="点赞创作" className={`creation-action ${post.liked ? "is-active" : ""}`}><span>{post.liked ? "♥" : "♡"}</span>{post.like_count}</button>
-                  <Link href={`/community/posts/${post.id}#comments`} className="creation-action"><span>◯</span>{post.reply_count}</Link>
+                  <Link href={`/community/posts/${post.id}#comments`} onClick={(event) => { event.preventDefault(); openPost(post.id, "comments"); }} className="creation-action"><span>◯</span>{post.reply_count}</Link>
                   <button onClick={() => void toggle(post, "bookmark")} disabled={busy === `bookmark:${post.id}`} aria-label="收藏创作" className={`creation-action ml-auto ${post.bookmarked ? "is-active" : ""}`}><span>{post.bookmarked ? "★" : "☆"}</span>{post.bookmark_count}</button>
                 </div>
               </div>
@@ -220,6 +271,31 @@ export default function CreationWall() {
           ) : null}
         </div>
       </div>
+      {selectedPostId ? (
+        <div
+          role="presentation"
+          onMouseDown={(event) => { if (event.target === event.currentTarget) closePost(); }}
+          className={`community-drawer-backdrop fixed inset-0 z-[1000] flex items-end justify-center bg-[#050619]/75 px-0 pt-5 backdrop-blur-md md:px-8 md:pt-10 ${drawerClosing ? "is-closing" : ""}`}
+        >
+          <section
+            role="dialog"
+            aria-modal="true"
+            aria-label="创作详情"
+            className="community-letter-drawer relative flex max-h-[calc(100dvh-1.25rem)] w-full max-w-6xl flex-col overflow-hidden rounded-t-lg bg-[#111538] shadow-[0_45px_140px_rgba(0,0,0,.72),0_0_70px_rgba(131,88,255,.16)] md:max-h-[calc(100dvh-2.5rem)]"
+            onMouseDown={(event) => event.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={closePost}
+              aria-label="关闭创作详情"
+              className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-white/15 bg-[#090b23]/85 text-2xl leading-none text-white/75 shadow-lg transition-colors hover:border-accent/50 hover:text-white"
+            >
+              <span aria-hidden="true" className="-translate-y-px">×</span>
+            </button>
+            <PostDetail postId={selectedPostId} variant="drawer" onClose={closePost} />
+          </section>
+        </div>
+      ) : null}
     </main>
   );
 }

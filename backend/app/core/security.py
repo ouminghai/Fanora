@@ -57,7 +57,7 @@ async def _resolve_identity(
         user_id=user.id,
         primary_wallet=wallet.address,
         wallet_type=wallet.wallet_type,  # type: ignore[arg-type]
-        provider=wallet.provider or "web3auth",
+        provider=wallet.provider or "wallet",
     )
 
 

@@ -12,7 +12,7 @@ import {ERC721} from "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 contract FanoraMembershipIdentity is ERC721, AccessControl, Pausable {
     /// @notice 可为已验证正式会员铸造身份的角色。
     bytes32 public constant MINTER_ROLE = keccak256("MINTER_ROLE");
-    /// @notice 可将会员等级向上升级的角色。
+    /// @notice 可同步会员等级变化的角色，支持升级和降级。
     bytes32 public constant LEVEL_MANAGER_ROLE = keccak256("LEVEL_MANAGER_ROLE");
     /// @notice 可在等级不变时更新 metadata URI 的角色。
     bytes32 public constant URI_MANAGER_ROLE = keccak256("URI_MANAGER_ROLE");
@@ -21,7 +21,7 @@ contract FanoraMembershipIdentity is ERC721, AccessControl, Pausable {
 
     /// @notice 链上会员等级配置。
     struct LevelConfig {
-        /// @dev 等级排序值，只允许升级到 rank 更高的等级。
+        /// @dev 等级排序值，用于前端和索引器理解等级高低。
         uint64 rank;
         /// @dev 是否允许新铸造或升级到此等级。
         bool active;
@@ -38,7 +38,6 @@ contract FanoraMembershipIdentity is ERC721, AccessControl, Pausable {
     error IdentityAlreadyExists();
     error OperationAlreadyProcessed();
     error SameMembershipLevel();
-    error MembershipDowngradeNotAllowed();
     error EmptyReason();
 
     /// @notice 管理员创建或启停会员等级时触发。
@@ -52,7 +51,7 @@ contract FanoraMembershipIdentity is ERC721, AccessControl, Pausable {
         string metadataUri,
         uint256 metadataVersion
     );
-    /// @notice 等级升级及 metadata 更新完成时触发。
+    /// @notice 等级变更及 metadata 更新完成时触发。
     event MembershipLevelUpdated(
         address indexed account,
         uint256 indexed tokenId,
@@ -144,8 +143,8 @@ contract FanoraMembershipIdentity is ERC721, AccessControl, Pausable {
         emit IdentityMinted(account, tokenId, levelId, operationId, metadataUri, 1);
     }
 
-    /// @notice 将现有身份升级到更高等级，同时切换该等级对应的 metadata。
-    /// @dev tokenId 不变，且仅允许 rank 严格增加，不允许降级。
+    /// @notice 将现有身份同步到新的会员等级，同时切换该等级对应的 metadata。
+    /// @dev tokenId 不变，等级可升可降；等级由累计获得 FAN 决定，不受可消费 FAN 余额扣减影响。
     function updateMembershipLevel(
         uint256 tokenId,
         uint256 nextLevelId,
@@ -159,9 +158,6 @@ contract FanoraMembershipIdentity is ERC721, AccessControl, Pausable {
 
         uint256 previousLevelId = membershipLevelOf[tokenId];
         if (previousLevelId == nextLevelId) revert SameMembershipLevel();
-        if (membershipLevels[nextLevelId].rank <= membershipLevels[previousLevelId].rank) {
-            revert MembershipDowngradeNotAllowed();
-        }
 
         processedOperationIds[operationId] = true;
         membershipLevelOf[tokenId] = nextLevelId;
@@ -172,7 +168,7 @@ contract FanoraMembershipIdentity is ERC721, AccessControl, Pausable {
         );
     }
 
-    /// @notice 在会员等级不变时更新身份 metadata，例如修复 Pinata 内容。
+    /// @notice 在会员等级不变时更新身份 metadata，例如重绘可下载会员证或修复 Pinata 内容。
     function updateIdentityMetadata(uint256 tokenId, string calldata metadataUri, bytes32 operationId)
         external
         onlyRole(URI_MANAGER_ROLE)

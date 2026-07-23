@@ -7,6 +7,11 @@
   to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
+@keyframes nftCardReveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 @keyframes communityPageEnter {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }
@@ -21,6 +26,26 @@
   0% { opacity: 0; transform: translateY(-8px) scale(.98); }
   65% { opacity: 1; transform: translateY(2px) scale(1.005); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes communityDrawerBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes communityLetterOpen {
+  from { opacity: 0; transform: translate3d(0, 100%, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@keyframes communityDrawerBackdropOut {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes communityLetterClose {
+  from { opacity: 1; transform: translate3d(0, 0, 0); }
+  to { opacity: 0; transform: translate3d(0, 100%, 0); }
 }
 
 @keyframes web3OrbFloat {
@@ -132,6 +157,29 @@
   animation: communityNoticeEnter .48s cubic-bezier(.22, 1, .36, 1) both;
 }
 
+.community-drawer-backdrop {
+  animation: communityDrawerBackdropIn .24s ease-out both;
+}
+
+.community-letter-drawer {
+  transform-origin: 50% 100%;
+  animation: communityLetterOpen .46s cubic-bezier(.16, 1, .3, 1) both;
+}
+
+.community-drawer-backdrop.is-closing {
+  animation: communityDrawerBackdropOut .22s ease-in both;
+}
+
+.community-drawer-backdrop.is-closing .community-letter-drawer {
+  animation: communityLetterClose .22s ease-in both;
+}
+
+.community-letter-scroll {
+  overflow-anchor: none;
+  scrollbar-color: rgba(185, 160, 255, .55) rgba(255, 255, 255, .04);
+  scrollbar-width: thin;
+}
+
 @supports (animation-timeline: view()) {
   .community-section-enter {
     animation-timeline: view();
@@ -171,6 +219,153 @@
 }
 
 .web3-interactive-card:hover::before { opacity: 1; }
+
+.nft-tilt-surface {
+  --nft-rotate-x: 0deg;
+  --nft-rotate-y: 0deg;
+  --nft-glare-x: 50%;
+  --nft-glare-y: 50%;
+  --nft-glare-opacity: 0;
+  position: relative;
+  isolation: isolate;
+  transform: perspective(900px) rotateX(var(--nft-rotate-x)) rotateY(var(--nft-rotate-y));
+  transform-style: preserve-3d;
+  transition: transform .22s ease-out, border-color .3s ease, box-shadow .3s ease;
+  will-change: transform;
+}
+
+.community-reveal.nft-tilt-surface {
+  animation-name: nftCardReveal;
+}
+
+.nft-tilt-surface::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 8;
+  border-radius: inherit;
+  background: radial-gradient(circle at var(--nft-glare-x) var(--nft-glare-y), rgba(255, 255, 255, .16), rgba(114, 220, 255, .055) 22%, transparent 52%);
+  mix-blend-mode: screen;
+  opacity: var(--nft-glare-opacity);
+  pointer-events: none;
+  transition: opacity .2s ease;
+}
+
+.nft-tilt-surface:hover {
+  border-color: rgba(131, 88, 255, .32);
+  box-shadow: 0 20px 52px rgba(5, 6, 25, .3), 0 7px 18px rgba(69, 191, 239, .07) !important;
+}
+
+.nft-flow-border {
+  position: relative;
+  isolation: isolate;
+}
+
+.nft-flow-border::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 9;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(105deg, transparent 12%, rgba(69, 191, 239, .35) 30%, rgba(255, 255, 255, .9) 45%, rgba(131, 88, 255, .52) 60%, transparent 82%);
+  background-size: 260% 100%;
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  animation: nftFlowBorder 3.8s linear infinite;
+}
+
+@keyframes nftFlowBorder {
+  from { background-position: 130% 0; }
+  to { background-position: -130% 0; }
+}
+
+.chain-transaction-progress {
+  width: min(100%, 42rem);
+  margin-top: 1rem;
+  padding: 1.5rem;
+  border: 1px solid rgba(69, 191, 239, .16);
+  border-radius: .75rem;
+  background: rgba(9, 12, 36, .035);
+}
+
+.dark .chain-transaction-progress { background: rgba(255, 255, 255, .025); }
+.chain-transaction-progress.is-compact { width: 100%; margin-top: 0; padding: 1.1rem; }
+
+.chain-transaction-nodes {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  margin-top: 1.5rem;
+}
+
+.chain-transaction-step { position: relative; display: grid; justify-items: center; gap: .55rem; min-width: 0; }
+.chain-transaction-node { position: relative; z-index: 2; display: grid; width: 2rem; height: 2rem; place-items: center; border: 1px solid rgba(113, 118, 151, .28); border-radius: 9999px; background: #fff; color: #8c8da8; font-size: .68rem; font-weight: 800; transition: border-color .35s ease, background-color .35s ease, color .35s ease, box-shadow .35s ease, transform .35s ease; }
+.dark .chain-transaction-node { background: #171a42; }
+.chain-transaction-node.is-current { border-color: rgba(69, 191, 239, .8); color: #45bfef; box-shadow: 0 0 0 5px rgba(69, 191, 239, .08), 0 0 22px rgba(69, 191, 239, .2); animation: chainNodePulse 1.15s ease-in-out infinite; }
+.chain-transaction-node.is-complete { border-color: rgba(42, 189, 132, .65); background: #2abd84; color: #fff; transform: scale(.92); }
+.chain-transaction-link { position: absolute; top: 1rem; right: 50%; width: 100%; height: 1px; background: rgba(113, 118, 151, .2); transform-origin: left; }
+.chain-transaction-link::after { content: ""; display: block; width: 100%; height: 100%; background: #45bfef; transform: scaleX(0); transform-origin: left; transition: transform .5s cubic-bezier(.22, 1, .36, 1); }
+.chain-transaction-link.is-connected::after { transform: scaleX(1); }
+.chain-transaction-label { max-width: 5.5rem; overflow: hidden; color: #8c8da8; font-size: .64rem; font-weight: 600; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
+
+.chain-transaction-artifact { display: flex; align-items: center; gap: .8rem; width: min(100%, 22rem); margin: 1.35rem auto 0; padding: .75rem; border: 1px solid rgba(42, 189, 132, .28); border-radius: .65rem; background: rgba(42, 189, 132, .06); box-shadow: 0 16px 42px rgba(5, 6, 25, .12), 0 0 28px rgba(69, 191, 239, .08); animation: chainArtifactForm .65s cubic-bezier(.22, 1, .36, 1) both; }
+.chain-transaction-cube { position: relative; display: block; width: 2.8rem; height: 2.8rem; flex: 0 0 auto; border: 1px solid rgba(69, 191, 239, .6); border-radius: .4rem; background: rgba(69, 191, 239, .08); transform: rotate(45deg) scale(.72); }
+.chain-transaction-cube i { position: absolute; background: rgba(69, 191, 239, .5); }
+.chain-transaction-cube i:nth-child(1) { left: 50%; top: 0; width: 1px; height: 100%; }
+.chain-transaction-cube i:nth-child(2) { left: 0; top: 50%; width: 100%; height: 1px; }
+.chain-transaction-cube i:nth-child(3) { inset: 25%; border: 1px solid rgba(255,255,255,.65); background: transparent; }
+
+@keyframes chainNodePulse { 50% { transform: scale(1.08); box-shadow: 0 0 0 8px rgba(69, 191, 239, .04), 0 0 28px rgba(69, 191, 239, .28); } }
+@keyframes chainArtifactForm { from { opacity: 0; transform: translateY(12px) scale(.82); filter: blur(5px); } to { opacity: 1; transform: none; filter: none; } }
+
+.membership-card-stage {
+  isolation: isolate;
+}
+
+.membership-card-image {
+  transition: filter .9s cubic-bezier(.22, 1, .36, 1), opacity .8s ease, transform .9s cubic-bezier(.22, 1, .36, 1);
+}
+
+.membership-card-pixels {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  opacity: 0;
+  pointer-events: none;
+  background-image:
+    linear-gradient(rgba(7, 20, 47, .24) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(7, 20, 47, .24) 1px, transparent 1px);
+  background-size: 18px 18px;
+  mix-blend-mode: multiply;
+  transition: opacity .7s ease;
+}
+
+.membership-card-stage.is-sealed .membership-card-image {
+  filter: blur(13px) saturate(.45) brightness(.62) contrast(1.22);
+  opacity: .72;
+  transform: scale(1.045);
+}
+
+.membership-card-stage.is-sealed .membership-card-pixels {
+  opacity: .75;
+  animation: membershipCardPixels 1.15s steps(4, end) infinite;
+}
+
+.membership-card-stage.is-revealed .membership-card-image {
+  animation: membershipCardReveal 1.15s cubic-bezier(.22, 1, .36, 1) both;
+}
+
+@keyframes membershipCardPixels {
+  50% { background-position: 9px -9px, -9px 9px; opacity: .48; }
+}
+
+@keyframes membershipCardReveal {
+  from { filter: blur(16px) saturate(.4) brightness(.68); opacity: .66; transform: scale(1.04); }
+  62% { filter: blur(2px) saturate(1.12) brightness(1.08); opacity: 1; }
+  to { filter: none; opacity: 1; transform: none; }
+}
 
 .web3-action-button {
   background: linear-gradient(110deg, #7444ff, #925fff, #5f74ff);
@@ -212,12 +407,15 @@
   .community-grid-card,
   .community-task-card,
   .community-notice-enter,
+  .community-drawer-backdrop,
+  .community-letter-drawer,
   .web3-orb {
     opacity: 1;
     transform: none;
     animation: none;
   }
   .web3-interactive-card,
+  .nft-tilt-surface,
   .web3-action-button,
   .community-list-item,
   .community-grid-card,
@@ -226,6 +424,13 @@
   .community-stat-card {
     transition: none;
   }
+  .nft-tilt-surface { transform: none; }
+  .nft-tilt-surface::before { display: none; }
+  .nft-flow-border::after { animation: none; background-position: 50% 0; }
+  .chain-transaction-node.is-current,
+  .chain-transaction-artifact,
+  .membership-card-stage.is-revealed .membership-card-image,
+  .membership-card-stage.is-sealed .membership-card-pixels { animation: none; }
   .community-task-card::after { display: none; }
 }
 

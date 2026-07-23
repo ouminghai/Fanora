@@ -2,14 +2,14 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import WalletButton from "@/components/web3/WalletButton";
+import RainbowWalletLoginButton from "@/components/web3/RainbowWalletLoginButton";
 import { useAuth } from "@/components/providers/AuthProvider";
 import styles from "./LoginExperience.module.css";
 
 const steps = [
-  ["01", "选择熟悉的方式", "使用邮箱或社交账号，不需要安装钱包。"],
-  ["02", "自动获得钱包身份", "Web3Auth 安全创建或恢复 Monad 兼容钱包。"],
-  ["03", "进入 Fanora", "一次确认后完成注册或登录，开始积累粉丝身份。"],
+  ["01", "连接钱包", "通过 RainbowKit 选择 MetaMask、WalletConnect 等钱包。"],
+  ["02", "确认签名", "签署一次性登录消息，不会产生链上费用。"],
+  ["03", "进入 Fanora", "验证成功后绑定主钱包并开始积累粉丝身份。"],
 ];
 
 export default function LoginExperience() {
@@ -18,8 +18,7 @@ export default function LoginExperience() {
 
   useEffect(() => {
     if (user && status === "authenticated") {
-      const timer = window.setTimeout(() => router.replace("/profile"), 450);
-      return () => window.clearTimeout(timer);
+      router.replace("/collection");
     }
   }, [router, status, user]);
 
@@ -34,7 +33,7 @@ export default function LoginExperience() {
            Fanora — Every Interaction Builds Your Identity.
           </h1>
           <p className="mt-6 max-w-xl text-lg leading-8 text-jacarta-500 dark:text-jacarta-200">
-            Fanora 使用 Web3Auth 把邮箱与社交登录转换成安全的嵌入式钱包。你无需理解助记词、Gas 或切链，也能拥有可验证的粉丝身份。
+            Fanora 使用 RainbowKit 连接你熟悉的钱包。完成一次无 Gas 的消息签名后，即可获得可验证的粉丝身份。
           </p>
           <div className="mt-10 grid gap-4 sm:grid-cols-3">
             {steps.map(([number, title, text], index) => (
@@ -64,7 +63,7 @@ export default function LoginExperience() {
             <p className="mt-3 text-sm leading-6 text-jacarta-500 dark:text-jacarta-300">首次登录会自动注册 Fanora 账户并绑定唯一主钱包。</p>
           </div>
           <div className="mt-8">
-            <WalletButton variant="login" />
+            <RainbowWalletLoginButton variant="full" />
           </div>
           {error && (
             <button

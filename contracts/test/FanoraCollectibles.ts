@@ -14,6 +14,12 @@ describe("FanoraCollectibles", function () {
     return { collectibles, admin, manager, minter, uriManager, pauser, fan, anotherFan, now };
   }
 
+  it("exposes ERC-721-style collection metadata for wallet compatibility", async function () {
+    const { collectibles } = await fixture();
+    expect(await collectibles.name()).to.equal("Fanora Collectibles");
+    expect(await collectibles.symbol()).to.equal("FANORA");
+  });
+
   it("enforces supply, cumulative wallet limits, time windows, and claim keys", async function () {
     const { collectibles, manager, minter, fan, now } = await fixture();
     await collectibles.connect(manager).createTokenType(1, 0, "ipfs://concert", 3, 2, now, now + 3600, true);
@@ -32,6 +38,8 @@ describe("FanoraCollectibles", function () {
       .to.be.revertedWithCustomError(collectibles, "InvalidCategoryConfiguration");
     await expect(collectibles.connect(manager).createTokenType(3, 2, "ipfs://task", 10, 2, now, now + 3600, false))
       .to.be.revertedWithCustomError(collectibles, "InvalidCategoryConfiguration");
+    await collectibles.connect(manager).createTokenType(4, 3, "ipfs://fan-limited", 25, 1, now, now + 3600, true);
+    expect((await collectibles.tokenTypes(4)).maxSupply).to.equal(25);
   });
 
   it("blocks non-transferable single and batch transfers while allowing concert cards", async function () {

@@ -16,11 +16,11 @@ const level: MembershipLevel = {
   is_management: false,
 };
 
-test("membership presentation uses backend threshold fields", () => {
+test("membership presentation uses lifetime FAN threshold fields", () => {
   assert.equal(formatMembershipTokenRange(level), "500 - 1,499");
   assert.equal(getMembershipProgress(level, 120, "轻度神经"), "还差 380 FAN");
   assert.equal(getMembershipProgress(level, 600, "中度神经"), "当前等级");
-  assert.equal(getMembershipProgress(level, 2000, "重度神经"), "已解锁");
+  assert.equal(getMembershipProgress(level, 2000, "重度神经"), "已达到");
   assert.equal(
     getMembershipProgress(level, 0, "待入会", false),
     "缴纳 1 MON 后解锁",
@@ -36,8 +36,9 @@ test("membership levels use the database-backed animated autoplay slider", () =>
   assert.match(source, /api\.get<MembershipLevel\[]>\("\/membership-levels"\)/);
   assert.match(source, /modules=\{\[Autoplay, EffectCoverflow\]\}/);
   assert.match(source, /autoplay=\{\{/);
-  assert.match(source, /575:\s*\{\s*slidesPerView: 3,/);
-  assert.match(source, /992:\s*\{\s*slidesPerView: 5,/);
+  assert.match(source, /575:\s*\{\s*slidesPerView: 2,/);
+  assert.match(source, /992:\s*\{\s*slidesPerView: 6,/);
+  assert.match(source, /user\?\.fan_token_lifetime_earned \?\? null/);
   assert.match(source, /delay: 1200,/);
   assert.match(source, /\sloop\s/);
   assert.match(source, /const \[isReady, setIsReady\] = useState\(false\)/);

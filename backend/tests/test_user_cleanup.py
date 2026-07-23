@@ -37,7 +37,7 @@ async def test_delete_user_cleans_current_foreign_key_dependants(client):
         await session.flush()
         session.add_all(
             [
-                AuthIdentity(user_id=user.id, provider="web3auth", subject=f"delete-{user.id}"),
+                AuthIdentity(user_id=user.id, provider="wallet", subject=f"delete-{user.id}"),
                 Wallet(user_id=user.id, address=wallet_address, wallet_type="embedded", is_primary=True),
                 UserProfile(user_id=user.id),
                 UserRole(user_id=user.id, role="fan"),

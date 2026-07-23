@@ -1,7 +1,7 @@
 # Fanora Protocol 技术架构文档
 
-> 文档版本：v1.4\
-> 更新日期：2026-07-21\
+> 文档版本：v1.6\
+> 更新日期：2026-07-23\
 > 需求基线：[PRODUCT_REQUIREMENTS.md](./PRODUCT_REQUIREMENTS.md)\
 > MVP 网络：Monad Testnet
 
@@ -20,12 +20,12 @@ Fanora 采用“链下业务事实 + 链上公开凭证”的混合架构：
 
 核心边界如下：
 
-- PostgreSQL 是用户、任务、积分、等级、审核和链上任务状态的业务事实源。
+- PostgreSQL 是用户、任务、FAN 可用余额与终身累计、等级、NFT 市场和链上任务状态的业务事实源。
 - ERC-721 保存唯一、不可转让的会员身份和当前公开等级，tokenId 在升级时保持不变。
-- ERC-1155 保存演唱会纪念卡、自定义纪念徽章和任务限定 Badge。
-- Pinata 保存已批准 NFT 图片与 metadata；合约保存 `ipfs://CID`。
-- LangGraph 负责分析、解释、推荐和 ERC-1155 草案，不修改积分、不审批申请、不决定 ERC-721 等级。
-- 链上写入采用后台异步任务、唯一 operationId/claimKey、确认状态和事件对账。
+- ERC-1155 保存演唱会纪念卡、粉丝限量 NFT、自定义纪念徽章和任务限定 Badge。
+- Pinata 保存会员证、粉丝 NFT 图片与 metadata；合约保存 `ipfs://CID`。
+- LangGraph 负责分析、解释、推荐和 metadata 草案，不修改积分、不决定发布资格或 ERC-721 等级。
+- 当前用户触发的身份同步、会员证、发布和购买链路会在 HTTP 请求中等待链上确认；可靠后台重试、常驻事件监听和完整对账仍待实现。
 - 早期 `ProofOfFandomBadge.sol` 原型已删除，正式架构使用付款 Gateway、ERC-721 身份与 ERC-1155 纪念资产合约。
 
 ## 2. 系统总体架构
@@ -36,7 +36,7 @@ flowchart TB
 
     subgraph FRONTEND["Next.js Frontend"]
         WEB["页面与业务交互"]
-        WALLET["Web3Auth / wagmi / viem"]
+        WALLET["RainbowKit / wagmi / viem"]
     end
 
     subgraph BACKEND["Fanora Backend"]
@@ -44,19 +44,19 @@ flowchart TB
         AUTH["身份与会话"]
         TASK["任务与积分"]
         PROFILE["LangGraph 粉丝画像"]
-        NFT["NFT 编排与申请审核"]
+        NFT["会员证与粉丝 NFT 市场"]
         CHAIN["Monad Adapter"]
         IPFS["Pinata Adapter"]
-        WORKER["链上任务 / 事件对账"]
+        WORKER["待完善：重试 / 事件对账"]
     end
 
     subgraph DATA["Data"]
         DB["PostgreSQL<br/>业务事实源"]
-        STAGING["受控临时审核存储"]
+        MEDIA["校验后的上传内容"]
     end
 
     subgraph EXTERNAL["External Services"]
-        WEB3AUTH["Web3Auth / 外部钱包"]
+        WALLETS["MetaMask / WalletConnect / 外部钱包"]
         OPENAI["OpenAI Platform API"]
         PINATA["Pinata IPFS Platform"]
         RPC["Monad RPC"]
@@ -69,7 +69,7 @@ flowchart TB
 
     USER --> WEB
     WEB --> WALLET
-    WALLET --> WEB3AUTH
+    WALLET --> WALLETS
     WEB --> API
     API --> AUTH
     API --> TASK
@@ -80,7 +80,7 @@ flowchart TB
     PROFILE --> DB
     PROFILE --> OPENAI
     NFT --> DB
-    NFT --> STAGING
+    NFT --> MEDIA
     NFT --> IPFS
     IPFS --> PINATA
     NFT --> CHAIN
@@ -96,8 +96,8 @@ flowchart TB
 
 | 模块 | 当前技术 | 主要职责 |
 | --- | --- | --- |
-| `frontend` | Next.js 15、React 19、Web3Auth、RainbowKit、wagmi、viem | 登录、资料、官方社区、任务、会员证、收藏页和申请交互 |
-| `backend` | FastAPI、SQLModel、Alembic、LangGraph、web3.py | 认证、任务、积分、等级、Agent、Pinata、NFT 编排和事件对账 |
+| `frontend` | Next.js 15、React 19、RainbowKit、wagmi、viem | 登录、资料、官方社区、任务、会员证、个人收藏和粉丝 NFT 市场 |
+| `backend` | FastAPI、SQLModel、Alembic、LangGraph、web3.py | 认证、任务、FAN、终身等级、Agent、Pinata、会员证、NFT 发布/购买和链上编排 |
 | `contracts` | Solidity、Hardhat、OpenZeppelin | ERC-721 会员身份与 ERC-1155 纪念资产 |
 | `docs` | Markdown | 产品需求、架构、路线图、开发说明和历史证据 |
 
@@ -107,8 +107,7 @@ flowchart TB
 
 ### 4.1 身份与钱包
 
-- 快捷登录用户通过 Web3Auth 创建或恢复嵌入式钱包。
-- 外部钱包用户通过一次性 challenge 和钱包签名完成服务端认证。
+- 用户通过 RainbowKit 连接已有外部钱包，并通过一次性 challenge 和钱包签名完成服务端认证。
 - 业务模块只读取统一 `user_id` 与 `primary_wallet`，不判断具体登录提供商。
 - Fanora 后端不生成、保存或记录用户钱包私钥。
 - 主钱包切换属于高风险操作；不可转让身份 NFT 不自动迁移。
@@ -139,8 +138,8 @@ flowchart TB
 ### 4.5 NFT 与 metadata
 
 - ERC-721 会员身份：每个有效主钱包最多一个 token；升级更新同一 token 的 levelId 与 metadata。
-- ERC-1155 纪念资产：类别为演唱会纪念卡、自定义纪念徽章或任务限定 Badge。
-- 未审核用户图片存入受控临时存储；审核通过后才上传 Pinata。
+- ERC-1155 纪念资产：类别为演唱会纪念卡、粉丝限量 NFT、自定义纪念徽章或任务限定 Badge。
+- 粉丝限量 NFT 由正式会员直接发布；图片与 metadata 发布成功后固定到 Pinata。
 - 图片 CID 先生成，metadata JSON 引用 `ipfs://imageCid` 后再上传得到 metadata CID。
 - 合约只保存 URI、等级/类别和必要约束，不保存图片二进制、完整积分或私密数据。
 
@@ -157,7 +156,7 @@ LangGraph 的高层接口是“生成粉丝画像与推荐”，输入和输出�
 禁止：
 
 - 修改积分、等级、角色或任务状态。
-- 审批自定义 NFT 申请。
+- 决定粉丝 NFT 发布资格、价格、供应量或资金结算。
 - 决定 ERC-721 会员等级。
 - 持有 Pinata JWT、运营私钥或管理员私钥。
 - 直接提交链上交易或处理交易重试。
@@ -168,17 +167,18 @@ LangGraph 的高层接口是“生成粉丝画像与推荐”，输入和输出�
 
 - 官网、登录、Profile、官方社区展示与加入、正式入会页面。
 - 统一 Axios API 客户端与用户会话状态。
-- Web3Auth 嵌入式钱包和外部钱包交互入口。
+- RainbowKit 多钱包连接、签名和切链入口。
 - 公开 Monad 读取、交易状态和区块浏览器链接。
-- 私钥导出只在用户明确确认后通过浏览器 Provider 执行，不经过后端。
+- 钱包私钥、助记词和账户备份只由用户选择的钱包应用管理。
 
-### 5.2 目标页面
+### 5.2 已落地页面
 
-- Dashboard：积分、等级、画像和链上同步状态。
-- 会员证：ERC-721 tokenId、当前等级、metadata 与交易记录。
-- 收藏页：演唱会纪念卡、自定义纪念徽章和任务限定 Badge。
-- NFT 申请页：图片预览、版权确认、审核状态和失败原因。
-- 创作者控制台：任务、统计、纪念资产草稿和申请审核。
+- `/profile`：资料、钱包、FAN、等级与社区身份。
+- `/collection`：ERC-721 会员证、链上同步、会员证生成/刷新和 ERC-1155 个人收藏。
+- `/collections`：粉丝 NFT 广场、主题筛选、点赞和收藏。
+- `/collections/create`：正式会员发布限量 NFT。
+- `/item/[id]`：NFT 详情、故事图片、铸造记录和 FAN 购买。
+- `/collection/[id]`：创作者集合页。
 
 ### 5.3 前端不负责
 
@@ -216,7 +216,7 @@ flowchart LR
 - `TaskService`：任务状态、领取、提交和验证。
 - `PointService`：积分流水、余额和等级计算。
 - `FanProfileService`：LangGraph 高层接口与运行记录。
-- `NftApplicationService`：自定义 NFT 申请、审核和状态转换。
+- `NftService`：会员身份、会员证、粉丝限量 NFT 发布、购买、收藏和头像设置。
 - `MetadataService`：图片、JSON、CID 和版本。
 - `NftOrchestrator`：资格判断后创建链上 operationId/claimKey。
 - `BlockchainAdapter`：交易构建、提交、回执和事件解析。
@@ -232,8 +232,8 @@ flowchart LR
 | 任务、领取、验证、积分流水 | PostgreSQL | 高频写入、幂等和审计 |
 | 当前积分与等级 | PostgreSQL | 不写入链上完整流水 |
 | Agent 输入摘要、输出、版本 | PostgreSQL | 可追踪与重新计算 |
-| 未审核用户图片 | 受控临时存储 | 不直接公开固定到 IPFS |
-| 已批准图片与 metadata | Pinata IPFS | CID 内容寻址和公开读取 |
+| 粉丝 NFT 原始图片 Data URL | PostgreSQL `nft_applications.image_data` | 当前原型保留发布记录；生产环境应迁移对象存储并缩减数据库负载 |
+| 发布后的图片与 metadata | Pinata IPFS | 校验通过后固定，使用 CID 内容寻址和公开读取 |
 | ERC-721 身份状态 | Monad | 公开验证唯一身份与当前等级 |
 | ERC-1155 类型、余额与事件 | Monad | 公开验证纪念资产和发行约束 |
 | 交易提交、确认和对账状态 | PostgreSQL | 支持失败重试与恢复 |
@@ -356,28 +356,27 @@ sequenceDiagram
     end
 ```
 
-### 9.3 用户自定义纪念徽章
+### 9.3 粉丝限量 NFT 发布与购买
 
 ```mermaid
 sequenceDiagram
     participant U as 用户
     participant B as FastAPI
-    participant S as 临时审核存储
-    participant R as 审核人
     participant P as Pinata
     participant D as PostgreSQL
     participant C as ERC-1155
 
-    U->>B: 提交申请与图片
-    B->>S: 保存受控临时文件
-    B->>D: 状态 SUBMITTED
-    R->>B: 批准申请
-    B->>P: 上传最终图片与 metadata
+    U->>B: 发布 NFT 图片、定价和限量
+    B->>D: 校验正式会员与 100 FAN 发布费
+    B->>P: 上传图片与 metadata
     P-->>B: 返回 CID
-    B->>C: createTokenType(CUSTOM_BADGE, supply=1)
-    B->>C: mintCollectible(user, tokenId, 1, claimKey)
+    B->>C: createTokenType(FAN_LIMITED_NFT, maxSupply)
+    B->>D: 扣除 100 FAN 并发布上架
+    U->>B: 购买 NFT
+    B->>D: 扣买家 FAN
+    B->>C: mintCollectible(buyer, tokenId, 1, claimKey)
     C-->>B: CollectibleMinted
-    B->>D: 状态 MINTED
+    B->>D: 给创作者记入 FAN，更新库存
 ```
 
 ### 9.4 演唱会纪念卡与任务限定 Badge
@@ -402,11 +401,13 @@ Railway / Render / Fly.io / Cloud Run
   └─ Worker / Reconciliation
 
 PostgreSQL / Supabase
-  ├─ 业务数据库
-  └─ 受控临时审核存储
+  └─ 业务数据库与当前原型图片记录
+
+Object Storage（生产目标）
+  └─ 上传原图、配额与清理
 
 Pinata
-  └─ 已批准 NFT 图片与 metadata
+  └─ 校验通过的会员证、NFT 图片与 metadata
 
 Monad Testnet
   ├─ FanoraMembershipGateway
@@ -421,8 +422,6 @@ Vercel Functions 可以用于短请求，但不适合依赖 HTTP 返回后继续
 ### 11.1 当前已有公开前端配置
 
 - `NEXT_PUBLIC_API_URL`
-- `NEXT_PUBLIC_WEB3AUTH_CLIENT_ID`
-- `NEXT_PUBLIC_WEB3AUTH_NETWORK`
 - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
 - `NEXT_PUBLIC_MONAD_TESTNET_RPC_URL`
 
@@ -431,7 +430,6 @@ Vercel Functions 可以用于短请求，但不适合依赖 HTTP 返回后继续
 ### 11.2 当前已有服务端配置
 
 - `DATABASE_URL`
-- Web3Auth 验证配置
 - `MONAD_RPC_URL`、`MONAD_CHAIN_ID`
 - 正式入会 Gateway、动态会费备用值、资金地址和确认数
 - ERC-721、ERC-1155 地址、事件起始区块和最小权限运营签名配置
@@ -442,7 +440,7 @@ Vercel Functions 可以用于短请求，但不适合依赖 HTTP 返回后继续
 ### 11.3 尚待生产化的配置
 
 - 将测试网共用部署钱包拆分为独立运营账户或安全签名服务。
-- 配置生产 Pinata JWT、受控临时审核存储和文件清理策略。
+- 配置生产 Pinata JWT、对象存储、上传配额和文件清理策略。
 - 配置后台任务队列、事件轮询间隔、链重组确认和告警渠道。
 
 Pinata JWT、运营私钥、管理员私钥、数据库凭证和 OpenAI Key 只能存在服务端密钥环境。
@@ -450,10 +448,10 @@ Pinata JWT、运营私钥、管理员私钥、数据库凭证和 OpenAI Key 只�
 ## 12. 安全与可靠性
 
 - 登录 challenge 一次性、限时并绑定域名、钱包地址和 chainId。
-- Web3Auth Identity Token 在后端验证签名、issuer、audience、过期时间和用户标识。
-- 积分、任务、审核和链上参数全部由服务端确定。
+- 钱包登录签名由后端恢复签名地址，并校验 challenge 内容、有效期和一次性使用状态。
+- FAN、任务、会员等级、NFT 发布约束和链上参数全部由服务端确定。
 - 用户上传图片验证 MIME、文件签名、大小、尺寸和内容；MVP 不接受未经清洗的 SVG。
-- 未审核文件不进入公开 IPFS。
+- 文件必须通过 MIME、签名、大小和尺寸校验后才能进入公开 IPFS。
 - Pinata JWT 与链上运营签名权限分离。
 - 合约按角色拆分管理员、铸造者、等级管理、类型管理、URI 管理和暂停权限。
 - operationId/claimKey 在数据库与合约两侧防重。
@@ -465,22 +463,22 @@ Pinata JWT、运营私钥、管理员私钥、数据库凭证和 OpenAI Key 只�
 
 ### 13.1 已具备
 
-- Web3Auth Modal 登录、钱包签名挑战、统一会话和 MetaMask 入会付款确认。
+- RainbowKit 多钱包连接、钱包签名挑战、统一会话和入会付款确认。
 - 官方社区创作、Markdown、多图、评论回复、任务、签到日历和 Fan Token 幂等奖励闭环。
 - 动态会费 Gateway、管理员提现与改价、付款事件验证和正式会员激活。
 - ERC-721 SBT 会员身份、等级 metadata 版本、Pinata 固定和用户主动等级同步。
-- ERC-1155 纪念资产合约、自定义徽章申请/审核/处理和统一收藏页。
+- ERC-1155 纪念资产合约、粉丝限量 NFT 发布/购买、点赞/收藏、创作者集合和统一收藏页。
 - Monad/Pinata 适配器、链上操作和 NFT 数据模型，以及对应 FastAPI 接口。
 - LangGraph 确定性评分、结构化画像、LLM 降级和分析记录持久化。
-- 三个合约 Monad Testnet 部署、16 项合约测试、ABI 导出和前后端配置自动同步。
+- 三个合约 Monad Testnet 部署、19 项合约测试、ABI 导出和前后端配置自动同步。
 
 ### 13.2 仍需完成
 
 - 外部钱包关联、主钱包切换和 SBT 身份恢复/迁移管理。
 - 可靠后台任务执行器、失败自动重试、链重组处理、常驻事件监听和完整对账。
 - 任务限定 Badge 与演唱会纪念卡的资格领取、类型管理和前端闭环。
-- Pinata pin 状态查询、受控临时审核存储、恶意内容检测、配额和清理策略。
-- 自定义 NFT 重新编辑/版本审核、完整审计日志和管理员操作页面。
+- Pinata pin 状态查询、独立对象存储、恶意内容检测、配额和清理策略。
+- 粉丝 NFT 编辑/下架、退款或失败补偿、完整交易审计和管理员操作页面。
 - 将 Testnet 共用运营钱包拆分为最小权限账户，并迁移 `DEFAULT_ADMIN_ROLE` 至多签。
 
 ## 14. 非目标

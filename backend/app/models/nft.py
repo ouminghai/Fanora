@@ -73,6 +73,12 @@ class MembershipIdentityNft(SQLModel, table=True):
     level_code: str = Field(max_length=50)
     metadata_version: int = Field(default=1, ge=1)
     metadata_cid: str = Field(max_length=255)
+    is_member_card: bool = Field(default=False, index=True)
+    card_level_code: str | None = Field(default=None, max_length=50)
+    card_content_hash: str | None = Field(default=None, max_length=64)
+    card_fee_fan_tokens: int = Field(default=0, ge=0)
+    card_created_at: datetime | None = Field(default=None)
+    card_updated_at: datetime | None = Field(default=None)
     status: str = Field(default="PENDING", max_length=30, index=True)
     chain_operation_id: str | None = Field(default=None, foreign_key="chain_operations.id")
     minted_at: datetime | None = Field(default=None)
@@ -128,6 +134,19 @@ class CollectibleOwnership(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class NftCreationReaction(SQLModel, table=True):
+    __tablename__ = "nft_creation_reactions"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("application_id", "user_id", name="uq_nft_creation_reaction_user"),)
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    application_id: str = Field(foreign_key="nft_applications.id", index=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    liked: bool = Field(default=False, index=True)
+    favorited: bool = Field(default=False, index=True)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class NftApplication(SQLModel, table=True):
     __tablename__ = "nft_applications"  # pyright: ignore[reportAssignmentType]
 
@@ -135,9 +154,13 @@ class NftApplication(SQLModel, table=True):
     user_id: str = Field(foreign_key="users.id", index=True)
     name: str = Field(max_length=100)
     description: str = Field(max_length=1000)
+    story_image_urls: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     theme: str = Field(max_length=120)
     public_attributes: list[dict[str, str]] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     copyright_declaration: str = Field(max_length=500)
+    price_fan_tokens: int = Field(default=1, sa_column=Column(BigInteger, nullable=False))
+    max_supply: int = Field(default=1, sa_column=Column(BigInteger, nullable=False))
+    publish_fee_fan_tokens: int = Field(default=100, sa_column=Column(BigInteger, nullable=False))
     image_data: str | None = Field(default=None, max_length=7_000_000)
     image_mime_type: str = Field(max_length=100)
     image_size_bytes: int = Field(ge=0)

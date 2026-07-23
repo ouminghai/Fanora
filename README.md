@@ -4,7 +4,7 @@ Fanora 是一个由 AI Agent 驱动的 Web3 链上粉丝身份与互动协议。
 
 ## 阶段交付摘要
 
-如果只想快速了解项目目标、当前真实完成度和 Week 3 可承担的开发角色，请直接阅读 [Fanora 阶段开发汇总与 Week 3 角色](docs/WEEK2_DELIVERY_SUMMARY.md)。
+如果只想快速了解项目当前真实完成度、验证结果和剩余风险，请直接阅读 [2026-07-23 交付总结](docs/DELIVERY_SUMMARY_2026-07-23.md)。
 
 ## 项目结构
 
@@ -20,16 +20,16 @@ Fanora/
 
 ## 模块职责
 
-- `frontend`：钱包连接、用户 Dashboard、任务中心、徽章墙和创作者控制台。
-- `backend`：生产级 FastAPI、统一身份接口、任务验证、积分计算、LangGraph 粉丝画像、数据库和链上写入编排。
-- `contracts`：Proof of Fandom Badge、身份等级以及受权限控制的链上状态。
+- `frontend`：RainbowKit 钱包登录、用户资料、社区与任务、会员证、个人收藏和粉丝 NFT 市场。
+- `backend`：FastAPI 统一身份、任务验证、FAN 与终身等级、LangGraph 粉丝画像、Pinata 和 Monad 链上写入编排。
+- `contracts`：动态会费 Gateway、ERC-721 SBT 会员身份和 ERC-1155 粉丝纪念资产。
 - `docs`：跨模块的架构、接口约定和 MVP 开发顺序。
 
 ## 推荐启动顺序
 
 1. 启动后端健康检查。
 2. 启动前端并完成 Monad Testnet 钱包连接。
-3. 编译、测试并部署 Badge 合约。
-4. 将合约地址分别写入前端和后端的本地环境变量。
+3. 按需编译、测试或部署三个正式合约。
+4. 使用同步脚本将 ABI、合约地址和起始区块写入前端、后端与公开部署清单。
 
 详细内容见 [技术架构文档](docs/ARCHITECTURE.md)、[开发需求文档](docs/PRODUCT_REQUIREMENTS.md)、[本地开发说明](docs/DEVELOPMENT.md) 和 [MVP 路线图](docs/MVP_ROADMAP.md)。
