@@ -316,7 +316,7 @@ npm test
 
 ### 新测试数据库初始化时报种子图片缺失
 
-`backend/app/services/product_seed.py` 的本地开发种子仍会读取被 Git 忽略的 `resources/`，所有映射已对齐当前实际存在的素材。Railway 数据库迁移不依赖该目录；生产 Base64 图片由上述一次性 seed 脚本从有素材的本机写入。长期生产方案仍应改为已提交的可再分发资源或对象存储。
+`backend/app/services/product_seed.py` 只用于自动建表的本地开发和测试数据库，使用前端兜底 URL 创建系统用户、官方社区、基础 Echo 帖子和 Quests，不再读取本地文件。所有 `resources/` 图片映射和 Base64 写入均集中在上述一次性 seed 脚本中。Railway 生产环境仍应使用 `AUTO_CREATE_SCHEMA=false`，并由 Alembic 管理表结构和基础数据。
 
 ### 数据库连接等待时间长
 

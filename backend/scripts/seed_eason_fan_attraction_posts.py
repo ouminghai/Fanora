@@ -16,17 +16,32 @@ from app.core.database import database_service
 from app.models.base import utc_now
 from app.models.community import CommunityPost, FanTask
 from app.models.user import Community, User
-from app.services.product_seed import (
-    OFFICIAL_COMMUNITY_ID,
-    RESOURCE_POST_IMAGES,
-    RESOURCE_TASK_IMAGES,
-    SYSTEM_USER_ID,
-)
+from app.services.product_seed import OFFICIAL_COMMUNITY_ID, SYSTEM_USER_ID
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 RESOURCE_ROOT = PROJECT_ROOT / "resources"
 POST_ID_TEMPLATE = "20000000-0000-0000-0000-{index:012d}"
 SUPPORTED_IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".webp"}
+RESOURCE_POST_IMAGES = {
+    "00000000-0000-0000-0000-000000000003": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图1.jpg",
+    "00000000-0000-0000-0000-000000000004": "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图10.jpg",
+    "00000000-0000-0000-0000-000000000010": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图33.jpg",
+    "00000000-0000-0000-0000-000000000011": "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图1.jpg",
+    "00000000-0000-0000-0000-000000000012": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图6.jpg",
+    "00000000-0000-0000-0000-000000000013": "Eason-Concert-Horizontal-01-2-1-scaled.webp",
+}
+RESOURCE_TASK_IMAGES = {
+    "daily-check-in": "7560176241271295283/20251012-#fnds #大头仔-图24.jpg",
+    "fear-and-dreams": "Eason-Concert-Horizontal-01-2-1-scaled.webp",
+    "new-song-listening": "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图10.jpg",
+    "share-your-song": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图33.jpg",
+    "fan-story": "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图1.jpg",
+    "anniversary-wishes": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图6.jpg",
+    "classic-lyrics-chain": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图1.jpg",
+    "core-fan-identity": "20240727-在FEAR AND DREAMS上拍到的人生照片-图1.jpg",
+    "city-checkin": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图39.jpg",
+    "anniversary-badge": "7560176241271295283/20251012-#fnds #大头仔-图3.jpg",
+}
 EMOTION_WORDS = {
     "震撼",
     "热血",

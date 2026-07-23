@@ -1,8 +1,7 @@
 """Set portable fallback images for task and post records.
 
-The original version read ignored files from the repository-level ``resources``
-directory. Production migrations must be reproducible without a developer's
-local files, so Base64 image import now lives in
+The original version read ignored developer-local image assets. Production
+migrations must be reproducible without those files, so Base64 image import now lives in
 ``scripts/seed_eason_fan_attraction_posts.py``.
 """
 

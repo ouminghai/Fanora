@@ -1,9 +1,6 @@
-"""Idempotent defaults for auto-created development and test databases."""
+"""Idempotent, filesystem-independent defaults for development and test databases."""
 
-import base64
 from copy import deepcopy
-from functools import lru_cache
-from pathlib import Path
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
@@ -25,39 +22,6 @@ ANNIVERSARY_WISH_TASK_ID = "00000000-0000-0000-0000-000000000024"
 IDENTITY_TASK_ID = "00000000-0000-0000-0000-000000000026"
 CITY_CHECKIN_TASK_ID = "00000000-0000-0000-0000-000000000027"
 ANNIVERSARY_BADGE_TASK_ID = "00000000-0000-0000-0000-000000000028"
-
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
-RESOURCE_MIME_TYPES = {".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp"}
-
-
-@lru_cache(maxsize=32)
-def resource_data_url(relative_path: str) -> str:
-    path = PROJECT_ROOT / "resources" / relative_path
-    mime_type = RESOURCE_MIME_TYPES[path.suffix.lower()]
-    return f"data:{mime_type};base64,{base64.b64encode(path.read_bytes()).decode('ascii')}"
-
-
-RESOURCE_POST_IMAGES = {
-    WELCOME_POST_ID: "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图1.jpg",
-    MUSIC_POST_ID: "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图10.jpg",
-    "00000000-0000-0000-0000-000000000010": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图33.jpg",
-    "00000000-0000-0000-0000-000000000011": "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图1.jpg",
-    "00000000-0000-0000-0000-000000000012": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图6.jpg",
-    "00000000-0000-0000-0000-000000000013": "Eason-Concert-Horizontal-01-2-1-scaled.webp",
-}
-
-RESOURCE_TASK_IMAGES = {
-    "daily-check-in": "7560176241271295283/20251012-#fnds #大头仔-图24.jpg",
-    "fear-and-dreams": "Eason-Concert-Horizontal-01-2-1-scaled.webp",
-    "new-song-listening": "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图10.jpg",
-    "share-your-song": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图33.jpg",
-    "fan-story": "7537320444182646074/20250811-FnDs让我有个美满旅程❤️🧡💛💚💙💜-图1.jpg",
-    "anniversary-wishes": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图6.jpg",
-    "classic-lyrics-chain": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图1.jpg",
-    "core-fan-identity": "20240727-在FEAR AND DREAMS上拍到的人生照片-图1.jpg",
-    "city-checkin": "7519883883774463290/20250625-速通fnds.#fearanddreams #陈-图39.jpg",
-    "anniversary-badge": "7560176241271295283/20251012-#fnds #大头仔-图3.jpg",
-}
 
 POST_MARKDOWN_BODIES = {
     WELCOME_POST_ID: """## 第一次被一首歌击中的时候
@@ -395,7 +359,7 @@ async def seed_product_defaults(session: AsyncSession) -> None:
                     author_user_id=SYSTEM_USER_ID,
                     title="你与喜欢的音乐，第一次相遇在什么时候？",
                     body=POST_MARKDOWN_BODIES[WELCOME_POST_ID],
-                    cover_url=resource_data_url(RESOURCE_POST_IMAGES[WELCOME_POST_ID]),
+                    cover_url="/img/fanora/activity-community.jpg",
                     category="story",
                 ),
                 CommunityPost(
@@ -404,7 +368,7 @@ async def seed_product_defaults(session: AsyncSession) -> None:
                     author_user_id=SYSTEM_USER_ID,
                     title="本周循环：安利一首你舍不得切掉的歌",
                     body=POST_MARKDOWN_BODIES[MUSIC_POST_ID],
-                    cover_url=resource_data_url(RESOURCE_POST_IMAGES[MUSIC_POST_ID]),
+                    cover_url="/img/fanora/activity-music.jpg",
                     category="music",
                 ),
             ]
@@ -413,9 +377,6 @@ async def seed_product_defaults(session: AsyncSession) -> None:
     for task_seed in TASK_SEEDS:
         if await session.get(FanTask, task_seed["id"]) is None:
             stored_task = deepcopy(task_seed)
-            presentation = stored_task["validation_rule"]["presentation"]
-            catalog_key = presentation["catalog_key"]
-            presentation["image_url"] = resource_data_url(RESOURCE_TASK_IMAGES[catalog_key])
             session.add(
                 FanTask(
                     community_id=OFFICIAL_COMMUNITY_ID,
@@ -423,7 +384,7 @@ async def seed_product_defaults(session: AsyncSession) -> None:
                     **stored_task,
                 )
             )
-    for post_id, title, _body, _cover_url, category in CREATION_SEEDS:
+    for post_id, title, _body, cover_url, category in CREATION_SEEDS:
         if await session.get(CommunityPost, post_id) is None:
             session.add(
                 CommunityPost(
@@ -432,7 +393,7 @@ async def seed_product_defaults(session: AsyncSession) -> None:
                     author_user_id=SYSTEM_USER_ID,
                     title=title,
                     body=POST_MARKDOWN_BODIES[post_id],
-                    cover_url=resource_data_url(RESOURCE_POST_IMAGES[post_id]),
+                    cover_url=cover_url,
                     category=category,
                 )
             )

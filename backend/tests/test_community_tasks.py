@@ -155,14 +155,14 @@ async def test_pending_member_cannot_check_in_or_claim_task(client):
     assert client.post(f"/api/v1/tasks/{WELCOME_TASK_ID}/claim", headers=headers).status_code == 403
 
 
-async def test_seeded_tasks_and_posts_use_database_backed_resource_images(client):
+async def test_auto_created_tasks_and_posts_use_portable_fallback_images(client):
     tasks = client.get("/api/v1/tasks").json()
     posts = client.get("/api/v1/community/posts").json()
 
     assert len(tasks) >= 10
     assert len(posts) >= 6
-    assert all(task["presentation"]["image_url"].startswith("data:image/") for task in tasks)
-    assert all(post["cover_url"].startswith("data:image/") for post in posts if post["cover_url"])
+    assert all(task["presentation"]["image_url"].startswith("/img/") for task in tasks)
+    assert all(post["cover_url"].startswith("/img/") for post in posts if post["cover_url"])
 
 
 async def test_daily_creation_and_special_page_tasks_complete_without_manual_review(client):
