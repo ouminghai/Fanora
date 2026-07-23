@@ -1,6 +1,7 @@
 """Quest completion orchestration with Agent review and deterministic rewards."""
 
 from dataclasses import dataclass
+from typing import Literal, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
@@ -71,17 +72,21 @@ async def _review_submission(
             10,
         )
     )
+    content_type = cast(
+        Literal["post", "reply", "page_action"],
+        {
+            "content_publish": "post",
+            "post_reply": "reply",
+            "page_action": "page_action",
+        }[task.task_type],
+    )
     review = await content_review_agent.review(
         ContentReviewRequest(
             task_id=task.id,
             task_title=task.title,
             task_description=task.description,
             interaction_prompt=interaction_prompt,
-            content_type={
-                "content_publish": "post",
-                "post_reply": "reply",
-                "page_action": "page_action",
-            }[task.task_type],
+            content_type=content_type,
             source_id=event.source_id,
             title=event.content_title or "",
             body=event.content_text or "",

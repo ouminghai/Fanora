@@ -303,7 +303,7 @@ class FanProfileAgent:
             ).scalar_one()
         )
         active_dates = set(
-            (await session.execute(select(DailyCheckIn.check_in_date).where(DailyCheckIn.user_id == user_id)))
+            (await session.execute(select(col(DailyCheckIn.check_in_date)).where(DailyCheckIn.user_id == user_id)))
             .scalars()
             .all()
         )
@@ -470,8 +470,9 @@ class FanProfileAgent:
                 degraded=source == "rules" and self.model_service.available,
             )
         )
-        if state.get("user_id"):
-            profile = await session.get(UserProfile, state["user_id"])
+        persisted_user_id = state.get("user_id")
+        if persisted_user_id:
+            profile = await session.get(UserProfile, persisted_user_id)
             if profile is not None:
                 profile.fan_type = state["fan_type"]
                 profile.updated_at = utc_now()

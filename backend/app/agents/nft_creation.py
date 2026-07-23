@@ -49,7 +49,8 @@ def _rule_draft(state: NftCreationState) -> dict[str, Any]:
     name = state.get("preferred_name") or f"{state['theme']} · Fanora Limited"
     story = state["story"].strip()
     description = story if len(story) <= 1000 else f"{story[:997]}..."
-    reference = f" Reference notes: {state['reference_notes']}." if state.get("reference_notes") else ""
+    reference_notes = state.get("reference_notes")
+    reference = f" Reference notes: {reference_notes}." if reference_notes else ""
     image_prompt = (
         f"Create a square collectible NFT artwork about {state['theme']}. "
         f"Visual style: {state['visual_style']}. Story and emotional context: {story}."
@@ -124,11 +125,14 @@ def build_nft_creation_graph(model_service: LLMService = llm_service) -> Compile
                 size=settings.openai_image_size,
                 n=1,
             )
+            if not response.data:
+                raise RuntimeError("Image generation response did not include a result")
             item = response.data[0]
             encoded = getattr(item, "b64_json", None)
-            if not encoded and getattr(item, "url", None):
+            image_url = getattr(item, "url", None)
+            if not encoded and image_url:
                 async with httpx.AsyncClient(timeout=settings.image_generation_timeout_seconds) as http:
-                    remote = await http.get(item.url)
+                    remote = await http.get(image_url)
                     remote.raise_for_status()
                     encoded = base64.b64encode(remote.content).decode("ascii")
             if not encoded:

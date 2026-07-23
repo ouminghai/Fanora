@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     membership_identity_start_block: int = 0
     collectibles_start_block: int = 0
     chain_write_confirmations: int = 1
+    chain_writes_enabled: bool = True
     chain_transaction_timeout_seconds: int = 90
     membership_treasury_manager_private_key: str = ""
     identity_minter_private_key: str = ""

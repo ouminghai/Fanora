@@ -11,6 +11,8 @@ from sqlmodel import SQLModel
 import app.models.database  # noqa: F401
 from app.adapters.monad import ConfirmedContractTransaction, monad_contract_adapter
 from app.adapters.pinata import PinnedFile, pinata_adapter
+from app.core.config import settings
+from app.models.community import FanTask, TaskParticipation
 from app.models.membership import MembershipLevel
 from app.models.nft import (
     ChainOperation,
@@ -19,7 +21,7 @@ from app.models.nft import (
     MembershipIdentityNft,
     NftMetadataVersion,
 )
-from app.models.user import User, UserProfile
+from app.models.user import Community, User, UserProfile, Wallet
 from app.services.identity import AuthenticatedIdentity
 from app.services.nft import NftService, NftValidationError
 
@@ -119,6 +121,140 @@ def test_membership_card_refresh_fingerprint_tracks_lifetime_level_data() -> Non
     profile.fan_token_lifetime_earned = 500
     after = service.membership_card_content_hash(user=user, profile=profile, level=level, record=record)
     assert before != after
+
+
+@pytest.mark.asyncio
+async def test_fear_task_reward_mints_once_with_local_concert_image(monkeypatch) -> None:
+    chain_calls: list[str] = []
+
+    async def pin_image(filename: str, content: bytes, mime_type: str) -> PinnedFile:
+        assert filename.endswith(".webp")
+        assert content
+        assert mime_type == "image/webp"
+        return PinnedFile(cid="fear-image-cid", pin_id="fear-image-pin")
+
+    async def pin_metadata(filename: str, payload: dict) -> PinnedFile:
+        assert filename.endswith(".json")
+        assert payload["image"] == "ipfs://fear-image-cid"
+        return PinnedFile(cid="fear-metadata-cid", pin_id="fear-metadata-pin")
+
+    async def create_token_type(payload: dict) -> ConfirmedContractTransaction:
+        chain_calls.append("create")
+        assert payload["category"] == 0
+        return ConfirmedContractTransaction(
+            transaction_hash="0x" + "11" * 32,
+            block_number=100,
+            confirmations=1,
+            event_args={},
+        )
+
+    async def mint_collectible(wallet: str, token_id: int, amount: int, claim_hash: str):
+        chain_calls.append("mint")
+        assert wallet == "0x1111111111111111111111111111111111111111"
+        assert amount == 1
+        assert token_id > 0
+        assert len(claim_hash.removeprefix("0x")) == 64
+        return ConfirmedContractTransaction(
+            transaction_hash="0x" + "22" * 32,
+            block_number=101,
+            confirmations=1,
+            event_args={},
+        )
+
+    monkeypatch.setattr(settings, "chain_writes_enabled", True)
+    monkeypatch.setattr(settings, "pinata_jwt", "test-pinata-jwt")
+    monkeypatch.setattr(settings, "collectibles_contract_address", "0x2222222222222222222222222222222222222222")
+    monkeypatch.setattr(settings, "collectible_type_manager_private_key", "0x" + "1" * 64)
+    monkeypatch.setattr(settings, "collectible_minter_private_key", "0x" + "2" * 64)
+    monkeypatch.setattr(pinata_adapter, "pin_image", pin_image)
+    monkeypatch.setattr(pinata_adapter, "pin_metadata", pin_metadata)
+    monkeypatch.setattr(monad_contract_adapter, "create_token_type", create_token_type)
+    monkeypatch.setattr(monad_contract_adapter, "mint_collectible", mint_collectible)
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
+    async with engine.begin() as connection:
+        await connection.run_sync(SQLModel.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    try:
+        async with factory() as session:
+            user = User(display_name="Fear Ticket Fan")
+            session.add(user)
+            await session.flush()
+            community = Community(
+                owner_user_id=user.id,
+                slug="fear-ticket-test",
+                name="Fear Ticket Test",
+                description="Task reward test community",
+                logo_url="/img/logo.png",
+            )
+            session.add_all(
+                [
+                    UserProfile(user_id=user.id, is_official_member=True),
+                    Wallet(
+                        user_id=user.id,
+                        address="0x1111111111111111111111111111111111111111",
+                        wallet_type="external",
+                        is_primary=True,
+                    ),
+                    community,
+                ]
+            )
+            await session.flush()
+            task = FanTask(
+                community_id=community.id,
+                created_by_user_id=user.id,
+                title="FEAR and DREAMS 纪念票任务",
+                description="分享真实现场记忆并领取纪念票",
+                task_type="page_action",
+                status="published",
+                reward_fan_tokens=500,
+                validation_rule={
+                    "nft_reward": {
+                        "enabled": True,
+                        "version": 1,
+                        "category": "CONCERT_CARD",
+                        "name": "FEAR and DREAMS 纪念票",
+                        "image_path": "/img/fanora/eason-concert.webp",
+                        "max_supply": 10000,
+                        "per_wallet_limit": 1,
+                        "transferable": False,
+                    }
+                },
+            )
+            session.add(task)
+            await session.flush()
+            participation = TaskParticipation(
+                task_id=task.id,
+                user_id=user.id,
+                status="rewarded",
+                reward_snapshot=500,
+            )
+            session.add(participation)
+            await session.commit()
+
+            service = NftService()
+            first = await service.mint_task_reward(
+                session,
+                task=task,
+                participation=participation,
+                user_id=user.id,
+            )
+            second = await service.mint_task_reward(
+                session,
+                task=task,
+                participation=participation,
+                user_id=user.id,
+            )
+
+            assert first is not None and first.status == "CONFIRMED"
+            assert second is not None and second.id == first.id
+            assert chain_calls == ["create", "mint"]
+    finally:
+        await engine.dispose()
 
 
 @pytest.mark.asyncio

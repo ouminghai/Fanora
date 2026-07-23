@@ -8,6 +8,7 @@ os.environ["ENVIRONMENT"] = "test"
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["AUTO_CREATE_SCHEMA"] = "true"
 os.environ["CHECKPOINT_DATABASE_URL"] = ""
+os.environ["CHAIN_WRITES_ENABLED"] = "false"
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["OPENAI_MODEL"] = ""
 

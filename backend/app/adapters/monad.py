@@ -53,20 +53,33 @@ class MonadContractAdapter:
 
     @property
     def identity_configured(self) -> bool:
-        return bool(settings.membership_identity_contract_address and settings.identity_minter_private_key)
+        return bool(
+            settings.chain_writes_enabled
+            and settings.membership_identity_contract_address
+            and settings.identity_minter_private_key
+        )
 
     @property
     def identity_uri_manager_configured(self) -> bool:
-        return bool(settings.membership_identity_contract_address and settings.identity_uri_manager_private_key)
+        return bool(
+            settings.chain_writes_enabled
+            and settings.membership_identity_contract_address
+            and settings.identity_uri_manager_private_key
+        )
 
     @property
     def membership_gateway_configured(self) -> bool:
-        return bool(settings.membership_payment_contract_address and settings.membership_treasury_manager_private_key)
+        return bool(
+            settings.chain_writes_enabled
+            and settings.membership_payment_contract_address
+            and settings.membership_treasury_manager_private_key
+        )
 
     @property
     def collectibles_configured(self) -> bool:
         return bool(
-            settings.collectibles_contract_address
+            settings.chain_writes_enabled
+            and settings.collectibles_contract_address
             and settings.collectible_type_manager_private_key
             and settings.collectible_minter_private_key
         )

@@ -16,6 +16,7 @@ from app.models.community import DailyCheckIn, FanTask, TaskAuditLog, TaskConten
 from app.models.nft import ChainOperation, CollectibleOwnership, CollectibleTokenType, TaskNftReward
 from app.models.user import CommunityMember, UserProfile
 from app.schemas.community import (
+    CheckInRecordResponse,
     CheckInResponse,
     TaskCreate,
     TaskPageCompletion,
@@ -505,10 +506,10 @@ async def build_check_in_response(
         fan_token_balance=profile.fan_token_balance if profile else 0,
         month=month_start.strftime("%Y-%m"),
         monthly_records=[
-            {
-                "check_in_date": record.check_in_date,
-                "reward_fan_tokens": record.reward_fan_tokens,
-            }
+            CheckInRecordResponse(
+                check_in_date=record.check_in_date,
+                reward_fan_tokens=record.reward_fan_tokens,
+            )
             for record in monthly_records
         ],
         monthly_reward_fan_tokens=sum(record.reward_fan_tokens for record in monthly_records),
