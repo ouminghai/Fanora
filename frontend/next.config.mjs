@@ -16,6 +16,11 @@ const nextConfig = {
         hostname: "cdn.jsdelivr.net",
         port: "",
       },
+      {
+        protocol: "https",
+        hostname: "gateway.pinata.cloud",
+        pathname: "/ipfs/**",
+      },
     ],
   },
 };
