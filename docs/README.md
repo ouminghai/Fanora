@@ -12,6 +12,8 @@
 | [MVP_ROADMAP.md](./MVP_ROADMAP.md) | 按依赖关系排列的实施阶段、交付物和退出条件 | 是，执行顺序基线 |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 当前代码可执行的本地启动、测试和配置说明 | 是，开发操作基线 |
 | [CONTRACT_DEPLOYMENT.md](./CONTRACT_DEPLOYMENT.md) | Monad 合约编译、发布、角色配置和前后端参数同步 | 是，合约发布操作指南 |
+| [week3/README.md](./week3/README.md) | Week 3 初步版本交付、运行方式、真实功能、Mock 范围和问题清单 | 是，团队演示入口 |
+| [week3/DEMO_GUIDE.md](./week3/DEMO_GUIDE.md) | 钱包、社区、会员证与 NFT 市场的演示脚本 | 是，演示操作指南 |
 | [DELIVERY_SUMMARY_2026-07-23.md](./DELIVERY_SUMMARY_2026-07-23.md) | 钱包登录、终身等级、会员证与粉丝 NFT 市场的当前交付证据 | 是，当前交付证据 |
 | [DELIVERY_SUMMARY_2026-07-21.md](./DELIVERY_SUMMARY_2026-07-21.md) | 社区、Fan Token、NFT、合约与 Testnet 发布完成摘要 | 否，历史快照 |
 | [WEEK2_DELIVERY_SUMMARY.md](./WEEK2_DELIVERY_SUMMARY.md) | 2026-07-17 阶段交付证据和当时的 Known Issues | 否，历史快照 |
