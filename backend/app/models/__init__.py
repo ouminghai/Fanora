@@ -25,6 +25,8 @@ from app.models.database import (
     NftMetadataVersion,
     OfficialMembershipPayment,
     TaskAuditLog,
+    TaskContentReview,
+    TaskNftReward,
     TaskParticipation,
     User,
     UserProfile,
@@ -63,5 +65,7 @@ __all__ = [
     "UserSession",
     "Wallet",
     "TaskAuditLog",
+    "TaskContentReview",
     "TaskParticipation",
+    "TaskNftReward",
 ]

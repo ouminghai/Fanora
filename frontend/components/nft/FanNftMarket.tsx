@@ -15,7 +15,7 @@ import ChainTransactionProgress, { type TransactionPhase } from "@/components/nf
 import UserAvatar from "@/components/profile/UserAvatar";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { api } from "@/lib/api/client";
-import type { FanNftCreateResponse, FanNftEngagement, FanNftListing, FanNftPurchaseResponse } from "@/lib/api/types";
+import type { FanNftAiDraft, FanNftCreateResponse, FanNftEngagement, FanNftListing, FanNftPurchaseResponse } from "@/lib/api/types";
 import { resetNftTilt, updateNftTilt } from "@/components/nft/nftMotion";
 
 type MarketMode = "market" | "collection" | "item" | "create";
@@ -263,6 +263,46 @@ function PublishModal({
   const [progressText, setProgressText] = useState("正在准备发布 NFT...");
   const [publishPhase, setPublishPhase] = useState<TransactionPhase>("idle");
   const [storyImageUrls, setStoryImageUrls] = useState<string[]>([]);
+  const [aiBrief, setAiBrief] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiAttributes, setAiAttributes] = useState<Array<{ trait_type: string; value: string }>>([]);
+
+  const generateAiDraft = async () => {
+    const story = aiBrief.trim() || stripMarkdown(draft.description);
+    const theme = draft.theme.trim();
+    if (story.length < 10 || theme.length < 2) {
+      setNotice("先填写主题，并用至少 10 个字描述希望保存的粉丝故事或画面。");
+      return;
+    }
+    setAiBusy(true);
+    setNotice("Agent 正在生成可编辑的 metadata 草稿与 NFT 图片…");
+    try {
+      const response = await api.post<FanNftAiDraft>("/nft/creations/ai-draft", {
+        theme,
+        story,
+        preferred_name: draft.name || null,
+        visual_style: "高级音乐纪念品、电影感舞台光影、方形收藏卡构图",
+        reference_notes: "保留粉丝个人故事的情绪，不使用品牌 Logo、水印或可读文字",
+        generate_image: true,
+      });
+      const result = response.data;
+      setDraft((current) => ({
+        ...current,
+        name: result.name,
+        description: result.description,
+        theme: result.theme,
+        image_data_url: result.image_data_url || current.image_data_url,
+      }));
+      setAiAttributes(result.suggested_attributes);
+      setNotice(result.image_data_url
+        ? "AI 草稿和图片已生成。请确认名称、描述、图片、定价和数量后再发布。"
+        : `metadata 草稿已生成；${result.image_error || "图片服务暂不可用，请上传自己的图片。"}`);
+    } catch (error) {
+      setNotice(errorText(error));
+    } finally {
+      setAiBusy(false);
+    }
+  };
 
   useEffect(() => {
     if (open) {
@@ -296,7 +336,7 @@ function PublishModal({
       const response = await api.post<FanNftCreateResponse>("/nft/creations", {
         ...draft,
         story_image_urls: storyImageUrls,
-        public_attributes: [{ trait_type: "Theme", value: draft.theme }],
+        public_attributes: aiAttributes.length ? aiAttributes : [{ trait_type: "Theme", value: draft.theme }],
       });
       setProgressText("链上铸造已确认，正在更新你的 NFT 页面。");
       setPublishPhase("complete");
@@ -306,6 +346,8 @@ function PublishModal({
       setNotice("NFT 已发布到 Pinata，并创建了链上限量资产。");
       setDraft((current) => ({ ...current, name: "", description: "", theme: "", image_data_url: "" }));
       setStoryImageUrls([]);
+      setAiAttributes([]);
+      setAiBrief("");
     } catch (error) {
       setPublishPhase("idle");
       setNotice(errorText(error));
@@ -378,6 +420,7 @@ function PublishModal({
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-[300px_1fr]">
+        <div className="grid content-start gap-3">
         <label className="flex aspect-square cursor-pointer flex-col items-center justify-center overflow-hidden rounded-lg border border-dashed border-jacarta-200 bg-jacarta-50 text-center text-sm text-jacarta-400 dark:border-white/10 dark:bg-white/[.04]">
           <span className="mb-3 text-xs font-semibold text-jacarta-500 dark:text-jacarta-200">NFT 图片</span>
           {draft.image_data_url ? (
@@ -397,6 +440,23 @@ function PublishModal({
             }}
           />
         </label>
+        <textarea
+          value={aiBrief}
+          onChange={(event) => setAiBrief(event.target.value)}
+          maxLength={1500}
+          className="min-h-24 rounded-lg border-jacarta-100 text-sm dark:border-white/10 dark:bg-jacarta-900 dark:text-white"
+          placeholder="描述希望 AI 保存的粉丝故事、舞台瞬间或视觉意象…"
+        />
+        <button
+          type="button"
+          onClick={() => void generateAiDraft()}
+          disabled={aiBusy || busy}
+          className="rounded-lg border border-accent/30 bg-accent/10 px-4 py-3 text-sm font-semibold text-accent transition-colors hover:bg-accent hover:text-white disabled:opacity-50"
+        >
+          {aiBusy ? "AI 生成中…" : "AI 生成草稿与图片"}
+        </button>
+        <p className="text-xs leading-5 text-jacarta-400">生成结果只会填入草稿，不会自动设置价格、供应量或上链发布。</p>
+        </div>
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="grid gap-2 text-sm font-semibold text-jacarta-700 dark:text-white">
             NFT 名称

@@ -10,6 +10,7 @@ from app.api.routes.health import router as health_router
 from app.api.routes.membership import router as membership_router
 from app.api.routes.membership_payment import router as membership_payment_router
 from app.api.routes.nft import router as nft_router
+from app.api.routes.profile import router as profile_router
 from app.api.routes.roles import router as roles_router
 from app.api.routes.tasks import check_in_router, task_router
 
@@ -18,6 +19,7 @@ api_router.include_router(health_router, tags=["system"])
 api_router.include_router(agent_router, tags=["agent"])
 api_router.include_router(auth_router, tags=["auth"])
 api_router.include_router(user_router, tags=["users"])
+api_router.include_router(profile_router, tags=["profile"])
 api_router.include_router(communities_router, tags=["communities"])
 api_router.include_router(community_router, tags=["community"])
 api_router.include_router(task_router, tags=["tasks"])

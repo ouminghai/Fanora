@@ -223,12 +223,22 @@ async def test_membership_levels_pin_their_own_badge_images(monkeypatch) -> None
     monkeypatch.setattr(pinata_adapter, "pin_image", pin_image)
     service = NftService()
     newborn = MembershipLevel(
-        code="newborn", name="新生儿", description="新会员", rank=1,
-        min_token_balance=0, max_token_balance=99, badge_image_url="/img/badges/new.png",
+        code="newborn",
+        name="新生儿",
+        description="新会员",
+        rank=1,
+        min_token_balance=0,
+        max_token_balance=99,
+        badge_image_url="/img/badges/new.png",
     )
     mild = MembershipLevel(
-        code="mild-neuro", name="轻度神经", description="活跃会员", rank=2,
-        min_token_balance=100, max_token_balance=499, badge_image_url="/img/badges/mild.png",
+        code="mild-neuro",
+        name="轻度神经",
+        description="活跃会员",
+        rank=2,
+        min_token_balance=100,
+        max_token_balance=499,
+        badge_image_url="/img/badges/mild.png",
     )
 
     newborn_cid = await service._pin_membership_level_image(newborn)

@@ -41,7 +41,9 @@ async def test_delete_user_cleans_current_foreign_key_dependants(client):
                 Wallet(user_id=user.id, address=wallet_address, wallet_type="embedded", is_primary=True),
                 UserProfile(user_id=user.id),
                 UserRole(user_id=user.id, role="fan"),
-                UserSession(user_id=user.id, token_hash=user.id.replace("-", "").ljust(64, "0"), expires_at=user.created_at),
+                UserSession(
+                    user_id=user.id, token_hash=user.id.replace("-", "").ljust(64, "0"), expires_at=user.created_at
+                ),
                 LoginChallenge(wallet_address=wallet_address, message="test", expires_at=user.created_at),
                 OfficialMembershipPayment(
                     user_id=user.id,

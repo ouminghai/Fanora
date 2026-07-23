@@ -12,7 +12,8 @@ from app.api.routes.community import get_official_community, require_creator
 from app.core.database import get_database_session
 from app.core.security import get_current_identity, get_optional_identity, require_official_member
 from app.models.base import utc_now
-from app.models.community import DailyCheckIn, FanTask, TaskAuditLog, TaskParticipation
+from app.models.community import DailyCheckIn, FanTask, TaskAuditLog, TaskContentReview, TaskParticipation
+from app.models.nft import ChainOperation, CollectibleOwnership, CollectibleTokenType, TaskNftReward
 from app.models.user import CommunityMember, UserProfile
 from app.schemas.community import (
     CheckInResponse,
@@ -26,6 +27,7 @@ from app.schemas.community import (
 from app.services.auth import as_utc
 from app.services.fan_tokens import fan_token_service
 from app.services.identity import AuthenticatedIdentity
+from app.services.nft import nft_service
 from app.services.task_completion import TaskCompletionEvent, complete_claimed_tasks
 
 task_router = APIRouter(prefix="/tasks")
@@ -98,6 +100,41 @@ async def to_task_response(
     elif task.participation_limit is not None and participant_count >= task.participation_limit:
         eligible = False
         reason = "任务名额已满"
+    review = None
+    nft_reward = None
+    nft_operation = None
+    nft_token_type = None
+    if participation is not None:
+        review = (
+            (
+                await session.execute(
+                    select(TaskContentReview)
+                    .where(TaskContentReview.participation_id == participation.id)
+                    .order_by(col(TaskContentReview.created_at).desc())
+                    .limit(1)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        nft_reward = (
+            (
+                await session.execute(
+                    select(TaskNftReward)
+                    .where(TaskNftReward.participation_id == participation.id)
+                    .order_by(col(TaskNftReward.reward_version).desc())
+                    .limit(1)
+                )
+            )
+            .scalars()
+            .first()
+        )
+        if nft_reward and nft_reward.token_type_id:
+            nft_token_type = await session.get(CollectibleTokenType, nft_reward.token_type_id)
+        if nft_reward and nft_reward.ownership_id:
+            ownership = await session.get(CollectibleOwnership, nft_reward.ownership_id)
+            if ownership and ownership.chain_operation_id:
+                nft_operation = await session.get(ChainOperation, ownership.chain_operation_id)
     return TaskResponse(
         id=task.id,
         title=task.title,
@@ -114,6 +151,16 @@ async def to_task_response(
         participation_limit=task.participation_limit,
         participant_count=participant_count,
         participation_status=participation.status if participation else None,
+        review_decision=review.decision if review else None,
+        review_quality_score=review.quality_score if review else None,
+        review_reasons=review.reasons if review else [],
+        nft_reward_status=nft_reward.status if nft_reward else None,
+        nft_transaction_hash=nft_operation.transaction_hash if nft_operation else None,
+        nft_explorer_url=(
+            f"https://testnet.monadvision.com/nft/{nft_token_type.contract_address}/{nft_token_type.token_id}?tab=Overview"
+            if nft_token_type
+            else None
+        ),
         eligible=eligible,
         unavailable_reason=reason,
         created_at=task.created_at,
@@ -289,17 +336,26 @@ async def complete_page_task(
             "body": payload.interaction_note,
             "image_urls": payload.image_urls,
         }
-        await complete_claimed_tasks(
+        completed = await complete_claimed_tasks(
             session,
             user_id=identity.user_id,
             event=TaskCompletionEvent(
                 task_type="page_action",
                 task_id=task.id,
                 source_id=task.id,
+                content_text=payload.interaction_note,
                 detail=f"Event-page memory: {payload.interaction_note}",
             ),
         )
-        await session.commit()
+        if completed:
+            await nft_service.mint_task_reward(
+                session,
+                task=task,
+                participation=participation,
+                user_id=identity.user_id,
+            )
+        else:
+            await session.commit()
     return await to_task_response(
         session,
         task,

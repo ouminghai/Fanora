@@ -20,4 +20,4 @@ def test_analyze_fan_profile_endpoint(client: TestClient) -> None:
     assert payload["badge_eligible"] is True
     assert payload["badge_draft"]["name"]
     assert payload["risk_level"] == "low"
-    assert payload["rule_version"] == "fan-profile-v2"
+    assert payload["rule_version"] == "fan-profile-v3"

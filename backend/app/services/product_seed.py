@@ -140,22 +140,35 @@ TASK_SEEDS = [
     {
         "id": FEAR_TASK_ID,
         "title": "FEAR and DREAMS 纪念票任务",
-        "description": "进入演唱会纪念页完成打卡，领取 FAN；页面已为后续 NFT 纪念票铸造预留入口。",
+        "description": "写下真实现场记忆，通过 AI Agent 内容审核后领取 FAN，并获得一张链上 FEAR and DREAMS 纪念票。",
         "task_type": "page_action",
         "status": "published",
         "reward_fan_tokens": 500,
         "target_post_id": None,
         "validation_rule": {
+            "minimum_content_length": 10,
+            "nft_reward": {
+                "enabled": True,
+                "version": 1,
+                "category": "CONCERT_CARD",
+                "name": "FEAR and DREAMS 纪念票",
+                "description": "由 Fanora 为完成 FEAR and DREAMS 粉丝记忆任务的成员发行的限量 ERC-1155 演唱会纪念票。",
+                "image_path": "/img/fanora/eason-concert.webp",
+                "max_supply": 10000,
+                "per_wallet_limit": 1,
+                "mint_window_days": 3650,
+                "transferable": False,
+            },
             "presentation": {
                 "catalog_key": "fear-and-dreams",
-                "image_url": "/img/fanora/activity-concert.jpg",
+                "image_url": "/img/fanora/eason-concert.webp",
                 "category": "event",
                 "interaction_prompt": "留下你的现场记忆，激活纪念票收藏资格",
                 "action_url": "/community/tasks/fear-and-dreams",
                 "action_label": "进入纪念票页面",
                 "badge_label": "特别任务",
                 "special": True,
-            }
+            },
         },
     },
     {

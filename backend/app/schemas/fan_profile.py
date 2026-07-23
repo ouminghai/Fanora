@@ -55,6 +55,14 @@ class FanProfileNarrative(BaseModel):
     image_prompt: str | None = Field(default=None, max_length=500)
 
 
+class TaskRecommendation(BaseModel):
+    task_id: str
+    title: str
+    reason: str = Field(min_length=1, max_length=300)
+    reward_fan_tokens: int = Field(ge=0)
+    action_url: str
+
+
 class FanProfileAnalysis(BaseModel):
     run_id: str
     wallet_address: str
@@ -70,3 +78,4 @@ class FanProfileAnalysis(BaseModel):
     model_id: str
     badge_eligible: bool
     badge_draft: BadgeDraft | None = None
+    recommended_tasks: list[TaskRecommendation] = Field(default_factory=list, max_length=8)

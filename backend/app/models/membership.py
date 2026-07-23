@@ -68,9 +68,7 @@ class FanTokenRule(SQLModel, table=True):
 
 class FanTokenConfig(SQLModel, table=True):
     __tablename__ = "fan_token_config"  # pyright: ignore[reportAssignmentType]
-    __table_args__ = (
-        CheckConstraint("decimals >= 0 AND decimals <= 18", name="ck_fan_token_config_decimals"),
-    )
+    __table_args__ = (CheckConstraint("decimals >= 0 AND decimals <= 18", name="ck_fan_token_config_decimals"),)
 
     id: str = Field(default="default", primary_key=True, max_length=30)
     name: str = Field(default="Fan Token", max_length=50)

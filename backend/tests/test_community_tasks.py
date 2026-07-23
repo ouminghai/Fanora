@@ -5,7 +5,8 @@ from sqlmodel import col, select
 
 from app.core.database import database_service
 from app.models.base import utc_now
-from app.models.community import CommunityPost, FanTokenLedger, TaskParticipation
+from app.models.community import CommunityPost, FanTokenLedger, TaskContentReview, TaskParticipation
+from app.models.nft import TaskNftReward
 from app.models.user import User, UserProfile, UserSession, Wallet
 from app.services.auth import hash_session_token
 from app.services.product_seed import (
@@ -124,7 +125,9 @@ async def test_join_check_in_reply_task_and_ledger_are_idempotent(client):
                         FanTokenLedger.user_id == user_id,
                     )
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         assert participation.status == "rewarded"
         assert len(task_rewards) == 1
@@ -206,7 +209,9 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
                         FanTokenLedger.source_type == "rule:post-publish",
                     )
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         assert len(post_publish_entries) == 1
         assert post_publish_entries[0].delta == 5
@@ -228,7 +233,9 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
         headers=headers,
         json={
             "interaction_note": "最后一首歌结束时，全场一起亮起灯光的瞬间最难忘。",
-            "image_urls": ["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII="],
+            "image_urls": [
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII="
+            ],
         },
     )
     assert fear_complete.status_code == 200
@@ -246,6 +253,16 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
         ).scalar_one()
         assert fear_participation.submission["body"].startswith("最后一首歌")
         assert len(fear_participation.submission["image_urls"]) == 1
+        fear_review = (
+            await session.execute(
+                select(TaskContentReview).where(TaskContentReview.participation_id == fear_participation.id)
+            )
+        ).scalar_one()
+        assert fear_review.decision == "approved"
+        fear_nft_reward = (
+            await session.execute(select(TaskNftReward).where(TaskNftReward.participation_id == fear_participation.id))
+        ).scalar_one()
+        assert fear_nft_reward.status == "WAITING_CONFIGURATION"
 
     tasks = client.get("/api/v1/tasks", headers=headers).json()
     statuses = {task["id"]: task["participation_status"] for task in tasks}
@@ -262,11 +279,9 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
 
     async with database_service.session() as session:
         participations = list(
-            (
-                await session.execute(
-                    select(TaskParticipation).where(TaskParticipation.user_id == user_id)
-                )
-            ).scalars().all()
+            (await session.execute(select(TaskParticipation).where(TaskParticipation.user_id == user_id)))
+            .scalars()
+            .all()
         )
         assert {item.task_id for item in participations if item.status == "rewarded"}.issuperset(
             {DAILY_TASK_ID, FAN_STORY_TASK_ID, FEAR_TASK_ID}
@@ -371,7 +386,9 @@ async def test_post_reactions_and_two_level_comments(client):
                         col(FanTokenLedger.source_type).in_(["rule:post-like", "rule:post-reply"]),
                     )
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         post_like_entries = [entry for entry in interaction_entries if entry.source_type == "rule:post-like"]
         post_reply_entries = [entry for entry in interaction_entries if entry.source_type == "rule:post-reply"]
@@ -391,7 +408,9 @@ async def test_post_reactions_and_two_level_comments(client):
                         FanTokenLedger.source_id == WELCOME_POST_ID,
                     )
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
         assert len(bookmark_entries) == 1
         assert bookmark_entries[0].delta == 1
@@ -411,13 +430,17 @@ async def test_post_comments_are_paginated_by_root_comment(client):
         )
         assert response.status_code == 201
 
-    first_page = client.get(f"/api/v1/community/posts/{WELCOME_POST_ID}?reply_limit=10&reply_offset=0", headers=headers)
+    first_page = client.get(
+        f"/api/v1/community/posts/{WELCOME_POST_ID}?reply_limit=10&reply_offset=0", headers=headers
+    )
     assert first_page.status_code == 200
     assert len(first_page.json()["replies"]) == 10
     assert first_page.json()["has_more_replies"] is True
     assert first_page.json()["next_replies_offset"] == 10
 
-    second_page = client.get(f"/api/v1/community/posts/{WELCOME_POST_ID}?reply_limit=10&reply_offset=10", headers=headers)
+    second_page = client.get(
+        f"/api/v1/community/posts/{WELCOME_POST_ID}?reply_limit=10&reply_offset=10", headers=headers
+    )
     assert second_page.status_code == 200
     assert 1 <= len(second_page.json()["replies"]) <= 10
     assert second_page.json()["has_more_replies"] is False
@@ -432,6 +455,4 @@ async def test_community_posts_support_stable_offset_pagination(client):
     assert second_page.status_code == 200
     assert len(first_page.json()) == 2
     assert len(second_page.json()) == 2
-    assert {post["id"] for post in first_page.json()}.isdisjoint(
-        {post["id"] for post in second_page.json()}
-    )
+    assert {post["id"] for post in first_page.json()}.isdisjoint({post["id"] for post in second_page.json()})

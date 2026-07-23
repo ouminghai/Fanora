@@ -9,6 +9,7 @@ from app.models.community import (
     FanTask,
     FanTokenLedger,
     TaskAuditLog,
+    TaskContentReview,
     TaskParticipation,
 )
 from app.models.fan_profile import FanProfileRun
@@ -20,6 +21,7 @@ from app.models.nft import (
     MembershipIdentityNft,
     NftApplication,
     NftMetadataVersion,
+    TaskNftReward,
 )
 from app.models.user import (
     AuthIdentity,
@@ -65,5 +67,7 @@ __all__ = [
     "UserSession",
     "Wallet",
     "TaskAuditLog",
+    "TaskContentReview",
     "TaskParticipation",
+    "TaskNftReward",
 ]

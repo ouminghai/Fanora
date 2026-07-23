@@ -179,6 +179,12 @@ export type FanTask = {
   participation_limit: number | null;
   participant_count: number;
   participation_status: "claimed" | "rewarded" | null;
+  review_decision: "approved" | "rejected" | "manual_review" | null;
+  review_quality_score: number | null;
+  review_reasons: string[];
+  nft_reward_status: "PENDING" | "WAITING_CONFIGURATION" | "CREATING_TOKEN_TYPE" | "MINTING" | "CONFIRMED" | "RETRYABLE" | null;
+  nft_transaction_hash: string | null;
+  nft_explorer_url: string | null;
   eligible: boolean;
   unavailable_reason: string | null;
   created_at: string;
@@ -337,6 +343,39 @@ export type FanNftEngagement = {
 export type FanNftCreateResponse = {
   listing: FanNftListing;
   fan_token_balance: number;
+};
+
+export type FanNftAiDraft = {
+  name: string;
+  description: string;
+  theme: string;
+  image_prompt: string;
+  suggested_attributes: Array<{ trait_type: string; value: string }>;
+  image_data_url: string | null;
+  metadata_source: "rules" | "llm";
+  image_source: "openai" | "not_requested" | "unavailable";
+  degraded: boolean;
+  image_error: string | null;
+  prompt_version: string;
+};
+
+export type FanProfileAnalysis = {
+  run_id: string;
+  wallet_address: string;
+  scores: { activity: number; loyalty: number; influence: number; contribution: number; total: number };
+  fan_type: string;
+  labels: string[];
+  risk_level: "low" | "medium" | "high";
+  summary: string;
+  analysis_source: "rules" | "llm";
+  degraded: boolean;
+  recommended_tasks: Array<{
+    task_id: string;
+    title: string;
+    reason: string;
+    reward_fan_tokens: number;
+    action_url: string;
+  }>;
 };
 
 export type FanNftPurchaseResponse = {

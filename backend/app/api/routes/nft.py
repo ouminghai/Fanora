@@ -6,6 +6,7 @@ from sqlmodel import col, func, select
 
 from app.adapters.monad import ChainConfigurationError, monad_contract_adapter
 from app.adapters.pinata import pinata_adapter
+from app.agents.nft_creation import nft_creation_agent
 from app.core.config import settings
 from app.core.database import get_database_session
 from app.core.logging import logger
@@ -37,6 +38,7 @@ from app.schemas.nft import (
     NftApplicationResponse,
     NftCreatorResponse,
 )
+from app.schemas.nft_agent import NftDraftRequest, NftDraftResponse
 from app.services.identity import AuthenticatedIdentity
 from app.services.nft import NftValidationError, nft_service
 
@@ -111,8 +113,11 @@ async def _fan_nft_engagement(
                 )
             )
         ).scalar_one_or_none()
-    return int(like_count), int(favorite_count), bool(reaction and reaction.liked), bool(
-        reaction and reaction.favorited
+    return (
+        int(like_count),
+        int(favorite_count),
+        bool(reaction and reaction.liked),
+        bool(reaction and reaction.favorited),
     )
 
 
@@ -218,18 +223,26 @@ async def my_collection(
     if identity_nft is not None:
         user = await session.get(User, identity.user_id)
         profile = await session.get(UserProfile, identity.user_id)
-        operation = await session.get(ChainOperation, identity_nft.chain_operation_id) if identity_nft.chain_operation_id else None
+        operation = (
+            await session.get(ChainOperation, identity_nft.chain_operation_id)
+            if identity_nft.chain_operation_id
+            else None
+        )
         mint_operation = (
-            await session.execute(
-                select(ChainOperation)
-                .where(
-                    ChainOperation.user_id == identity.user_id,
-                    ChainOperation.operation_type == "IDENTITY_MINT",
-                    ChainOperation.contract_address == identity_nft.contract_address,
+            (
+                await session.execute(
+                    select(ChainOperation)
+                    .where(
+                        ChainOperation.user_id == identity.user_id,
+                        ChainOperation.operation_type == "IDENTITY_MINT",
+                        ChainOperation.contract_address == identity_nft.contract_address,
+                    )
+                    .order_by(col(ChainOperation.created_at).desc())
                 )
-                .order_by(col(ChainOperation.created_at).desc())
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         metadata = (
             await session.execute(
                 select(NftMetadataVersion).where(
@@ -292,15 +305,21 @@ async def my_collection(
     ).all()
     collectibles: list[CollectibleResponse] = []
     for ownership, token_type in rows:
-        operation = await session.get(ChainOperation, ownership.chain_operation_id) if ownership.chain_operation_id else None
+        operation = (
+            await session.get(ChainOperation, ownership.chain_operation_id) if ownership.chain_operation_id else None
+        )
         metadata = (
-            await session.execute(
-                select(NftMetadataVersion)
-                .where(NftMetadataVersion.metadata_cid == token_type.metadata_cid)
-                .order_by(col(NftMetadataVersion.created_at).desc())
-                .limit(1)
+            (
+                await session.execute(
+                    select(NftMetadataVersion)
+                    .where(NftMetadataVersion.metadata_cid == token_type.metadata_cid)
+                    .order_by(col(NftMetadataVersion.created_at).desc())
+                    .limit(1)
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         collectibles.append(
             CollectibleResponse(
                 token_type_id=token_type.id,
@@ -323,10 +342,22 @@ async def my_collection(
             )
         )
     applications = list(
-        (await session.execute(select(NftApplication).where(NftApplication.user_id == identity.user_id).order_by(col(NftApplication.created_at).desc()))).scalars().all()
+        (
+            await session.execute(
+                select(NftApplication)
+                .where(NftApplication.user_id == identity.user_id)
+                .order_by(col(NftApplication.created_at).desc())
+            )
+        )
+        .scalars()
+        .all()
     )
-    sync_status = identity_nft.status if identity_nft else (
-        "READY" if monad_contract_adapter.identity_configured and pinata_adapter.configured else "NOT_CONFIGURED"
+    sync_status = (
+        identity_nft.status
+        if identity_nft
+        else (
+            "READY" if monad_contract_adapter.identity_configured and pinata_adapter.configured else "NOT_CONFIGURED"
+        )
     )
     return MyCollectionResponse(
         chain_id=settings.monad_chain_id,
@@ -529,6 +560,16 @@ async def publish_fan_nft(
     )
 
 
+@router.post("/creations/ai-draft", response_model=NftDraftResponse)
+async def create_fan_nft_ai_draft(
+    payload: NftDraftRequest,
+    _: AuthenticatedIdentity = Depends(require_official_member),
+) -> NftDraftResponse:
+    """Generate a creator-editable draft; this endpoint never publishes or mints."""
+
+    return await nft_creation_agent.create_draft(payload)
+
+
 @router.post("/creations/{creation_id}/buy", response_model=FanNftPurchaseResponse)
 async def buy_fan_nft(
     creation_id: str,
@@ -543,24 +584,32 @@ async def buy_fan_nft(
     except (NftValidationError, ChainConfigurationError) as error:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(error)) from error
     except Exception as error:
-        logger.exception("fan_nft_purchase_failed", user_id=identity.user_id, creation_id=creation_id, error=str(error))
+        logger.exception(
+            "fan_nft_purchase_failed", user_id=identity.user_id, creation_id=creation_id, error=str(error)
+        )
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
             detail=f"NFT purchase minting failed: {error}",
         ) from error
     profile = await session.get(UserProfile, identity.user_id)
     token_type = await session.get(CollectibleTokenType, ownership.token_type_id)
-    operation = await session.get(ChainOperation, ownership.chain_operation_id) if ownership.chain_operation_id else None
+    operation = (
+        await session.get(ChainOperation, ownership.chain_operation_id) if ownership.chain_operation_id else None
+    )
     if token_type is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="NFT token type is missing")
     metadata = (
-        await session.execute(
-            select(NftMetadataVersion)
-            .where(NftMetadataVersion.metadata_cid == token_type.metadata_cid)
-            .order_by(col(NftMetadataVersion.created_at).desc())
-            .limit(1)
+        (
+            await session.execute(
+                select(NftMetadataVersion)
+                .where(NftMetadataVersion.metadata_cid == token_type.metadata_cid)
+                .order_by(col(NftMetadataVersion.created_at).desc())
+                .limit(1)
+            )
         )
-    ).scalars().first()
+        .scalars()
+        .first()
+    )
     collectible = CollectibleResponse(
         token_type_id=token_type.id,
         fan_nft_creation_id=token_type.source_id if token_type.source_type == "FAN_NFT" else None,

@@ -67,8 +67,19 @@ export default function FearAndDreamsTicket() {
       const response = await api.post<FanTask>(`/tasks/${task.id}/complete`, { interaction_note: memory.trim(), image_urls: imageUrls });
       setTask(response.data);
       await refreshUser();
-      setImageUrls([]);
-      setNotice("纪念页打卡完成，500 FAN 已发放。NFT 纪念票将在后续版本开放。 ");
+      if (response.data.participation_status === "rewarded") {
+        setImageUrls([]);
+        if (response.data.nft_reward_status === "CONFIRMED") {
+          setNotice("AI 审核已通过，500 FAN 已发放，FEAR and DREAMS 纪念票 NFT 已完成链上铸造。");
+        } else if (response.data.nft_reward_status === "WAITING_CONFIGURATION") {
+          setNotice("AI 审核已通过，500 FAN 已发放；纪念票铸造已登记，等待部署环境完成 Pinata 与 Monad 配置。");
+        } else {
+          setNotice("AI 审核已通过，500 FAN 已发放，纪念票正在进入链上铸造流程。");
+        }
+      } else {
+        const reasons = response.data.review_reasons.join("；") || "内容需要进一步确认";
+        setNotice(`本次尚未完成任务：${reasons}。可以修改后重新提交。`);
+      }
     } catch (error) { setNotice(message(error)); } finally { setBusy(null); }
   };
 
@@ -84,17 +95,18 @@ export default function FearAndDreamsTicket() {
             <div>
               <span className="inline-flex rounded-full border border-accent/30 bg-accent/10 px-4 py-2 text-xs font-bold uppercase tracking-[.24em] text-accent-lighter">Special mission · Ticket preview</span>
               <h1 className="mt-7 max-w-4xl font-display text-5xl font-semibold leading-[.95] md:text-7xl">FEAR<br /><span className="text-accent-light">and DREAMS</span></h1>
-              <p className="mt-7 max-w-2xl text-base leading-8 text-white/60">把一次现场相遇保存成长期粉丝记忆。当前阶段完成纪念页打卡可领取 FAN，页面结构已为后续 NFT 纪念票铸造、钱包签名与领取状态预留扩展位置。</p>
+              <p className="mt-7 max-w-2xl text-base leading-8 text-white/60">把一次现场相遇保存成长期粉丝记忆。提交内容由 AI Agent 检查相关性与灌水，通过后发放 FAN，并使用演唱会纪念图铸造一张限量 ERC-1155 纪念票。</p>
               <div className="mt-8 flex flex-wrap gap-3 text-sm">
                 <span className="rounded-full bg-white/5 px-4 py-2 text-white/65">演唱会纪念</span>
                 <span className="rounded-full bg-white/5 px-4 py-2 text-white/65">限时活动</span>
-                <span className="rounded-full bg-white/5 px-4 py-2 text-white/65">未来 NFT</span>
+                <span className="rounded-full bg-white/5 px-4 py-2 text-white/65">AI 内容审核</span>
+                <span className="rounded-full bg-white/5 px-4 py-2 text-white/65">ERC-1155 纪念票</span>
               </div>
             </div>
 
             <div className="web3-interactive-card relative mx-auto w-full max-w-md overflow-hidden rounded-[2rem] border border-white/20 bg-[#151941] shadow-[0_30px_80px_rgba(0,0,0,.45)]">
               <div className="relative h-64 overflow-hidden">
-                <Image src={task?.presentation.image_url || "/img/fanora/activity-concert.jpg"} alt="FEAR and DREAMS 纪念票预览" fill priority sizes="(max-width: 1023px) 100vw, 430px" className="object-cover" />
+                <Image src={task?.presentation.image_url || "/img/fanora/eason-concert.webp"} alt="FEAR and DREAMS 纪念票预览" fill priority sizes="(max-width: 1023px) 100vw, 430px" className="object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#151941] via-transparent to-black/20" />
                 <span className="absolute right-5 top-5 rounded-full border border-white/20 bg-black/35 px-3 py-1 text-[10px] font-bold tracking-[.2em] backdrop-blur">MEMORIAL PASS</span>
               </div>
@@ -119,7 +131,7 @@ export default function FearAndDreamsTicket() {
           <div className="rounded-[2rem] border border-white/10 bg-[#111538] p-6 md:p-8">
             <p className="text-xs font-bold uppercase tracking-[.24em] text-accent-light">Your live memory</p>
             <h2 className="mt-4 font-display text-3xl font-semibold">你最想留住哪一个现场瞬间？</h2>
-            <p className="mt-4 text-sm leading-7 text-white/50">用 Markdown 写下现场记忆，也可以上传多张图片。内容会作为本次任务提交记录保存，未来可扩展为纪念票元数据或公开社区故事。</p>
+            <p className="mt-4 text-sm leading-7 text-white/50">用 Markdown 写下现场记忆，也可以上传多张图片。Agent 会判断内容是否回应演唱会主题、是否有真实信息量以及是否存在明显灌水。</p>
             <MarkdownEditor value={memory} onChange={setMemory} maxLength={300} imageUrls={imageUrls} onImageUrlsChange={setImageUrls} onImageError={setNotice} />
           </div>
 
@@ -128,7 +140,7 @@ export default function FearAndDreamsTicket() {
             <ol className="mt-6 space-y-5 text-sm text-white/55">
               <li className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">1</span><span>加入 Fanora 链上社区并领取任务</span></li>
               <li className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">2</span><span>写下至少 10 个字的现场记忆</span></li>
-              <li className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">3</span><span>完成打卡并领取 500 FAN</span></li>
+              <li className="flex gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent text-xs font-bold text-white">3</span><span>通过 AI 审核，领取 500 FAN 与纪念票 NFT</span></li>
             </ol>
             <div className="mt-7">
               {!user ? <Link href="/login" className="web3-action-button block rounded-full py-3.5 text-center font-semibold">登录后领取</Link>
@@ -136,10 +148,12 @@ export default function FearAndDreamsTicket() {
                   : !joined ? <button onClick={() => void join()} disabled={busy === "join"} className="web3-action-button w-full rounded-full py-3.5 font-semibold">{busy === "join" ? "加入中…" : "先加入链上社区"}</button>
                     : !task ? <div className="rounded-full bg-white/5 py-3.5 text-center text-sm text-white/35">任务加载中…</div>
                       : !task.participation_status ? <button onClick={() => void claim()} disabled={busy === "claim" || !task.eligible} className="web3-action-button w-full rounded-full py-3.5 font-semibold disabled:opacity-45">{busy === "claim" ? "领取中…" : "领取纪念票任务"}</button>
-                        : task.participation_status === "claimed" ? <button onClick={() => void complete()} disabled={busy === "complete" || memory.trim().length < 10} className="web3-action-button w-full rounded-full py-3.5 font-semibold disabled:opacity-45">{busy === "complete" ? "记录中…" : "完成打卡并领取 FAN"}</button>
-                          : <div className="rounded-full border border-green/20 bg-green/10 py-3.5 text-center text-sm font-semibold text-green">✓ 已完成纪念页打卡</div>}
+                        : task.participation_status === "claimed" ? <button onClick={() => void complete()} disabled={busy === "complete" || memory.trim().length < 10} className="web3-action-button w-full rounded-full py-3.5 font-semibold disabled:opacity-45">{busy === "complete" ? "AI 审核中…" : "提交审核并领取纪念票"}</button>
+                          : task.nft_reward_status === "CONFIRMED" && task.nft_explorer_url ? <a href={task.nft_explorer_url} target="_blank" rel="noreferrer" className="block rounded-full border border-green/20 bg-green/10 py-3.5 text-center text-sm font-semibold text-green">✓ 查看链上纪念票 ↗</a>
+                            : <div className="rounded-full border border-green/20 bg-green/10 py-3.5 text-center text-sm font-semibold text-green">✓ 任务完成 · NFT {task.nft_reward_status || "处理中"}</div>}
             </div>
-            <p className="mt-5 text-xs leading-5 text-white/30">本阶段只发放站内 FAN，不执行链上铸造。后续可在同一页面接入 NFT 合约、钱包签名和纪念票资产展示。</p>
+            {task?.review_decision && <p className="mt-5 text-xs leading-5 text-white/45">最近审核：{task.review_decision} · {task.review_quality_score ?? 0}/100{task.review_reasons.length ? ` · ${task.review_reasons.join("；")}` : ""}</p>}
+            <p className="mt-3 text-xs leading-5 text-white/30">Agent 只输出结构化审核结论；FAN 发放和 ERC-1155 铸造由后端业务服务执行。未配置链上环境时会明确保留待铸造状态，不伪造交易。</p>
           </aside>
         </section>
       </div>

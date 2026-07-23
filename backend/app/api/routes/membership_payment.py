@@ -155,7 +155,9 @@ async def withdraw_membership_treasury(
 ) -> MembershipTreasuryResponse:
     await require_admin(session, identity.user_id)
     if not monad_contract_adapter.membership_gateway_configured:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Treasury manager is not configured")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Treasury manager is not configured"
+        )
     try:
         receipt = await monad_contract_adapter.withdraw_membership_fees(payload.amount_wei)
         balance = await monad_contract_adapter.membership_gateway_balance()
@@ -180,7 +182,9 @@ async def update_membership_fee(
 ) -> MembershipFeeResponse:
     await require_admin(session, identity.user_id)
     if not monad_contract_adapter.membership_gateway_configured:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Treasury manager is not configured")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Treasury manager is not configured"
+        )
     try:
         receipt = await monad_contract_adapter.set_membership_fee(payload.fee_wei)
         fee_wei = await monad_contract_adapter.membership_fee()

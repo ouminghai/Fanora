@@ -57,17 +57,11 @@ class MonadContractAdapter:
 
     @property
     def identity_uri_manager_configured(self) -> bool:
-        return bool(
-            settings.membership_identity_contract_address
-            and settings.identity_uri_manager_private_key
-        )
+        return bool(settings.membership_identity_contract_address and settings.identity_uri_manager_private_key)
 
     @property
     def membership_gateway_configured(self) -> bool:
-        return bool(
-            settings.membership_payment_contract_address
-            and settings.membership_treasury_manager_private_key
-        )
+        return bool(settings.membership_payment_contract_address and settings.membership_treasury_manager_private_key)
 
     @property
     def collectibles_configured(self) -> bool:
@@ -236,15 +230,19 @@ class MonadContractAdapter:
                 contract_address=settings.collectibles_contract_address,
                 abi=self.collectibles_abi,
                 build_call=lambda contract: contract.functions.createTokenType(
-                    payload["token_id"], payload["category"], payload["metadata_uri"], payload["max_supply"],
-                    payload["per_wallet_limit"], payload["mint_start"], payload["mint_end"], payload["transferable"],
+                    payload["token_id"],
+                    payload["category"],
+                    payload["metadata_uri"],
+                    payload["max_supply"],
+                    payload["per_wallet_limit"],
+                    payload["mint_start"],
+                    payload["mint_end"],
+                    payload["transferable"],
                 ),
                 event_name="TokenTypeCreated",
             )
 
-    async def update_collectible_metadata(
-        self, token_id: int, metadata_uri: str
-    ) -> ConfirmedContractTransaction:
+    async def update_collectible_metadata(self, token_id: int, metadata_uri: str) -> ConfirmedContractTransaction:
         async with self._write_lock:
             return await asyncio.to_thread(
                 self._send,

@@ -202,6 +202,12 @@ class TaskResponse(BaseModel):
     participation_limit: int | None
     participant_count: int
     participation_status: str | None
+    review_decision: str | None = None
+    review_quality_score: int | None = None
+    review_reasons: list[str] = Field(default_factory=list)
+    nft_reward_status: str | None = None
+    nft_transaction_hash: str | None = None
+    nft_explorer_url: str | None = None
     eligible: bool
     unavailable_reason: str | None
     created_at: datetime

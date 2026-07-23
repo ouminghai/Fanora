@@ -134,6 +134,26 @@ class CollectibleOwnership(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+class TaskNftReward(SQLModel, table=True):
+    __tablename__ = "task_nft_rewards"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (
+        UniqueConstraint("task_id", "user_id", "reward_version", name="uq_task_nft_reward_user_version"),
+        UniqueConstraint("participation_id", "reward_version", name="uq_task_nft_reward_participation_version"),
+    )
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    task_id: str = Field(foreign_key="fan_tasks.id", index=True)
+    participation_id: str = Field(foreign_key="task_participations.id", index=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    reward_version: int = Field(default=1, ge=1)
+    token_type_id: str | None = Field(default=None, foreign_key="collectible_token_types.id", index=True)
+    ownership_id: str | None = Field(default=None, foreign_key="collectible_ownerships.id", index=True)
+    status: str = Field(default="PENDING", max_length=30, index=True)
+    failure_reason: str | None = Field(default=None, max_length=500)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
 class NftCreationReaction(SQLModel, table=True):
     __tablename__ = "nft_creation_reactions"  # pyright: ignore[reportAssignmentType]
     __table_args__ = (UniqueConstraint("application_id", "user_id", name="uq_nft_creation_reaction_user"),)

@@ -1,12 +1,14 @@
-"""Deterministic completion for the supported fan-task interaction modes."""
+"""Quest completion orchestration with Agent review and deterministic rewards."""
 
 from dataclasses import dataclass
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
+from app.agents.content_review import content_review_agent
 from app.models.base import utc_now
-from app.models.community import FanTask, TaskAuditLog, TaskParticipation
+from app.models.community import FanTask, TaskAuditLog, TaskContentReview, TaskParticipation
+from app.schemas.content_review import ContentReviewRequest, ContentReviewResult
 from app.services.auth import as_utc
 from app.services.fan_tokens import fan_token_service
 
@@ -21,6 +23,7 @@ class TaskCompletionEvent:
     reply_id: str | None = None
     reply_length: int | None = None
     content_category: str | None = None
+    content_title: str | None = None
     content_text: str | None = None
     award_tokens: bool = True
 
@@ -37,10 +40,82 @@ def _matches(task: FanTask, event: TaskCompletionEvent) -> bool:
     allowed_categories = task.validation_rule.get("content_categories", [])
     if allowed_categories and event.content_category not in allowed_categories:
         return False
-    required_tag = (task.validation_rule.get("required_tag") or f"#{task.title}") if task.task_type == "content_publish" else None
+    required_tag = (
+        (task.validation_rule.get("required_tag") or f"#{task.title}") if task.task_type == "content_publish" else None
+    )
     if required_tag and (event.content_text is None or required_tag.casefold() not in event.content_text.casefold()):
         return False
     return True
+
+
+def _requires_agent_review(task: FanTask) -> bool:
+    return task.task_type in {"content_publish", "post_reply", "page_action"}
+
+
+async def _review_submission(
+    session: AsyncSession,
+    *,
+    task: FanTask,
+    participation: TaskParticipation,
+    user_id: str,
+    event: TaskCompletionEvent,
+) -> ContentReviewResult:
+    presentation = task.validation_rule.get("presentation", {})
+    interaction_prompt = presentation.get("interaction_prompt", "") if isinstance(presentation, dict) else ""
+    required_tag = (
+        task.validation_rule.get("required_tag") or f"#{task.title}" if task.task_type == "content_publish" else None
+    )
+    minimum_length = int(
+        task.validation_rule.get(
+            "minimum_reply_length" if task.task_type == "post_reply" else "minimum_content_length",
+            10,
+        )
+    )
+    review = await content_review_agent.review(
+        ContentReviewRequest(
+            task_id=task.id,
+            task_title=task.title,
+            task_description=task.description,
+            interaction_prompt=interaction_prompt,
+            content_type={
+                "content_publish": "post",
+                "post_reply": "reply",
+                "page_action": "page_action",
+            }[task.task_type],
+            source_id=event.source_id,
+            title=event.content_title or "",
+            body=event.content_text or "",
+            category=event.content_category,
+            required_tag=required_tag,
+            minimum_length=minimum_length,
+        )
+    )
+    session.add(
+        TaskContentReview(
+            task_id=task.id,
+            participation_id=participation.id,
+            user_id=user_id,
+            source_type=event.task_type,
+            source_id=event.source_id,
+            decision=review.decision,
+            quality_score=review.quality_score,
+            signals={
+                "tag_present": review.tag_present,
+                "relevant": review.relevant,
+                "spam": review.spam,
+                "meaningful": review.meaningful,
+                "policy_safe": review.policy_safe,
+                "ai_generated_likelihood": review.ai_generated_likelihood,
+            },
+            reasons=review.reasons,
+            review_source=review.source,
+            model_id=review.model_id,
+            rule_version=review.rule_version,
+            prompt_version=review.prompt_version,
+            degraded=review.degraded,
+        )
+    )
+    return review
 
 
 async def complete_claimed_tasks(
@@ -74,6 +149,27 @@ async def complete_claimed_tasks(
             continue
         if not _matches(task, event):
             continue
+        if _requires_agent_review(task):
+            review = await _review_submission(
+                session,
+                task=task,
+                participation=participation,
+                user_id=user_id,
+                event=event,
+            )
+            if review.decision != "approved":
+                session.add(
+                    TaskAuditLog(
+                        task_id=task.id,
+                        participation_id=participation.id,
+                        actor_user_id=user_id,
+                        event=f"agent_review_{review.decision}",
+                        from_status="claimed",
+                        to_status="claimed",
+                        detail="; ".join(review.reasons)[:500],
+                    )
+                )
+                continue
         participation.status = "rewarded"
         participation.reply_id = event.reply_id
         participation.submitted_at = now

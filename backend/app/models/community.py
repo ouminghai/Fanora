@@ -121,6 +121,27 @@ class TaskAuditLog(SQLModel, table=True):
     created_at: datetime = Field(default_factory=utc_now, index=True)
 
 
+class TaskContentReview(SQLModel, table=True):
+    __tablename__ = "task_content_reviews"  # pyright: ignore[reportAssignmentType]
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    task_id: str = Field(foreign_key="fan_tasks.id", index=True)
+    participation_id: str = Field(foreign_key="task_participations.id", index=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    source_type: str = Field(max_length=30, index=True)
+    source_id: str = Field(max_length=100, index=True)
+    decision: str = Field(max_length=20, index=True)
+    quality_score: int = Field(ge=0, le=100)
+    signals: dict[str, Any] = Field(default_factory=dict, sa_column=Column(JSON, nullable=False))
+    reasons: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    review_source: str = Field(max_length=20, index=True)
+    model_id: str = Field(default="rules", max_length=100)
+    rule_version: str = Field(max_length=50)
+    prompt_version: str = Field(max_length=50)
+    degraded: bool = Field(default=False, index=True)
+    created_at: datetime = Field(default_factory=utc_now, index=True)
+
+
 class DailyCheckIn(SQLModel, table=True):
     __tablename__ = "daily_check_ins"  # pyright: ignore[reportAssignmentType]
     __table_args__ = (UniqueConstraint("user_id", "check_in_date", name="uq_daily_check_in_user_date"),)

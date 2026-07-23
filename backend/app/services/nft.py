@@ -22,6 +22,7 @@ from app.adapters.pinata import pinata_adapter
 from app.core.config import settings
 from app.core.logging import logger
 from app.models.base import utc_now
+from app.models.community import FanTask, TaskParticipation
 from app.models.membership import MembershipLevel
 from app.models.nft import (
     ChainOperation,
@@ -30,6 +31,7 @@ from app.models.nft import (
     MembershipIdentityNft,
     NftApplication,
     NftMetadataVersion,
+    TaskNftReward,
 )
 from app.models.user import User, UserProfile, Wallet
 from app.schemas.nft import NftApplicationCreate
@@ -171,7 +173,9 @@ class NftService:
 
         scale = 2
         with Image.open(template_path) as source:
-            card = source.convert("RGB").resize((source.width * scale, source.height * scale), Image.Resampling.LANCZOS)
+            card = source.convert("RGB").resize(
+                (source.width * scale, source.height * scale), Image.Resampling.LANCZOS
+            )
         badge_bytes, _ = await self._membership_level_image_bytes(level)
         with Image.open(io.BytesIO(badge_bytes)) as source_badge:
             badge = source_badge.convert("RGBA")
@@ -192,9 +196,7 @@ class NftService:
         cyan = (22, 139, 184, 255)
         display_name = user.display_name or profile.username or "Fanora Member"
         username = display_name
-        explorer_url = (
-            f"https://testnet.monadvision.com/nft/{record.contract_address}/{record.token_id}?tab=Overview"
-        )
+        explorer_url = f"https://testnet.monadvision.com/nft/{record.contract_address}/{record.token_id}?tab=Overview"
         title_font = self._member_card_font(10 * scale, display=True)
         name_font = self._member_card_font(17 * scale)
         username_font = self._member_card_font(20 * scale)
@@ -297,9 +299,7 @@ class NftService:
             card_bytes,
             "image/png",
         )
-        explorer_url = (
-            f"https://testnet.monadvision.com/nft/{record.contract_address}/{record.token_id}?tab=Overview"
-        )
+        explorer_url = f"https://testnet.monadvision.com/nft/{record.contract_address}/{record.token_id}?tab=Overview"
         metadata = {
             "name": f"Fanora Member Card · {level.name}",
             "description": "A downloadable, soulbound Fanora membership card that proves the holder's fandom identity.",
@@ -373,9 +373,7 @@ class NftService:
             ],
         }
         metadata_bytes = json.dumps(metadata, ensure_ascii=False, sort_keys=True).encode("utf-8")
-        pinned = await pinata_adapter.pin_metadata(
-            f"fanora-identity-{identity.user_id}-v{version}.json", metadata
-        )
+        pinned = await pinata_adapter.pin_metadata(f"fanora-identity-{identity.user_id}-v{version}.json", metadata)
         record = NftMetadataVersion(
             subject_type="MEMBERSHIP_IDENTITY",
             subject_id=identity.user_id,
@@ -452,9 +450,7 @@ class NftService:
         user = await session.get(User, identity.user_id)
         creator_name = (user.display_name if user else None) or profile.username or identity.primary_wallet[:8]
         if profile.fan_token_balance < settings.nft_publish_fee_fan_tokens:
-            raise NftValidationError(
-                f"Publishing a fan NFT requires {settings.nft_publish_fee_fan_tokens} FAN"
-            )
+            raise NftValidationError(f"Publishing a fan NFT requires {settings.nft_publish_fee_fan_tokens} FAN")
         if payload.price_fan_tokens < settings.nft_min_price_fan_tokens:
             raise NftValidationError("NFT price is below the configured minimum")
         if payload.price_fan_tokens > settings.nft_max_price_fan_tokens:
@@ -634,7 +630,9 @@ class NftService:
                 failed_application.status = "FAILED"
                 failed_application.updated_at = utc_now()
                 await session.commit()
-            logger.exception("fan_nft_publish_pipeline_failed", user_id=identity.user_id, application_id=application_id)
+            logger.exception(
+                "fan_nft_publish_pipeline_failed", user_id=identity.user_id, application_id=application_id
+            )
             raise
 
     async def buy_fan_nft(
@@ -644,7 +642,9 @@ class NftService:
             raise NftValidationError("NFT is not available for purchase")
         if application.user_id == identity.user_id:
             raise NftValidationError("You already own the creator side of this NFT")
-        token_type = await session.get(CollectibleTokenType, application.collectible_token_type_id, with_for_update=True)
+        token_type = await session.get(
+            CollectibleTokenType, application.collectible_token_type_id, with_for_update=True
+        )
         if token_type is None or token_type.status != "CONFIRMED":
             raise NftValidationError("NFT token type is not confirmed")
         if token_type.minted_supply >= token_type.max_supply:
@@ -745,6 +745,278 @@ class NftService:
             await session.commit()
             raise
 
+    async def mint_task_reward(
+        self,
+        session: AsyncSession,
+        *,
+        task: FanTask,
+        participation: TaskParticipation,
+        user_id: str,
+    ) -> TaskNftReward | None:
+        """Create/mint one configured ERC-1155 Quest reward without exposing chain authority to the Agent."""
+
+        config = task.validation_rule.get("nft_reward")
+        if not isinstance(config, dict) or not config.get("enabled", False):
+            return None
+        reward_version = int(config.get("version", 1))
+        reward = (
+            await session.execute(
+                select(TaskNftReward).where(
+                    TaskNftReward.task_id == task.id,
+                    TaskNftReward.user_id == user_id,
+                    TaskNftReward.reward_version == reward_version,
+                )
+            )
+        ).scalar_one_or_none()
+        if reward is None:
+            reward = TaskNftReward(
+                task_id=task.id,
+                participation_id=participation.id,
+                user_id=user_id,
+                reward_version=reward_version,
+            )
+            session.add(reward)
+            await session.flush()
+        if reward.status == "CONFIRMED":
+            return reward
+        if not pinata_adapter.configured or not monad_contract_adapter.collectibles_configured:
+            reward.status = "WAITING_CONFIGURATION"
+            reward.failure_reason = "Pinata or Monad collectible operator is not configured"
+            reward.updated_at = utc_now()
+            await session.commit()
+            return reward
+
+        reward_id = reward.id
+        try:
+            token_type = (
+                (
+                    await session.execute(
+                        select(CollectibleTokenType).where(
+                            CollectibleTokenType.source_type == "TASK_REWARD",
+                            CollectibleTokenType.source_id == task.id,
+                        )
+                    )
+                )
+                .scalars()
+                .first()
+            )
+            if token_type is None:
+                public_root = Path(__file__).resolve().parents[3] / "frontend" / "public"
+                image_path = (public_root / str(config.get("image_path", "")).lstrip("/")).resolve()
+                if not image_path.is_relative_to(public_root.resolve()) or not image_path.is_file():
+                    raise NftValidationError("Task NFT reward image is unavailable")
+                content = image_path.read_bytes()
+                mime_type = mimetypes.guess_type(image_path.name)[0] or "application/octet-stream"
+                if mime_type not in ALLOWED_IMAGE_TYPES:
+                    raise NftValidationError("Task NFT reward image must be JPEG, PNG, WebP, or GIF")
+                image = await pinata_adapter.pin_image(
+                    f"task-reward-{task.id}-v{reward_version}{image_path.suffix}",
+                    content,
+                    mime_type,
+                )
+                name = str(config.get("name") or task.title)[:100]
+                description = str(config.get("description") or task.description)[:1000]
+                category = str(config.get("category", "TASK_LIMITED_BADGE"))
+                max_supply = int(config.get("max_supply", task.participation_limit or 10_000))
+                per_wallet_limit = int(config.get("per_wallet_limit", 1))
+                transferable = bool(config.get("transferable", False))
+                metadata_payload = {
+                    "name": name,
+                    "description": description,
+                    "image": pinata_adapter.ipfs_uri(image.cid),
+                    "category": category,
+                    "issuer": settings.fanora_issuer_name,
+                    "attributes": [
+                        {"trait_type": "Quest", "value": task.title},
+                        {"trait_type": "Reward Version", "value": str(reward_version)},
+                        {"trait_type": "Max Supply", "value": str(max_supply)},
+                        {"trait_type": "Transferable", "value": str(transferable).lower()},
+                    ],
+                }
+                metadata = await pinata_adapter.pin_metadata(
+                    f"task-reward-{task.id}-v{reward_version}.json",
+                    metadata_payload,
+                )
+                version = NftMetadataVersion(
+                    subject_type="TASK_REWARD",
+                    subject_id=task.id,
+                    version=reward_version,
+                    image_cid=image.cid,
+                    image_pin_id=image.pin_id,
+                    metadata_cid=metadata.cid,
+                    metadata_pin_id=metadata.pin_id,
+                    content_hash=hashlib.sha256(content).hexdigest(),
+                    size_bytes=len(content),
+                    mime_type=mime_type,
+                    metadata_payload=metadata_payload,
+                    created_by_user_id=task.created_by_user_id,
+                )
+                max_token_id = (
+                    await session.execute(select(func.max(CollectibleTokenType.token_id)))
+                ).scalar_one_or_none() or 0
+                token_id = int(max_token_id) + 1
+                now = datetime.now(UTC)
+                token_type = CollectibleTokenType(
+                    token_id=token_id,
+                    category=category,
+                    name=name,
+                    description=description,
+                    chain_id=settings.monad_chain_id,
+                    contract_address=settings.collectibles_contract_address.lower(),
+                    metadata_cid=metadata.cid,
+                    max_supply=max_supply,
+                    per_wallet_limit=per_wallet_limit,
+                    mint_start=now - timedelta(minutes=1),
+                    mint_end=now + timedelta(days=int(config.get("mint_window_days", 3650))),
+                    transferable=transferable,
+                    source_type="TASK_REWARD",
+                    source_id=task.id,
+                )
+                create_key = f"task-nft-type:{task.id}:v{reward_version}"
+                create_operation = ChainOperation(
+                    user_id=task.created_by_user_id,
+                    operation_type="TASK_NFT_TYPE_CREATE",
+                    idempotency_key=create_key,
+                    operation_hash=monad_contract_adapter.operation_hash(create_key),
+                    chain_id=settings.monad_chain_id,
+                    contract_address=settings.collectibles_contract_address.lower(),
+                    token_id=token_id,
+                    metadata_cid=metadata.cid,
+                    request_payload={
+                        "category": category,
+                        "max_supply": max_supply,
+                        "per_wallet_limit": per_wallet_limit,
+                        "reward_version": reward_version,
+                    },
+                )
+                session.add_all([version, token_type, create_operation])
+                await session.flush()
+                reward.token_type_id = token_type.id
+                reward.status = "CREATING_TOKEN_TYPE"
+                reward.failure_reason = None
+                await session.commit()
+
+                category_id = {"CONCERT_CARD": 0, "CUSTOM_BADGE": 1, "TASK_LIMITED_BADGE": 2}.get(category, 2)
+                create_operation.status = "SUBMITTED"
+                await session.commit()
+                receipt = await monad_contract_adapter.create_token_type(
+                    {
+                        "token_id": token_id,
+                        "category": category_id,
+                        "metadata_uri": pinata_adapter.ipfs_uri(metadata.cid),
+                        "max_supply": max_supply,
+                        "per_wallet_limit": per_wallet_limit,
+                        "mint_start": int(token_type.mint_start.timestamp()),
+                        "mint_end": int(token_type.mint_end.timestamp()),
+                        "transferable": transferable,
+                    }
+                )
+                create_operation.status = "CONFIRMED"
+                create_operation.transaction_hash = receipt.transaction_hash
+                create_operation.block_number = receipt.block_number
+                create_operation.confirmations = receipt.confirmations
+                create_operation.confirmed_at = utc_now()
+                token_type.status = "CONFIRMED"
+                await session.commit()
+            else:
+                reward.token_type_id = token_type.id
+
+            existing = (
+                await session.execute(
+                    select(CollectibleOwnership).where(
+                        CollectibleOwnership.token_type_id == token_type.id,
+                        CollectibleOwnership.user_id == user_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if existing is not None and existing.status == "CONFIRMED" and existing.amount > 0:
+                reward.ownership_id = existing.id
+                reward.status = "CONFIRMED"
+                reward.failure_reason = None
+                reward.updated_at = utc_now()
+                await session.commit()
+                return reward
+
+            wallet = (
+                await session.execute(
+                    select(Wallet.address).where(Wallet.user_id == user_id, col(Wallet.is_primary).is_(True))
+                )
+            ).scalar_one_or_none()
+            if wallet is None:
+                raise NftValidationError("Primary wallet is required for the task NFT reward")
+            claim_key = f"task-nft-mint:{task.id}:{user_id}:v{reward_version}"
+            claim_hash = monad_contract_adapter.operation_hash(claim_key)
+            mint_operation = (
+                await session.execute(select(ChainOperation).where(ChainOperation.idempotency_key == claim_key))
+            ).scalar_one_or_none()
+            if mint_operation is None:
+                mint_operation = ChainOperation(
+                    user_id=user_id,
+                    operation_type="TASK_NFT_MINT",
+                    idempotency_key=claim_key,
+                    operation_hash=claim_hash,
+                    chain_id=settings.monad_chain_id,
+                    contract_address=token_type.contract_address,
+                    token_id=token_type.token_id,
+                    metadata_cid=token_type.metadata_cid,
+                    request_payload={
+                        "wallet": wallet,
+                        "amount": 1,
+                        "task_id": task.id,
+                        "reward_version": reward_version,
+                    },
+                )
+                session.add(mint_operation)
+                await session.flush()
+            ownership = existing
+            if ownership is None:
+                ownership = CollectibleOwnership(
+                    token_type_id=token_type.id,
+                    user_id=user_id,
+                    wallet_address=wallet,
+                    amount=0,
+                    claim_key=claim_hash,
+                    chain_operation_id=mint_operation.id,
+                )
+                session.add(ownership)
+                await session.flush()
+            reward.ownership_id = ownership.id
+            reward.status = "MINTING"
+            reward.failure_reason = None
+            mint_operation.status = "SUBMITTED"
+            await session.commit()
+
+            receipt = await monad_contract_adapter.mint_collectible(wallet, token_type.token_id, 1, claim_hash)
+            mint_operation.status = "CONFIRMED"
+            mint_operation.transaction_hash = receipt.transaction_hash
+            mint_operation.block_number = receipt.block_number
+            mint_operation.confirmations = receipt.confirmations
+            mint_operation.confirmed_at = utc_now()
+            ownership.amount = 1
+            ownership.status = "CONFIRMED"
+            ownership.minted_at = utc_now()
+            token_type.minted_supply += 1
+            reward.status = "CONFIRMED"
+            reward.failure_reason = None
+            reward.updated_at = utc_now()
+            await session.commit()
+            return reward
+        except Exception as error:
+            await session.rollback()
+            failed_reward = await session.get(TaskNftReward, reward_id)
+            if failed_reward is not None:
+                failed_reward.status = "RETRYABLE"
+                failed_reward.failure_reason = str(error)[:500]
+                failed_reward.updated_at = utc_now()
+                await session.commit()
+            logger.exception(
+                "task_nft_reward_mint_failed",
+                task_id=task.id,
+                participation_id=participation.id,
+                user_id=user_id,
+            )
+            return failed_reward
+
     async def set_collectible_avatar(
         self,
         session: AsyncSession,
@@ -768,13 +1040,17 @@ class NftService:
         if token_type is None or profile is None:
             raise NftValidationError("NFT or user profile is unavailable")
         metadata = (
-            await session.execute(
-                select(NftMetadataVersion)
-                .where(NftMetadataVersion.metadata_cid == token_type.metadata_cid)
-                .order_by(col(NftMetadataVersion.created_at).desc())
-                .limit(1)
+            (
+                await session.execute(
+                    select(NftMetadataVersion)
+                    .where(NftMetadataVersion.metadata_cid == token_type.metadata_cid)
+                    .order_by(col(NftMetadataVersion.created_at).desc())
+                    .limit(1)
+                )
             )
-        ).scalars().first()
+            .scalars()
+            .first()
+        )
         if metadata is None or not metadata.image_cid:
             raise NftValidationError("NFT image is unavailable")
         avatar_url = pinata_adapter.gateway_url(metadata.image_cid)
@@ -830,7 +1106,9 @@ class NftService:
         self, session: AsyncSession, identity: AuthenticatedIdentity
     ) -> MembershipIdentityNft | None:
         existing = (
-            await session.execute(select(MembershipIdentityNft).where(MembershipIdentityNft.user_id == identity.user_id))
+            await session.execute(
+                select(MembershipIdentityNft).where(MembershipIdentityNft.user_id == identity.user_id)
+            )
         ).scalar_one_or_none()
         profile = await session.get(UserProfile, identity.user_id)
         user = await session.get(User, identity.user_id)
@@ -906,9 +1184,7 @@ class NftService:
             if existing.status != "RETRYABLE" or not monad_contract_adapter.identity_configured:
                 return existing
             operation = (
-                await session.get(ChainOperation, existing.chain_operation_id)
-                if existing.chain_operation_id
-                else None
+                await session.get(ChainOperation, existing.chain_operation_id) if existing.chain_operation_id else None
             )
             if operation is None:
                 raise NftValidationError("Membership identity mint operation is missing")
@@ -1179,9 +1455,7 @@ class NftService:
     ) -> MembershipIdentityNft:
         record = (
             await session.execute(
-                select(MembershipIdentityNft).where(
-                    MembershipIdentityNft.user_id == identity.user_id
-                )
+                select(MembershipIdentityNft).where(MembershipIdentityNft.user_id == identity.user_id)
             )
         ).scalar_one_or_none()
         profile = await session.get(UserProfile, identity.user_id)
@@ -1191,25 +1465,15 @@ class NftService:
         if level is None:
             raise NftValidationError("Membership level is not configured")
         if level.rank != record.level_id:
-            raise NftValidationError(
-                "Membership level must be synchronized before refreshing identity metadata"
-            )
+            raise NftValidationError("Membership level must be synchronized before refreshing identity metadata")
         if not pinata_adapter.configured or not monad_contract_adapter.identity_uri_manager_configured:
-            raise ChainConfigurationError(
-                "Pinata and identity URI manager configuration are required"
-            )
+            raise ChainConfigurationError("Pinata and identity URI manager configuration are required")
 
         image_cid = await self._pin_membership_level_image(level)
         image_hash = level.badge_image_content_hash or image_cid
-        idempotency_key = (
-            f"identity-metadata-refresh:{identity.user_id}:{level.code}:{image_hash}"
-        )
+        idempotency_key = f"identity-metadata-refresh:{identity.user_id}:{level.code}:{image_hash}"
         operation = (
-            await session.execute(
-                select(ChainOperation).where(
-                    ChainOperation.idempotency_key == idempotency_key
-                )
-            )
+            await session.execute(select(ChainOperation).where(ChainOperation.idempotency_key == idempotency_key))
         ).scalar_one_or_none()
         if operation is not None and operation.status == "CONFIRMED":
             return record
@@ -1384,13 +1648,20 @@ class NftService:
 
             wallet = (
                 await session.execute(
-                    select(MembershipIdentityNft.wallet_address).where(MembershipIdentityNft.user_id == application.user_id)
+                    select(MembershipIdentityNft.wallet_address).where(
+                        MembershipIdentityNft.user_id == application.user_id
+                    )
                 )
             ).scalar_one_or_none()
             if wallet is None:
                 from app.models.user import Wallet
+
                 wallet = (
-                    await session.execute(select(Wallet.address).where(Wallet.user_id == application.user_id, col(Wallet.is_primary).is_(True)))
+                    await session.execute(
+                        select(Wallet.address).where(
+                            Wallet.user_id == application.user_id, col(Wallet.is_primary).is_(True)
+                        )
+                    )
                 ).scalar_one()
             claim_key = f"custom-badge-mint:{application.id}:v1"
             claim_hash = monad_contract_adapter.operation_hash(claim_key)

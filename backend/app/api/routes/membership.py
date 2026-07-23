@@ -26,4 +26,3 @@ async def list_membership_levels(
         .scalars()
         .all()
     )
-

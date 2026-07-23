@@ -96,16 +96,22 @@ class WalletAuthService:
             if user is None or user.status != "active":
                 raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User account is not active")
             if not wallet.is_primary:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Wallet is not the primary login wallet")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, detail="Wallet is not the primary login wallet"
+                )
             if identity is not None and identity.user_id != user.id:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Wallet identity belongs to another user")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, detail="Wallet identity belongs to another user"
+                )
             if identity is None:
                 session.add(AuthIdentity(user_id=user.id, provider="wallet", subject=address.lower()))
             if await session.get(UserProfile, user.id) is None:
                 session.add(UserProfile(user_id=user.id))
         else:
             if identity is not None:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Wallet identity is missing its wallet")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT, detail="Wallet identity is missing its wallet"
+                )
             user = User()
             session.add(user)
             await session.flush()
@@ -145,7 +151,9 @@ class WalletAuthService:
             or challenge.wallet_address != address
             or as_utc(challenge.expires_at) <= now
         ):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Login challenge is invalid or expired")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED, detail="Login challenge is invalid or expired"
+            )
 
         try:
             recovered = Account.recover_message(encode_defunct(text=challenge.message), signature=signature)
@@ -183,7 +191,12 @@ class WalletAuthService:
                 detail="The login identity or wallet was linked by another request",
             ) from error
 
-        return raw_token, session_expires_at, is_new_user, await build_user_response(session, user.id, include_private=True)
+        return (
+            raw_token,
+            session_expires_at,
+            is_new_user,
+            await build_user_response(session, user.id, include_private=True),
+        )
 
 
 async def build_user_response(session: AsyncSession, user_id: str, *, include_private: bool) -> UserResponse:
@@ -194,9 +207,7 @@ async def build_user_response(session: AsyncSession, user_id: str, *, include_pr
     ).scalar_one_or_none()
     if user is None or profile is None or wallet is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="User wallet profile is incomplete")
-    roles = list(
-        (await session.execute(select(UserRole.role).where(UserRole.user_id == user_id))).scalars().all()
-    )
+    roles = list((await session.execute(select(UserRole.role).where(UserRole.user_id == user_id))).scalars().all())
     memberships = list(
         (await session.execute(select(CommunityMember).where(CommunityMember.user_id == user_id))).scalars().all()
     )

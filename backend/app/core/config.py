@@ -51,6 +51,9 @@ class Settings(BaseSettings):
     openai_base_url: str = ""
     openai_model: str = ""
     openai_fallback_models: str = ""
+    openai_image_model: str = "gpt-image-2"
+    openai_image_size: str = "1024x1024"
+    image_generation_timeout_seconds: float = 90.0
     llm_temperature: float = 0.2
     llm_max_tokens: int = 1200
     llm_max_retries: int = 3

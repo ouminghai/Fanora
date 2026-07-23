@@ -364,7 +364,8 @@ async def create_post(
             task_type="content_publish",
             source_id=post.id,
             content_category=post.category,
-            content_text=f"{post.title}\n{post.body}",
+            content_title=post.title,
+            content_text=post.body,
             detail="The member published an eligible community creation.",
         ),
     )
@@ -521,7 +522,8 @@ async def create_reply(
             target_post_id=post.id,
             reply_id=reply.id,
             reply_length=len(payload.body),
-            detail="The reply met the deterministic task rule; no manual review was required.",
+            content_text=payload.body,
+            detail="The reply was submitted to the Quest content-review workflow.",
         ),
     )
     await session.commit()

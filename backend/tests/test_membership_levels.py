@@ -46,4 +46,3 @@ async def test_membership_levels_are_returned_from_database_in_rank_order(client
     assert levels[0]["badge_image_url"] == "/img/badges/new.png"
     assert levels[0]["min_token_balance"] == 0
     assert levels[1]["max_token_balance"] == 999
-

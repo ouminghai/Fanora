@@ -161,9 +161,13 @@ class OfficialMembershipPaymentService:
                 detail="Payment sender does not match the signed-in primary wallet",
             )
         if payment.to_address != gateway_address:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payment was not sent through the membership contract")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Payment was not sent through the membership contract"
+            )
         if payment.payment_id != self.payment_id_for_user(identity.user_id):
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Membership payment id does not match this user")
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST, detail="Membership payment id does not match this user"
+            )
         if payment.confirmations < settings.membership_min_confirmations:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,

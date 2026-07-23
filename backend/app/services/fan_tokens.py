@@ -112,9 +112,7 @@ class FanTokenService:
         if earned_level is None:
             return
         current_level = (
-            await session.execute(
-                select(MembershipLevel).where(MembershipLevel.name == profile.level)
-            )
+            await session.execute(select(MembershipLevel).where(MembershipLevel.name == profile.level))
         ).scalar_one_or_none()
         if current_level is None or earned_level.name != profile.level:
             profile.level = earned_level.name

@@ -8,7 +8,7 @@ import FanTokenAmount from "@/components/common/FanTokenAmount";
 import { useAuth } from "@/components/providers/AuthProvider";
 import UserAvatar from "./UserAvatar";
 import { api } from "@/lib/api/client";
-import type { Community, FanoraUser } from "@/lib/api/types";
+import type { Community, FanoraUser, FanProfileAnalysis } from "@/lib/api/types";
 
 const fieldClass =
   "w-full rounded-xl border border-jacarta-100 bg-white px-4 py-3 text-jacarta-700 outline-none transition-all placeholder:text-jacarta-300 focus:border-accent focus:ring-2 focus:ring-accent/10 dark:border-white/10 dark:bg-white/[.06] dark:text-white";
@@ -34,6 +34,7 @@ export default function ProfileDashboard() {
     profile_visibility: "public" as "public" | "private",
   });
   const [communities, setCommunities] = useState<Community[]>([]);
+  const [fanProfile, setFanProfile] = useState<FanProfileAnalysis | null>(null);
   const [saving, setSaving] = useState(false);
   const [joining, setJoining] = useState<string | null>(null);
   const [notice, setNotice] = useState<{ kind: "success" | "error"; text: string } | null>(null);
@@ -52,7 +53,13 @@ export default function ProfileDashboard() {
       locale: user.locale || "zh-CN",
       profile_visibility: user.profile_visibility,
     });
-    api.get<Community[]>("/communities").then((response) => setCommunities(response.data)).catch(() => undefined);
+    void Promise.allSettled([
+      api.get<Community[]>("/communities"),
+      api.get<FanProfileAnalysis>("/profile/me"),
+    ]).then(([communityResult, profileResult]) => {
+      if (communityResult.status === "fulfilled") setCommunities(communityResult.value.data);
+      if (profileResult.status === "fulfilled") setFanProfile(profileResult.value.data);
+    });
   }, [user]);
 
   const joinedIds = useMemo(() => new Set(user?.communities.map((community) => community.id) || []), [user]);
@@ -167,6 +174,46 @@ export default function ProfileDashboard() {
             </div>
           </div>
         </section>
+
+        {fanProfile ? (
+          <section className="mt-8 rounded-[2rem] bg-white p-7 shadow-sm dark:bg-jacarta-800 md:p-9">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="text-xs font-bold uppercase tracking-[.18em] text-accent">LangGraph fan profile</p>
+                <h2 className="mt-2 font-display text-2xl font-semibold text-jacarta-700 dark:text-white">可解释粉丝画像</h2>
+                <p className="mt-3 max-w-3xl text-sm leading-6 text-jacarta-500 dark:text-jacarta-300">{fanProfile.summary}</p>
+              </div>
+              <span className="rounded-full bg-accent/10 px-4 py-2 text-sm font-semibold text-accent">{fanProfile.fan_type} · {fanProfile.analysis_source === "llm" ? "AI 增强" : "规则降级"}</span>
+            </div>
+            <div className="mt-6 grid grid-cols-2 gap-3 md:grid-cols-5">
+              {([
+                ["总分", fanProfile.scores.total],
+                ["活跃", fanProfile.scores.activity],
+                ["忠诚", fanProfile.scores.loyalty],
+                ["影响", fanProfile.scores.influence],
+                ["贡献", fanProfile.scores.contribution],
+              ] as const).map(([label, value]) => (
+                <div key={label} className="rounded-2xl bg-jacarta-50 p-4 text-center dark:bg-white/[.04]">
+                  <p className="text-xs text-jacarta-400">{label}</p>
+                  <p className="mt-1 font-display text-2xl font-semibold text-jacarta-700 dark:text-white">{value}</p>
+                </div>
+              ))}
+            </div>
+            {fanProfile.recommended_tasks.length ? (
+              <div className="mt-6 grid gap-3 md:grid-cols-2">
+                {fanProfile.recommended_tasks.slice(0, 4).map((task) => (
+                  <Link key={task.task_id} href={task.action_url} className="rounded-2xl border border-jacarta-100 p-4 transition-colors hover:border-accent dark:border-white/10">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-semibold text-jacarta-700 dark:text-white">{task.title}</p>
+                      <FanTokenAmount amount={task.reward_fan_tokens} className="shrink-0 text-sm font-semibold text-accent" />
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-jacarta-400">{task.reason}</p>
+                  </Link>
+                ))}
+              </div>
+            ) : null}
+          </section>
+        ) : null}
 
         {notice && (
           <div className={`mt-6 animate-[fadeIn_.25s_ease-out] rounded-2xl border px-5 py-4 text-sm font-medium ${notice.kind === "success" ? "border-green/20 bg-green/10 text-green" : "border-red/20 bg-red/10 text-red"}`}>
