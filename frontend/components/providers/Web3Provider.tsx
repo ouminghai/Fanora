@@ -4,6 +4,7 @@ import {
   RainbowKitProvider,
   darkTheme,
 } from "@rainbow-me/rainbowkit";
+import NiceModal from "@ebay/nice-modal-react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, type ReactNode } from "react";
 import { WagmiProvider } from "wagmi";
@@ -37,7 +38,9 @@ export default function Web3Provider({ children }: Web3ProviderProps) {
           modalSize="compact"
           theme={darkTheme({ accentColor: "#8358ff" })}
         >
-          <AuthProvider>{children}</AuthProvider>
+          <NiceModal.Provider>
+            <AuthProvider>{children}</AuthProvider>
+          </NiceModal.Provider>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

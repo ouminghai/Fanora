@@ -103,6 +103,7 @@ export type CommunityPostSummary = {
   liked: boolean;
   bookmarked: boolean;
   author: CommunityAuthor;
+  linked_nft: FanNftListing | null;
   created_at: string;
   updated_at: string;
 };
@@ -133,6 +134,7 @@ export type CommunityPostDetail = {
   liked: boolean;
   bookmarked: boolean;
   author: CommunityAuthor;
+  linked_nft: FanNftListing | null;
   replies: CommunityReply[];
   has_more_replies: boolean;
   next_replies_offset: number | null;
@@ -378,6 +380,11 @@ export type FanProfileAnalysis = {
   }>;
 };
 
+export type PublicFanProfileAnalysis = Pick<
+  FanProfileAnalysis,
+  "scores" | "fan_type" | "labels" | "summary" | "analysis_source" | "degraded"
+>;
+
 export type FanNftPurchaseResponse = {
   listing: FanNftListing;
   collectible: CollectibleNft;
@@ -413,4 +420,28 @@ export type MyCollection = {
   identity: MembershipIdentityNft | null;
   collectibles: CollectibleNft[];
   applications: NftApplication[];
+};
+
+export type PublicCollectionUser = {
+  id: string;
+  display_name: string;
+  username: string | null;
+  avatar_url: string | null;
+  bio: string | null;
+  level: string;
+  is_official_member: boolean;
+  official_member_since: string | null;
+  fan_token_balance: number;
+  fan_token_lifetime_earned: number;
+  fan_type: string;
+  created_at: string;
+};
+
+export type PublicCollection = {
+  chain_id: number;
+  network_name: string;
+  user: PublicCollectionUser;
+  identity: MembershipIdentityNft | null;
+  collectibles: CollectibleNft[];
+  creations: FanNftListing[];
 };

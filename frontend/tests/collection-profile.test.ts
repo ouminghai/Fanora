@@ -10,6 +10,21 @@ const transactionProgressSource = readFileSync(
   new URL("../components/nft/ChainTransactionProgress.tsx", import.meta.url),
   "utf8",
 );
+const globalInfoModalSource = readFileSync(
+  new URL("../components/modals/GlobalInfoModal.tsx", import.meta.url),
+  "utf8",
+);
+const styleSource = readFileSync(new URL("../public/styles/style.css", import.meta.url), "utf8");
+const profileSource = readFileSync(
+  new URL("../components/profile/ProfileDashboard.tsx", import.meta.url),
+  "utf8",
+);
+
+test("profile editing does not expose a separate avatar upload button", () => {
+  assert.doesNotMatch(profileSource, /selectAvatar/);
+  assert.doesNotMatch(profileSource, /选择图片（最大 1 MB）/);
+  assert.match(profileSource, /avatar_url: user\.avatar_url \|\| ""/);
+});
 
 test("collection uses a profile banner, overlapping avatar, and asset tabs", () => {
   assert.match(source, /eason-concert\.webp/);
@@ -25,6 +40,10 @@ test("collection uses a profile banner, overlapping avatar, and asset tabs", () 
   assert.match(source, /我的收藏/);
   assert.doesNotMatch(source, /徽章申请/);
   assert.doesNotMatch(source, /\/nft\/applications/);
+  assert.match(source, /api\.get<FanProfileAnalysis>\("\/profile\/me"\)/);
+  assert.match(source, /<FanProfileSummary profile=\{fanProfile\}/);
+  assert.doesNotMatch(source, /Promise\.all\(\[\s*api\.get<MyCollection>\("\/nft\/me"\),\s*api\.get<FanProfileAnalysis>\("\/profile\/me"\)/);
+  assert.match(source, /void api\.get<FanProfileAnalysis>\("\/profile\/me"\)[\s\S]*const response = await api\.get<MyCollection>\("\/nft\/me"\)/);
 });
 
 test("collection keeps identity synchronization and on-chain links", () => {
@@ -64,11 +83,13 @@ test("collection automatically creates, refreshes, reveals, and downloads a free
   assert.match(source, /identity\?\.is_member_card && !identity\.card_needs_refresh/);
   assert.match(source, /\/img\/membercard\/membercard\.jpg/);
   assert.match(source, /membership-card-stage/);
-  assert.match(source, /kind="member-card"/);
+  assert.match(source, /progressKind: "member-card"/);
   assert.match(transactionProgressSource, /"member-card": \["验证会员身份"/);
   assert.doesNotMatch(transactionProgressSource, /"member-card": \["扣除 FAN"/);
   assert.match(source, /downloadMembershipCard/);
-  assert.match(source, /等级或资料已更新，点击卡面刷新会员证/);
+  assert.match(source, /会员等级已更新，点击卡面刷新会员证/);
+  const autoCardSyncBlock = source.slice(source.indexOf("const syncKey = ["), source.indexOf("].join", source.indexOf("const syncKey = [")));
+  assert.doesNotMatch(autoCardSyncBlock, /fan_token_lifetime_earned/);
 });
 
 test("owned collection NFTs can be selected as the current profile avatar", () => {
@@ -95,7 +116,8 @@ test("fan NFT publishing is guarded by spendable FAN balance", () => {
   assert.match(marketSource, /可用 FAN 不足/);
   assert.match(marketSource, /发布费/);
   assert.match(marketSource, /function PublishModal/);
-  assert.match(marketSource, /\/img\/process\/cyancat\.gif/);
+  assert.match(marketSource, /NiceModal\.show\(GlobalProcessModal/);
+  assert.match(marketSource, /progressKind: "publish"/);
   assert.match(marketSource, /正在上传图片与 metadata 到 IPFS/);
   assert.match(marketSource, /transition-opacity duration-200/);
   assert.match(marketSource, /translate-y-3 scale-95 opacity-0/);
@@ -242,10 +264,52 @@ test("chain transactions connect nodes and resolve into NFT or identity artifact
   assert.match(progressSource, /提交发布.*写入 IPFS.*合约铸造.*链上确认/);
   assert.match(progressSource, /chain-transaction-link/);
   assert.match(progressSource, /chain-transaction-artifact/);
-  assert.match(marketSource, /kind="publish"/);
-  assert.match(marketSource, /kind="mint"/);
-  assert.match(marketSource, /setPublishPhase\("complete"\)/);
-  assert.match(marketSource, /setBuyPhase\("complete"\)/);
-  assert.match(collectionSource, /kind="identity"/);
-  assert.match(collectionSource, /setIdentityPhase\(confirmed \? "complete"/);
+  assert.match(marketSource, /progressKind: "publish"/);
+  assert.match(marketSource, /progressKind: "mint"/);
+  assert.match(marketSource, /await hideGlobalProcessModal\(\)/);
+  assert.match(marketSource, /celebrate: true/);
+  assert.doesNotMatch(marketSource, /<ChainTransactionProgress/);
+  assert.match(collectionSource, /progressKind: "identity"/);
+  assert.match(collectionSource, /progressKind: "member-card"/);
+  assert.match(collectionSource, /NiceModal\.show\(GlobalInfoModal/);
+  assert.doesNotMatch(collectionSource, /<ChainTransactionProgress/);
+});
+
+test("NFT success modals are not delayed by profile refreshes", () => {
+  const marketSource = readFileSync(new URL("../components/nft/FanNftMarket.tsx", import.meta.url), "utf8");
+  const publishStart = marketSource.indexOf('api.post<FanNftCreateResponse>("/nft/creations"');
+  const purchaseStart = marketSource.indexOf("api.post<FanNftPurchaseResponse>");
+  const publishBlock = marketSource.slice(publishStart, marketSource.indexOf("} catch", publishStart));
+  const purchaseBlock = marketSource.slice(purchaseStart, marketSource.indexOf("} catch", purchaseStart));
+
+  assert.ok(publishBlock.indexOf("void refreshUser().catch") < publishBlock.indexOf("NiceModal.show(GlobalInfoModal"));
+  assert.ok(publishBlock.indexOf("void hideGlobalProcessModal().catch") < publishBlock.indexOf("NiceModal.show(GlobalInfoModal"));
+  assert.doesNotMatch(purchaseBlock, /await NiceModal\.show\(GlobalInfoModal/);
+  assert.ok(purchaseBlock.indexOf("setBusy(null)") < purchaseBlock.indexOf("NiceModal.show(GlobalInfoModal"));
+  assert.ok(purchaseBlock.indexOf('phase: "complete"') < purchaseBlock.indexOf("NiceModal.show(GlobalInfoModal"));
+  assert.ok(purchaseBlock.indexOf("void hideGlobalProcessModal().catch") < purchaseBlock.indexOf("NiceModal.show(GlobalInfoModal"));
+});
+
+test("successful NFT publishing unlocks and closes the composer before showing the acquired modal", () => {
+  const marketSource = readFileSync(new URL("../components/nft/FanNftMarket.tsx", import.meta.url), "utf8");
+  const publishStart = marketSource.indexOf('api.post<FanNftCreateResponse>("/nft/creations"');
+  const publishEnd = marketSource.indexOf("} catch", publishStart);
+  const publishBlock = marketSource.slice(publishStart, publishEnd);
+  const successModalIndex = publishBlock.indexOf("NiceModal.show(GlobalInfoModal");
+
+  assert.ok(publishStart >= 0 && successModalIndex > 0);
+  assert.doesNotMatch(publishBlock, /await NiceModal\.show\(GlobalInfoModal/);
+  assert.doesNotMatch(publishBlock, /await hideGlobalProcessModal\(\)/);
+  assert.ok(publishBlock.indexOf("setBusy(false)") < successModalIndex);
+  assert.ok(publishBlock.indexOf("onPublished(response.data.listing)") < successModalIndex);
+  assert.ok(publishBlock.indexOf('name: "", description: "", theme: "", image_data_url: ""') < successModalIndex);
+});
+
+test("acquired NFT and membership card images preserve source aspect ratio over blurred backdrops", () => {
+  assert.match(globalInfoModalSource, /reward-modal-backdrop/);
+  assert.match(globalInfoModalSource, /reward-modal-image object-contain/);
+  assert.match(styleSource, /\.reward-modal-backdrop[\s\S]*filter: blur/);
+  assert.match(styleSource, /\.membership-card-backdrop[\s\S]*filter: blur/);
+  assert.match(source, /membership-card-backdrop object-cover/);
+  assert.match(source, /membership-card-image \$\{identity\?\.is_member_card && identity\?\.image_url \? "object-contain" : "object-cover"\}/);
 });

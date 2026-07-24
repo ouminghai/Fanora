@@ -15,11 +15,13 @@
     "test:membership": "tsx --test tests/membership-levels.test.ts",
     "test:official-membership": "tsx --test tests/official-membership.test.ts",
     "test:community": "tsx --test tests/community-flow.test.ts",
+    "test:api-error": "tsx --test tests/api-error.test.ts",
     "test:video-sound": "tsx --test tests/video-sound-toggle.test.tsx",
     "test:wallet-login": "tsx --test tests/wallet-login-routing.test.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@ebay/nice-modal-react": "^1.2.13",
     "@popperjs/core": "^2.11.8",
     "@rainbow-me/rainbowkit": "^2.2.11",
     "@tailwindcss/forms": "^0.5.10",
@@ -27,6 +29,7 @@
     "axios": "^1.18.1",
     "bootstrap": "^5.3.6",
     "boring-avatars": "^2.0.4",
+    "canvas-confetti": "^1.9.4",
     "lucide-react": "^0.468.0",
     "next": "^15.5.20",
     "photoswipe": "^5.4.4",
@@ -43,6 +46,7 @@
     "wagmi": "^2.19.5"
   },
   "devDependencies": {
+    "@types/canvas-confetti": "^1.9.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",

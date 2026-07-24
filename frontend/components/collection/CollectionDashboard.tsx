@@ -1,5 +1,6 @@
 "use client";
 
+import NiceModal from "@ebay/nice-modal-react";
 import axios from "axios";
 import { Download, ExternalLink, RefreshCw, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import Image from "next/image";
@@ -9,12 +10,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { Abi } from "viem";
 import { useReadContract } from "wagmi";
 import FanTokenAmount from "@/components/common/FanTokenAmount";
-import ChainTransactionProgress, { type TransactionPhase } from "@/components/nft/ChainTransactionProgress";
+import GlobalInfoModal from "@/components/modals/GlobalInfoModal";
+import GlobalProcessModal, { hideGlobalProcessModal } from "@/components/modals/GlobalProcessModal";
+import type { TransactionPhase } from "@/components/nft/ChainTransactionProgress";
 import { resetNftTilt, updateNftTilt } from "@/components/nft/nftMotion";
+import FanProfileSummary from "@/components/profile/FanProfileSummary";
 import UserAvatar from "@/components/profile/UserAvatar";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { api } from "@/lib/api/client";
-import type { CollectibleAvatarResponse, CollectibleNft, MembershipCardAction, MembershipIdentityNft, MyCollection } from "@/lib/api/types";
+import type { CollectibleAvatarResponse, CollectibleNft, FanProfileAnalysis, MembershipCardAction, MembershipIdentityNft, MyCollection } from "@/lib/api/types";
 import membershipIdentityArtifact from "../../../shared/contracts/FanoraMembershipIdentity.json";
 
 type CollectionTab = "identity" | "collectibles";
@@ -97,7 +101,6 @@ function IdentityPanel({
   fanTokenBalance,
   fanTokenLifetimeEarned,
   busy,
-  syncPhase,
   cardPhase,
   downloading,
   onSync,
@@ -115,7 +118,6 @@ function IdentityPanel({
   fanTokenBalance: number;
   fanTokenLifetimeEarned: number;
   busy: boolean;
-  syncPhase: TransactionPhase;
   cardPhase: TransactionPhase;
   downloading: boolean;
   onSync: () => void;
@@ -145,6 +147,17 @@ function IdentityPanel({
           className={`membership-card-stage relative block aspect-[421/734] w-full overflow-hidden bg-[#100b24] text-left disabled:cursor-not-allowed ${cardPhase === "processing" ? "is-sealed" : ""} ${cardPhase === "complete" ? "is-revealed" : ""}`}
           aria-label={identity?.is_member_card ? "刷新会员证图片" : "制作会员证 NFT"}
         >
+          {identity?.is_member_card && identity?.image_url ? (
+            <Image
+              fill
+              unoptimized
+              src={identity.image_url}
+              alt=""
+              sizes="(max-width: 1023px) 100vw, 420px"
+              className="membership-card-backdrop object-cover"
+              aria-hidden="true"
+            />
+          ) : null}
           <Image
             key={`${identity?.token_id ?? "pending"}-${identity?.metadata_version ?? 0}-${identity?.image_url || "fallback"}`}
             fill
@@ -152,7 +165,7 @@ function IdentityPanel({
             src={identity?.is_member_card && identity?.image_url ? identity.image_url : "/img/membercard/membercard.jpg"}
             alt={`${level} Fanora 链上会员身份`}
             sizes="(max-width: 1023px) 100vw, 420px"
-            className="membership-card-image object-cover"
+            className={`membership-card-image ${identity?.is_member_card && identity?.image_url ? "object-contain" : "object-cover"}`}
           />
           <span className="membership-card-pixels" aria-hidden="true" />
           {!identity?.is_member_card || cardPhase === "processing" ? (
@@ -170,7 +183,7 @@ function IdentityPanel({
           ) : null}
           {identity?.card_needs_refresh && cardPhase === "idle" ? (
             <span className="absolute inset-x-4 bottom-4 z-10 rounded-md bg-[#081832]/85 px-4 py-3 text-center text-xs font-semibold text-white backdrop-blur-md">
-              等级或资料已更新，点击卡面刷新会员证
+              会员等级已更新，点击卡面刷新会员证
             </span>
           ) : null}
           <span className="absolute right-4 top-4 z-10 rounded-full bg-black/45 px-3 py-1 font-mono text-[10px] text-white/80 backdrop-blur-md">
@@ -246,31 +259,6 @@ function IdentityPanel({
             </p>
           </div>
         </div>
-
-        {cardPhase !== "idle" ? (
-          <div className="mt-6">
-            <ChainTransactionProgress
-              phase={cardPhase}
-              kind="member-card"
-              compact
-              title={cardPhase === "complete" ? "会员证 NFT 已揭晓" : "正在制作会员证 NFT"}
-              detail={cardPhase === "complete" ? "卡面、二维码与链上 metadata 已完成确认。" : "交易已提交，节点正在依次合成卡面、写入 IPFS 并确认链上身份。"}
-              artifactName={`${level} Member Card${visibleTokenId ? ` #${visibleTokenId}` : ""}`}
-              imageUrl={identity?.image_url}
-            />
-          </div>
-        ) : syncPhase !== "idle" ? (
-          <div className="mt-6">
-            <ChainTransactionProgress
-              phase={syncPhase}
-              kind="identity"
-              compact
-              title={syncPhase === "complete" ? "身份区块已确认" : "正在刷新链上身份"}
-              detail={syncPhase === "complete" ? "等级、Owner 与身份 Token 已完成链上校验。" : "交易已提交，验证节点正在依次读取并确认身份数据。"}
-              artifactName={`${level} Identity${visibleTokenId ? ` #${visibleTokenId}` : ""}`}
-            />
-          </div>
-        ) : null}
 
         <dl className="mt-8 grid border-y border-jacarta-100 py-6 dark:border-white/10 sm:grid-cols-3">
           <div className="py-2 sm:border-r sm:border-jacarta-100 sm:px-5 sm:first:pl-0 dark:sm:border-white/10">
@@ -485,17 +473,21 @@ export default function CollectionDashboard() {
   const [activeTab, setActiveTab] = useState<CollectionTab>("identity");
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
-  const [identityPhase, setIdentityPhase] = useState<TransactionPhase>("idle");
   const [cardPhase, setCardPhase] = useState<TransactionPhase>("idle");
   const [downloadingCard, setDownloadingCard] = useState(false);
   const [avatarBusyTokenId, setAvatarBusyTokenId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [fanProfile, setFanProfile] = useState<FanProfileAnalysis | null>(null);
   const [copied, setCopied] = useState(false);
   const initializedUserRef = useRef<string | null>(null);
   const autoCardSyncKeyRef = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
+    setFanProfile(null);
+    void api.get<FanProfileAnalysis>("/profile/me")
+      .then((response) => setFanProfile(response.data))
+      .catch(() => setFanProfile(null));
     try {
       const response = await api.get<MyCollection>("/nft/me");
       setCollection(response.data);
@@ -517,55 +509,120 @@ export default function CollectionDashboard() {
 
   const syncIdentity = useCallback(async (announce = true) => {
     setBusy("identity");
-    if (announce) setIdentityPhase("processing");
     if (announce) setNotice(null);
+    if (announce) {
+      void NiceModal.show(GlobalProcessModal, {
+        title: "正在铸造链上身份",
+        message: "正在同步会员等级、验证钱包 Owner，并等待 Monad 区块确认。完成前暂时无法操作其他区域。",
+        eyebrow: "MONAD TRANSACTION",
+        gifUrl: null,
+        phase: "processing",
+        progressKind: "identity",
+        artifactName: `${user?.level || "Fanora"} Identity`,
+      });
+    }
     try {
       await api.post<MyCollection>("/nft/identity/sync");
-      const [collectionResponse] = await Promise.all([
-        api.get<MyCollection>("/nft/me"),
-        refreshUser(),
-      ]);
+      const collectionResponse = await api.get<MyCollection>("/nft/me");
       setCollection(collectionResponse.data);
+      void refreshUser().catch(() => undefined);
       if (announce) {
         const confirmed = collectionResponse.data.identity?.status === "CONFIRMED";
-        setIdentityPhase(confirmed ? "complete" : "idle");
         setNotice(confirmed ? "链上会员身份与徽章数据已更新。" : "同步任务已记录，可稍后重试。");
-        if (confirmed) await new Promise((resolve) => window.setTimeout(resolve, 1400));
-        setIdentityPhase("idle");
+        await hideGlobalProcessModal();
+        if (confirmed) {
+          const syncedIdentity = collectionResponse.data.identity;
+          await NiceModal.show(GlobalInfoModal, {
+            title: `获得 ${user?.level || "Fanora"} 链上身份`,
+            message: "会员等级、钱包 Owner 与身份 Token 已在 Monad 完成确认。",
+            tone: "success",
+            eyebrow: "IDENTITY MINTED",
+            imageUrl: syncedIdentity?.image_url,
+            imageAlt: `${user?.level || "Fanora"} 链上会员身份`,
+            celebrate: true,
+            actionLabel: "查看链上 NFT",
+            actionUrl: syncedIdentity?.explorer_url,
+          });
+        }
       }
     } catch (error) {
-      if (announce) setIdentityPhase("idle");
-      setNotice(errorText(error));
+      if (announce) {
+        await hideGlobalProcessModal();
+        void NiceModal.show(GlobalInfoModal, {
+          title: "链上身份没有完成",
+          message: errorText(error),
+          tone: "error",
+          eyebrow: "IDENTITY ERROR",
+          confirmLabel: "返回重试",
+        });
+      } else {
+        setNotice(errorText(error));
+      }
     } finally {
       setBusy(null);
     }
-  }, [refreshUser]);
+  }, [refreshUser, user?.level]);
 
   const runMembershipCardAction = useCallback(async () => {
     const hasCard = Boolean(collection?.identity?.is_member_card);
     setBusy("member-card");
     setCardPhase("processing");
     setNotice(null);
+    void NiceModal.show(GlobalProcessModal, {
+      title: hasCard ? "正在更新会员证 NFT" : "正在制作会员证 NFT",
+      message: "正在合成会员证卡面、写入 IPFS，并等待 Monad 确认链上 metadata。",
+      eyebrow: "MONAD TRANSACTION",
+      gifUrl: null,
+      phase: "processing",
+      progressKind: "member-card",
+      artifactName: `${user?.level || "Fanora"} Member Card`,
+      imageUrl: collection?.identity?.image_url,
+    });
     try {
       const endpoint = hasCard ? "/nft/identity/card/refresh" : "/nft/identity/card";
       const response = await api.post<MembershipCardAction>(endpoint);
       setCollection(response.data.collection);
-      await refreshUser();
       setCardPhase("complete");
+      await hideGlobalProcessModal();
+      void refreshUser().catch(() => undefined);
       setNotice(
         response.data.changed
           ? "会员证已按最新等级和资料更新，Token ID 保持不变。"
           : "会员证已经是最新版本，无需重复写入链上。",
       );
-      await new Promise((resolve) => window.setTimeout(resolve, 1800));
+      const completedIdentity = response.data.collection.identity;
+      window.sessionStorage.removeItem("fanora.membership.card.onboarding");
+      if (window.location.search.includes("welcome=member-card")) {
+        window.history.replaceState(null, "", "/collection");
+      }
+      await NiceModal.show(GlobalInfoModal, {
+        title: response.data.changed ? `获得 ${user?.level || "Fanora"} 会员证 NFT` : "会员证 NFT 已是最新状态",
+        message: response.data.changed
+          ? "卡面、二维码与 metadata 已完成更新，并在 Monad 上确认。"
+          : "当前链上会员证已与最新等级和资料一致，无需重复铸造。",
+        tone: "success",
+        eyebrow: response.data.changed ? "MEMBER CARD MINTED" : "MEMBER CARD VERIFIED",
+        imageUrl: completedIdentity?.image_url,
+        imageAlt: `${user?.level || "Fanora"} 会员证 NFT`,
+        celebrate: response.data.changed,
+        actionLabel: "查看链上 NFT",
+        actionUrl: completedIdentity?.explorer_url,
+      });
       setCardPhase("idle");
     } catch (error) {
       setCardPhase("idle");
-      setNotice(errorText(error));
+      await hideGlobalProcessModal();
+      void NiceModal.show(GlobalInfoModal, {
+        title: "会员证 NFT 没有完成",
+        message: errorText(error),
+        tone: "error",
+        eyebrow: "MEMBER CARD ERROR",
+        confirmLabel: "返回重试",
+      });
     } finally {
       setBusy(null);
     }
-  }, [collection?.identity?.is_member_card, refreshUser]);
+  }, [collection?.identity?.image_url, collection?.identity?.is_member_card, refreshUser, user?.level]);
 
   const downloadMembershipCard = useCallback(async () => {
     const downloadUrl = collection?.identity?.download_url;
@@ -618,14 +675,14 @@ export default function CollectionDashboard() {
 
   const identity = collection?.identity;
   useEffect(() => {
-    if (status !== "authenticated" || !user?.is_official_member || !collection || busy) return;
+    const onboardingUserId = window.sessionStorage.getItem("fanora.membership.card.onboarding");
+    const onboarding = Boolean(user && onboardingUserId === user.id);
+    if (status !== "authenticated" || (!user?.is_official_member && !onboarding) || !collection || busy) return;
     if (identity?.is_member_card && !identity.card_needs_refresh) return;
     const syncKey = [
       user.id,
       user.level,
-      user.fan_token_lifetime_earned,
       identity?.token_id || "new",
-      identity?.metadata_version || 0,
     ].join(":");
     if (autoCardSyncKeyRef.current === syncKey) return;
     autoCardSyncKeyRef.current = syncKey;
@@ -752,6 +809,12 @@ export default function CollectionDashboard() {
         </div>
       </section>
 
+      {fanProfile ? (
+        <div className="community-reveal mx-auto max-w-6xl px-5 py-9 [animation-delay:120ms]">
+          <FanProfileSummary profile={fanProfile} ownerLabel="我的个人画像" />
+        </div>
+      ) : null}
+
       <div className="community-reveal border-b border-jacarta-100 bg-white [animation-delay:140ms] dark:border-white/10 dark:bg-jacarta-800">
         <nav className="mx-auto flex max-w-6xl gap-8 overflow-x-auto px-5" aria-label="收藏分类">
           {tabs.map((tab) => (
@@ -800,7 +863,6 @@ export default function CollectionDashboard() {
             fanTokenBalance={user.fan_token_balance}
             fanTokenLifetimeEarned={user.fan_token_lifetime_earned}
             busy={Boolean(busy)}
-            syncPhase={identityPhase}
             cardPhase={cardPhase}
             downloading={downloadingCard}
             onSync={() => void (identity?.is_member_card ? runMembershipCardAction() : syncIdentity())}

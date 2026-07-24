@@ -1,6 +1,6 @@
 "use client";
 
-import axios from "axios";
+import NiceModal from "@ebay/nice-modal-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -11,10 +11,12 @@ import FanTokenAmount from "@/components/common/FanTokenAmount";
 import ImageGallery from "@/components/community/ImageGallery";
 import MarkdownContent from "@/components/community/MarkdownContent";
 import MarkdownEditor from "@/components/community/MarkdownEditor";
-import ChainTransactionProgress, { type TransactionPhase } from "@/components/nft/ChainTransactionProgress";
-import UserAvatar from "@/components/profile/UserAvatar";
+import GlobalInfoModal from "@/components/modals/GlobalInfoModal";
+import GlobalProcessModal, { hideGlobalProcessModal } from "@/components/modals/GlobalProcessModal";
+import UserIdentityLink from "@/components/profile/UserIdentityLink";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { api } from "@/lib/api/client";
+import { apiErrorMessage } from "@/lib/api/errors";
 import type { FanNftAiDraft, FanNftCreateResponse, FanNftEngagement, FanNftListing, FanNftPurchaseResponse } from "@/lib/api/types";
 import { resetNftTilt, updateNftTilt } from "@/components/nft/nftMotion";
 
@@ -58,9 +60,7 @@ const itemImageGalleryOptions: PhotoSwipeOptions = {
 };
 
 function errorText(error: unknown) {
-  if (axios.isAxiosError(error)) return error.response?.data?.detail || "请求暂时没有完成。";
-  if (error instanceof Error) return error.message;
-  return "请求暂时没有完成。";
+  return apiErrorMessage(error, "请求暂时没有完成。");
 }
 
 function formatDate(value: string) {
@@ -76,6 +76,10 @@ function formatFullDate(value: string | null) {
     hour: "2-digit",
     minute: "2-digit",
   }).format(new Date(value));
+}
+
+function waitForUi(ms: number) {
+  return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
 function shortAddress(address: string | null) {
@@ -190,17 +194,13 @@ function NftCard({
       </Link>
       <div className="p-5">
         <div className="flex items-center gap-3">
-          <UserAvatar
-            avatarUrl={item.creator.avatar_url}
-            seed={item.creator.id}
-            displayName={item.creator.display_name}
-            className="h-9 w-9 rounded-full"
-          />
-          <div className="min-w-0">
-            <Link href={`/collection/${item.creator.id}`} className="block truncate text-sm font-semibold text-jacarta-700 hover:text-accent dark:text-white">
-              {item.creator.display_name}
-            </Link>
-            <p className="text-xs text-jacarta-400">{item.creator.level}</p>
+          <div className="min-w-0 flex-1">
+            <UserIdentityLink
+              author={item.creator}
+              avatarClassName="h-9 w-9 rounded-full"
+              nameClassName="text-sm font-semibold text-jacarta-700 dark:text-white"
+            />
+            <p className="ml-11 text-xs text-jacarta-400">{item.creator.level}</p>
           </div>
         </div>
         <Link href={`/item/${item.id}`} onClick={(event) => { event.preventDefault(); event.currentTarget.blur(); onOpen(item); }} className="mt-4 block">
@@ -260,22 +260,47 @@ function PublishModal({
   });
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const [progressText, setProgressText] = useState("正在准备发布 NFT...");
-  const [publishPhase, setPublishPhase] = useState<TransactionPhase>("idle");
   const [storyImageUrls, setStoryImageUrls] = useState<string[]>([]);
   const [aiBrief, setAiBrief] = useState("");
   const [aiBusy, setAiBusy] = useState(false);
   const [aiAttributes, setAiAttributes] = useState<Array<{ trait_type: string; value: string }>>([]);
+  const [referenceImageDataUrl, setReferenceImageDataUrl] = useState("");
+  const [aiGeneratedImage, setAiGeneratedImage] = useState("");
+  const [aiNotice, setAiNotice] = useState<string | null>(null);
+
+  const showFormError = (title: string, detail: string) => {
+    void NiceModal.show(GlobalInfoModal, {
+      title,
+      message: detail,
+      tone: "error",
+      eyebrow: "NFT FORM",
+      confirmLabel: "返回修改",
+    });
+  };
+
+  const selectImageFile = async (file: File, target: "nft" | "reference") => {
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      showFormError("图片格式不支持", "请选择 PNG、JPEG 或 WebP 图片。");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      showFormError("图片文件过大", "图片不能超过 5 MB，请压缩后再上传。");
+      return;
+    }
+    const imageDataUrl = await fileToDataUrl(file);
+    if (target === "reference") setReferenceImageDataUrl(imageDataUrl);
+    else setDraft((current) => ({ ...current, image_data_url: imageDataUrl }));
+  };
 
   const generateAiDraft = async () => {
     const story = aiBrief.trim() || stripMarkdown(draft.description);
     const theme = draft.theme.trim();
     if (story.length < 10 || theme.length < 2) {
-      setNotice("先填写主题，并用至少 10 个字描述希望保存的粉丝故事或画面。");
+      showFormError("还缺少生成信息", "先填写主题，并用至少 10 个字描述希望保存的粉丝故事或画面。");
       return;
     }
     setAiBusy(true);
-    setNotice("Agent 正在生成可编辑的 metadata 草稿与 NFT 图片…");
+    setAiNotice("Agent 正在生成可编辑的 metadata 草稿与 NFT 图片…");
     try {
       const response = await api.post<FanNftAiDraft>("/nft/creations/ai-draft", {
         theme,
@@ -283,6 +308,7 @@ function PublishModal({
         preferred_name: draft.name || null,
         visual_style: "高级音乐纪念品、电影感舞台光影、方形收藏卡构图",
         reference_notes: "保留粉丝个人故事的情绪，不使用品牌 Logo、水印或可读文字",
+        reference_image_data_url: referenceImageDataUrl || null,
         generate_image: true,
       });
       const result = response.data;
@@ -291,14 +317,15 @@ function PublishModal({
         name: result.name,
         description: result.description,
         theme: result.theme,
-        image_data_url: result.image_data_url || current.image_data_url,
       }));
+      setAiGeneratedImage(result.image_data_url || "");
       setAiAttributes(result.suggested_attributes);
-      setNotice(result.image_data_url
+      setAiNotice(result.image_data_url
         ? "AI 草稿和图片已生成。请确认名称、描述、图片、定价和数量后再发布。"
         : `metadata 草稿已生成；${result.image_error || "图片服务暂不可用，请上传自己的图片。"}`);
     } catch (error) {
-      setNotice(errorText(error));
+      setAiNotice(null);
+      showFormError("AI 图片没有生成", errorText(error));
     } finally {
       setAiBusy(false);
     }
@@ -317,40 +344,89 @@ function PublishModal({
 
   const publish = async () => {
     if (!user) {
-      setNotice("请先连接钱包登录。");
+      showFormError("请先登录", "连接钱包并登录后，才能发布限量粉丝 NFT。");
       return;
     }
     if (!user.is_official_member) {
-      setNotice("正式入会后才能发布粉丝 NFT。");
+      showFormError("需要正式会员身份", "正式入会后才能发布粉丝 NFT。");
       return;
     }
     if (user.fan_token_balance < publishFeeFanTokens) {
-      setNotice(`可用 FAN 不足，发布 NFT 需要 ${publishFeeFanTokens} FAN。`);
+      showFormError("可用 FAN 不足", `发布 NFT 需要 ${publishFeeFanTokens} FAN。`);
+      return;
+    }
+    if (draft.name.trim().length < 2) {
+      showFormError("请填写 NFT 名称", "名称至少需要 2 个字符。");
+      return;
+    }
+    if (draft.theme.trim().length < 2) {
+      showFormError("请填写主题", "主题或分类至少需要 2 个字符。");
+      return;
+    }
+    if (stripMarkdown(draft.description).length < 2) {
+      showFormError("请填写 NFT 故事", "用一句话说明这件作品保存的粉丝故事即可。");
+      return;
+    }
+    if (!draft.image_data_url) {
+      showFormError("请选择 NFT 图片", "上传自己的图片，或点击 AI 生成结果将它选为 NFT 图片。");
+      return;
+    }
+    if (!Number.isInteger(draft.price_fan_tokens) || draft.price_fan_tokens < 1) {
+      showFormError("定价不正确", "NFT 定价至少为 1 FAN。");
+      return;
+    }
+    if (!Number.isInteger(draft.max_supply) || draft.max_supply < 1 || draft.max_supply > 1000) {
+      showFormError("发行数量不正确", "发行数量需要在 1 到 1000 之间。");
+      return;
+    }
+    if (draft.copyright_declaration.trim().length < 10) {
+      showFormError("请确认版权声明", "版权声明至少需要 10 个字符。");
       return;
     }
     setBusy(true);
-    setPublishPhase("processing");
     setNotice(null);
-    setProgressText("正在上传图片与 metadata 到 IPFS，并创建链上限量资产。这个过程可能需要几十秒。");
+    void NiceModal.show(GlobalProcessModal, {
+      title: "正在发布并铸造 NFT",
+      message: "正在上传图片与 metadata 到 IPFS，并创建链上限量资产。确认完成前暂时无法操作其他区域。",
+      eyebrow: "MONAD TRANSACTION",
+      gifUrl: null,
+      phase: "processing",
+      progressKind: "publish",
+      artifactName: draft.name || "Fanora NFT",
+      imageUrl: draft.image_data_url,
+    });
     try {
       const response = await api.post<FanNftCreateResponse>("/nft/creations", {
         ...draft,
         story_image_urls: storyImageUrls,
         public_attributes: aiAttributes.length ? aiAttributes : [{ trait_type: "Theme", value: draft.theme }],
       });
-      setProgressText("链上铸造已确认，正在更新你的 NFT 页面。");
-      setPublishPhase("complete");
-      await refreshUser();
-      await new Promise((resolve) => window.setTimeout(resolve, 1400));
+      setBusy(false);
       onPublished(response.data.listing);
+      void refreshUser().catch(() => undefined);
+      void hideGlobalProcessModal().catch(() => undefined);
       setNotice("NFT 已发布到 Pinata，并创建了链上限量资产。");
       setDraft((current) => ({ ...current, name: "", description: "", theme: "", image_data_url: "" }));
       setStoryImageUrls([]);
       setAiAttributes([]);
       setAiBrief("");
+      setReferenceImageDataUrl("");
+      setAiGeneratedImage("");
+      void NiceModal.show(GlobalInfoModal, {
+        title: `获得 ${response.data.listing.name}`,
+        message: "图片与 metadata 已写入 IPFS，限量 NFT 已在 Monad 完成创建。现在可以进入 NFT 页面查看链上信息。",
+        tone: "success",
+        eyebrow: "NFT MINTED",
+        imageUrl: response.data.listing.image_url,
+        imageAlt: response.data.listing.name,
+        celebrate: true,
+        actionLabel: "查看链上 NFT",
+        actionUrl: response.data.listing.explorer_url,
+        confirmLabel: "知道了",
+      });
     } catch (error) {
-      setPublishPhase("idle");
-      setNotice(errorText(error));
+      await hideGlobalProcessModal();
+      showFormError("NFT 发布没有完成", errorText(error));
     } finally {
       setBusy(false);
     }
@@ -379,29 +455,6 @@ function PublishModal({
           <span aria-hidden="true" className="block leading-none">×</span>
         </button>
 
-        {busy ? (
-          <div className="flex min-h-[520px] flex-col items-center justify-center text-center">
-            <Image
-              src="/img/process/cyancat.gif"
-              alt="正在发布 NFT"
-              width={220}
-              height={220}
-              unoptimized
-              className="h-20 w-20 object-contain sm:h-24 sm:w-24"
-            />
-            {publishPhase !== "idle" ? (
-              <ChainTransactionProgress
-                phase={publishPhase}
-                kind="publish"
-                title={publishPhase === "complete" ? "NFT 已形成" : "正在发布 NFT"}
-                detail={progressText}
-                artifactName={draft.name || "Fanora NFT"}
-                imageUrl={draft.image_data_url}
-              />
-            ) : null}
-          </div>
-        ) : (
-          <>
         <div className="flex flex-wrap items-center justify-between gap-4 pr-10">
           <div>
             <p className="text-xs font-bold uppercase text-accent">Create Fan NFT</p>
@@ -435,8 +488,26 @@ function PublishModal({
             onChange={async (event) => {
               const file = event.target.files?.[0];
               if (!file) return;
-              const imageDataUrl = await fileToDataUrl(file);
-              setDraft((current) => ({ ...current, image_data_url: imageDataUrl }));
+              await selectImageFile(file, "nft");
+            }}
+          />
+        </label>
+        <label className="group flex cursor-pointer items-center gap-3 rounded-lg border border-dashed border-accent/30 bg-accent/[.06] p-3 text-left transition-colors hover:border-accent/60 hover:bg-accent/10">
+          <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-md bg-white/[.06]">
+            {referenceImageDataUrl ? <Image src={referenceImageDataUrl} alt="AI 参考图" fill unoptimized sizes="56px" className="object-cover" /> : <span className="grid h-full place-items-center text-xl text-accent">＋</span>}
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-jacarta-700 dark:text-white">上传 AI 参考图</span>
+            <span className="mt-1 block text-xs leading-5 text-jacarta-400">可选 · PNG、JPEG、WebP，最大 5 MB</span>
+          </span>
+          <input
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="sr-only"
+            onChange={async (event) => {
+              const file = event.target.files?.[0];
+              if (!file) return;
+              await selectImageFile(file, "reference");
             }}
           />
         </label>
@@ -455,6 +526,19 @@ function PublishModal({
         >
           {aiBusy ? "AI 生成中…" : "AI 生成草稿与图片"}
         </button>
+        {aiNotice ? <p className="rounded-lg border border-accent/20 bg-accent/[.06] px-3 py-2 text-xs leading-5 text-accent dark:text-accent-lighter">{aiNotice}</p> : null}
+        {aiGeneratedImage ? (
+          <button
+            type="button"
+            onClick={() => setDraft((current) => ({ ...current, image_data_url: aiGeneratedImage }))}
+            className={`overflow-hidden rounded-lg border p-2 text-left transition-all ${draft.image_data_url === aiGeneratedImage ? "border-emerald-400 bg-emerald-400/10" : "border-accent/30 bg-accent/[.05] hover:border-accent"}`}
+          >
+            <Image src={aiGeneratedImage} alt="AI 生成的 NFT 图片" width={300} height={300} unoptimized className="aspect-square w-full rounded-md object-cover" />
+            <span className="mt-2 block text-center text-xs font-semibold text-accent dark:text-accent-lighter">
+              {draft.image_data_url === aiGeneratedImage ? "✓ 已选择为 NFT 图片" : "点击选择作为 NFT 图片"}
+            </span>
+          </button>
+        ) : null}
         <p className="text-xs leading-5 text-jacarta-400">生成结果只会填入草稿，不会自动设置价格、供应量或上链发布。</p>
         </div>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -497,8 +581,6 @@ function PublishModal({
           {busy ? "正在发布..." : "发布 NFT"}
         </button>
       </div>
-          </>
-        )}
       </section>
     </div>
   );
@@ -695,7 +777,6 @@ export default function FanNftMarket({ mode, itemId, variant = "page", onClose }
   const loadMoreSentinel = useRef<HTMLDivElement | null>(null);
   const [hasMoreItems, setHasMoreItems] = useState(true);
   const [loadingMoreItems, setLoadingMoreItems] = useState(false);
-  const [buyPhase, setBuyPhase] = useState<TransactionPhase>("idle");
   const drawerScrollRef = useRef<HTMLElement | null>(null);
 
   const id = itemId || params?.id;
@@ -810,19 +891,57 @@ export default function FanNftMarket({ mode, itemId, variant = "page", onClose }
       return;
     }
     setBusy("buy");
-    setBuyPhase("processing");
     setNotice(null);
+    void NiceModal.show(GlobalProcessModal, {
+      title: "正在购买并铸造",
+      message: "交易已提交，正在扣除 FAN、连接 Monad 验证节点并把 NFT 铸造到你的钱包。",
+      eyebrow: "MONAD TRANSACTION",
+      gifUrl: null,
+      phase: "processing",
+      progressKind: "mint",
+      artifactName: item.name,
+      imageUrl: item.image_url,
+    });
     try {
       const response = await api.post<FanNftPurchaseResponse>(`/nft/creations/${item.id}/buy`);
       setItem(response.data.listing);
-      await refreshUser();
-      setBuyPhase("complete");
+      setBusy(null);
+      void refreshUser().catch(() => undefined);
+      void NiceModal.show(GlobalProcessModal, {
+        title: "NFT 已进入钱包",
+        message: "Monad 已确认交易，收藏记录正在更新，NFT 卡片已经形成。",
+        eyebrow: "MONAD TRANSACTION",
+        gifUrl: null,
+        phase: "complete",
+        progressKind: "mint",
+        artifactName: response.data.collectible.name,
+        imageUrl: response.data.collectible.image_url || response.data.listing.image_url,
+      });
+      await waitForUi(1200);
+      void hideGlobalProcessModal().catch(() => undefined);
       setNotice("购买成功，NFT 已铸造到你的钱包。");
-      await new Promise((resolve) => window.setTimeout(resolve, 1400));
-      setBuyPhase("idle");
+      void NiceModal.show(GlobalInfoModal, {
+        title: `获得 ${response.data.collectible.name}`,
+        message: "Monad 已确认购买与铸造交易，这件 NFT 已进入你的链上收藏。",
+        tone: "success",
+        eyebrow: "NFT ACQUIRED",
+        imageUrl: response.data.collectible.image_url || response.data.listing.image_url,
+        imageAlt: response.data.collectible.name,
+        celebrate: true,
+        actionLabel: "查看链上 NFT",
+        actionUrl: response.data.collectible.explorer_url || response.data.listing.explorer_url,
+        confirmLabel: "知道了",
+      });
     } catch (error) {
-      setBuyPhase("idle");
-      setNotice(errorText(error));
+      setBusy(null);
+      await hideGlobalProcessModal().catch(() => undefined);
+      void NiceModal.show(GlobalInfoModal, {
+        title: "NFT 购买没有完成",
+        message: errorText(error),
+        tone: "error",
+        eyebrow: "MINT ERROR",
+        confirmLabel: "返回重试",
+      });
     } finally {
       setBusy(null);
     }
@@ -916,6 +1035,16 @@ export default function FanNftMarket({ mode, itemId, variant = "page", onClose }
     router.push("/collections");
   };
 
+  const handlePublished = useCallback((created: FanNftListing) => {
+    setPublishOpen(false);
+    setItems((current) => [created, ...current.filter((entry) => entry.id !== created.id)]);
+    if (mode === "create") {
+      router.replace("/collections");
+      return;
+    }
+    void loadItemPage(true);
+  }, [loadItemPage, mode, router]);
+
   const Root = mode === "item" && variant === "drawer" ? "div" : "main";
   return (
     <Root ref={(node) => { drawerScrollRef.current = node; }} className={mode === "item" ? variant === "drawer" ? "community-letter-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#f7f7fb] dark:bg-jacarta-900" : "min-h-screen bg-[#f7f7fb] pb-24 pt-[88px] dark:bg-jacarta-900" : "web3-page-shell min-h-screen pb-24 pt-28 md:pt-32"}>
@@ -926,7 +1055,7 @@ export default function FanNftMarket({ mode, itemId, variant = "page", onClose }
             setPublishOpen(false);
             if (mode === "create") router.push("/collections");
           }}
-          onPublished={(created) => router.push(`/item/${created.id}`)}
+          onPublished={handlePublished}
         />
 
         {notice ? <div className="community-reveal mb-7 rounded-2xl border border-accent/20 bg-accent/10 px-5 py-4 text-sm font-semibold text-accent-lighter">{notice}</div> : null}
@@ -954,9 +1083,7 @@ export default function FanNftMarket({ mode, itemId, variant = "page", onClose }
             <div className="md:w-3/5 md:basis-auto md:pl-8 lg:w-1/2 lg:pl-[3.75rem]">
               <div className="mb-3 flex items-center gap-4">
                 <div className="flex min-w-0 items-center gap-2">
-                  <Link href={`/collection/${item.creator.id}`} className="truncate text-sm font-bold text-accent">
-                    {item.creator.display_name}
-                  </Link>
+                  <UserIdentityLink author={item.creator} avatarClassName="hidden" nameClassName="text-sm font-bold text-accent" />
                   <VerifiedMark />
                 </div>
                 <div className="ml-auto flex shrink-0 gap-2">
@@ -1002,16 +1129,14 @@ export default function FanNftMarket({ mode, itemId, variant = "page", onClose }
               <div className="mb-8 flex flex-wrap">
                 <div className="mr-8 mb-4 flex">
                   <figure className="mr-4 shrink-0">
-                    <Link href={`/collection/${item.creator.id}`} className="relative block">
-                      <UserAvatar avatarUrl={item.creator.avatar_url} seed={item.creator.id} displayName={item.creator.display_name} className="h-12 w-12 rounded-2lg" />
+                    <span className="relative block">
+                      <UserIdentityLink author={item.creator} avatarClassName="h-12 w-12 rounded-2lg" showName={false} />
                       <span className="absolute -right-3 top-[60%]"><VerifiedMark /></span>
-                    </Link>
+                    </span>
                   </figure>
                   <div className="flex flex-col justify-center">
                     <span className="block text-sm text-jacarta-400 dark:text-white">Creator</span>
-                    <Link href={`/collection/${item.creator.id}`} className="block text-accent">
-                      <span className="text-sm font-bold">@{item.creator.display_name}</span>
-                    </Link>
+                    <UserIdentityLink author={item.creator} avatarClassName="hidden" nameClassName="text-sm font-bold text-accent" />
                   </div>
                 </div>
                 <div className="mb-4 flex">
@@ -1028,18 +1153,6 @@ export default function FanNftMarket({ mode, itemId, variant = "page", onClose }
               </div>
 
               <div className="rounded-2lg border border-jacarta-100 bg-white p-8 dark:border-jacarta-600 dark:bg-jacarta-700">
-                {buyPhase !== "idle" ? (
-                  <ChainTransactionProgress
-                    phase={buyPhase}
-                    kind="mint"
-                    compact
-                    title={buyPhase === "complete" ? "NFT 已进入钱包" : "正在购买并铸造"}
-                    detail={buyPhase === "complete" ? "Monad 已确认交易，收藏记录正在更新。" : "交易已提交，正在连接验证节点并铸造 NFT。"}
-                    artifactName={item.name}
-                    imageUrl={item.image_url}
-                  />
-                ) : (
-                  <>
                 <div className="mb-8 sm:flex sm:flex-wrap">
                   <div className="sm:w-1/2 sm:pr-4 lg:pr-8">
                     <span className="text-sm text-jacarta-400 dark:text-jacarta-300">当前价格</span>
@@ -1059,8 +1172,6 @@ export default function FanNftMarket({ mode, itemId, variant = "page", onClose }
                 <button type="button" disabled={Boolean(busy) || item.remaining_supply <= 0} onClick={() => void buy()} className="inline-block w-full rounded-full bg-accent px-8 py-3 text-center font-semibold text-white shadow-accent-volume transition-all hover:bg-accent-dark disabled:opacity-50">
                   {busy === "buy" ? "正在购买..." : item.remaining_supply <= 0 ? "已售罄" : "购买并铸造"}
                 </button>
-                  </>
-                )}
               </div>
             </div>
           </section>
