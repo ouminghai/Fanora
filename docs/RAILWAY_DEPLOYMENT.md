@@ -6,7 +6,7 @@
 
 - Railway 使用 `backend/Dockerfile` 构建。
 - 容器读取 Railway 注入的 `PORT`，本地默认 `8000`。
-- 容器启动前执行 `alembic upgrade head`；迁移失败时 API 不会启动。
+- 容器启动前执行 `alembic upgrade head`；迁移会按 `MIGRATION_MAX_ATTEMPTS` 重试，最终失败时 API 不会启动。
 - Railway 的 `postgres://` 或 `postgresql://` 会自动规范为 `postgresql+psycopg://`。
 - 健康检查为 `/api/v1/health`。
 - 生产环境设置 `AUTO_CREATE_SCHEMA=false`，schema 只由 Alembic 管理。
@@ -34,6 +34,8 @@ ENVIRONMENT=production
 DEBUG=false
 AUTO_CREATE_SCHEMA=false
 RUN_MIGRATIONS=true
+MIGRATION_MAX_ATTEMPTS=12
+MIGRATION_RETRY_DELAY_SECONDS=5
 FRONTEND_ORIGINS=https://your-frontend.example
 INTERNAL_API_KEY=<至少 32 字节随机值>
 DATABASE_URL=${{Postgres.DATABASE_URL}}
