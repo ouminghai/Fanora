@@ -26,8 +26,17 @@ class ConfirmedContractTransaction:
 
 
 def _load_abi(name: str) -> list[dict[str, Any]]:
-    path = Path(__file__).resolve().parents[3] / "shared" / "contracts" / f"{name}.json"
-    return json.loads(path.read_text(encoding="utf-8"))["abi"]
+    current_file = Path(__file__).resolve()
+    candidates = (
+        current_file.parents[1] / "contracts" / f"{name}.json",
+        current_file.parents[2] / "shared" / "contracts" / f"{name}.json",
+        current_file.parents[3] / "shared" / "contracts" / f"{name}.json",
+    )
+    for path in candidates:
+        if path.exists():
+            return json.loads(path.read_text(encoding="utf-8"))["abi"]
+    searched = ", ".join(str(path) for path in candidates)
+    raise FileNotFoundError(f"Contract ABI {name} was not found. Searched: {searched}")
 
 
 def bytes32_from_hex(value: str) -> bytes:
