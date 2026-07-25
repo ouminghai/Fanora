@@ -65,17 +65,17 @@
     },
     {
       "inputs": [],
-      "name": "InvalidMembershipFee",
-      "type": "error"
-    },
-    {
-      "inputs": [],
       "name": "InvalidPaymentId",
       "type": "error"
     },
     {
       "inputs": [],
       "name": "InvalidWithdrawalAmount",
+      "type": "error"
+    },
+    {
+      "inputs": [],
+      "name": "MembershipFeeNotFree",
       "type": "error"
     },
     {
@@ -334,6 +334,24 @@
         }
       ],
       "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "account",
+          "type": "address"
+        },
+        {
+          "internalType": "bytes32",
+          "name": "paymentId",
+          "type": "bytes32"
+        }
+      ],
+      "name": "activateFreeMembership",
+      "outputs": [],
+      "stateMutability": "nonpayable",
       "type": "function"
     },
     {

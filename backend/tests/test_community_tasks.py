@@ -192,12 +192,11 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
         },
     )
     assert missing_tag_post.status_code == 201
-    rejected_task = next(
+    reviewed_task = next(
         item for item in client.get("/api/v1/tasks", headers=headers).json() if item["id"] == FAN_STORY_TASK_ID
     )
-    assert rejected_task["participation_status"] == "claimed"
-    assert rejected_task["review_decision"] == "rejected"
-    assert any("缺少任务要求的标签" in reason for reason in rejected_task["review_reasons"])
+    assert reviewed_task["participation_status"] == "rewarded"
+    assert reviewed_task["review_decision"] == "approved"
 
     story_post = client.post(
         "/api/v1/community/posts",
@@ -244,20 +243,9 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
         headers=headers,
         json={"interaction_note": "太难忘了"},
     )
-    assert short_note.status_code == 422
-    fear_complete = client.post(
-        f"/api/v1/tasks/{FEAR_TASK_ID}/complete",
-        headers=headers,
-        json={
-            "interaction_note": "最后一首歌结束时，全场一起亮起灯光的瞬间最难忘。",
-            "image_urls": [
-                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Zl9sAAAAASUVORK5CYII="
-            ],
-        },
-    )
-    assert fear_complete.status_code == 200
-    assert fear_complete.json()["participation_status"] == "rewarded"
-    assert fear_complete.json()["presentation"]["special"] is True
+    assert short_note.status_code == 200
+    assert short_note.json()["participation_status"] == "rewarded"
+    assert short_note.json()["presentation"]["special"] is True
 
     async with database_service.session() as session:
         fear_participation = (
@@ -268,8 +256,8 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
                 )
             )
         ).scalar_one()
-        assert fear_participation.submission["body"].startswith("最后一首歌")
-        assert len(fear_participation.submission["image_urls"]) == 1
+        assert fear_participation.submission["body"] == "太难忘了"
+        assert fear_participation.submission["image_urls"] == []
         fear_review = (
             await session.execute(
                 select(TaskContentReview).where(TaskContentReview.participation_id == fear_participation.id)
@@ -429,8 +417,7 @@ async def test_post_reactions_and_two_level_comments(client):
             .scalars()
             .all()
         )
-        assert len(bookmark_entries) == 1
-        assert bookmark_entries[0].delta == 1
+        assert bookmark_entries == []
 
 
 async def test_post_comments_are_paginated_by_root_comment(client):

@@ -4,6 +4,7 @@ import asyncio
 import json
 from dataclasses import dataclass
 from pathlib import Path
+from threading import RLock
 from typing import Any, Callable
 
 from web3 import Web3
@@ -43,6 +44,10 @@ def bytes32_from_hex(value: str) -> bytes:
 class MonadContractAdapter:
     def __init__(self) -> None:
         self._write_lock = asyncio.Lock()
+        self._client_lock = RLock()
+        self._web3_client: Web3 | None = None
+        self._web3_config_key: tuple[str, int] | None = None
+        self._contract_cache: dict[tuple[int, str], Contract] = {}
         self.membership_gateway_abi = _load_abi("FanoraMembershipGateway")
         self.identity_abi = _load_abi("FanoraMembershipIdentity")
         self.collectibles_abi = _load_abi("FanoraCollectibles")
@@ -85,17 +90,42 @@ class MonadContractAdapter:
         )
 
     def _web3(self) -> Web3:
-        web3 = Web3(Web3.HTTPProvider(settings.monad_rpc_url, request_kwargs={"timeout": 50}))
-        if not web3.is_connected():
-            raise ChainConfigurationError("Monad RPC is unavailable")
-        if int(web3.eth.chain_id) != settings.monad_chain_id:
-            raise ChainConfigurationError("Monad RPC chain id does not match configuration")
-        return web3
+        config_key = (settings.monad_rpc_url, settings.monad_chain_id)
+        with self._client_lock:
+            if self._web3_client is not None and self._web3_config_key == config_key:
+                return self._web3_client
+            web3 = Web3(
+                Web3.HTTPProvider(
+                    settings.monad_rpc_url,
+                    request_kwargs={"timeout": settings.monad_rpc_request_timeout_seconds},
+                )
+            )
+            if not web3.is_connected():
+                raise ChainConfigurationError("Monad RPC is unavailable")
+            if int(web3.eth.chain_id) != settings.monad_chain_id:
+                raise ChainConfigurationError("Monad RPC chain id does not match configuration")
+            self._web3_client = web3
+            self._web3_config_key = config_key
+            self._contract_cache.clear()
+            return web3
+
+    def _reset_web3(self) -> None:
+        with self._client_lock:
+            self._web3_client = None
+            self._web3_config_key = None
+            self._contract_cache.clear()
 
     def _contract(self, web3: Web3, address: str, abi: list[dict[str, Any]]) -> Contract:
         if not Web3.is_address(address):
             raise ChainConfigurationError("Contract address is not configured")
-        return web3.eth.contract(address=Web3.to_checksum_address(address), abi=abi)
+        checksum_address = Web3.to_checksum_address(address)
+        cache_key = (id(web3), checksum_address.lower())
+        with self._client_lock:
+            contract = self._contract_cache.get(cache_key)
+            if contract is None:
+                contract = web3.eth.contract(address=checksum_address, abi=abi)
+                self._contract_cache[cache_key] = contract
+            return contract
 
     def _send(
         self,
@@ -197,13 +227,17 @@ class MonadContractAdapter:
 
     async def membership_fee(self) -> int:
         def load() -> int:
-            web3 = self._web3()
-            contract = self._contract(
-                web3,
-                settings.membership_payment_contract_address,
-                self.membership_gateway_abi,
-            )
-            return int(contract.functions.membershipFee().call())
+            try:
+                web3 = self._web3()
+                contract = self._contract(
+                    web3,
+                    settings.membership_payment_contract_address,
+                    self.membership_gateway_abi,
+                )
+                return int(contract.functions.membershipFee().call())
+            except Exception:
+                self._reset_web3()
+                raise
 
         if not settings.membership_payment_contract_address:
             raise ChainConfigurationError("Membership payment contract is not configured")
@@ -218,6 +252,19 @@ class MonadContractAdapter:
                 abi=self.membership_gateway_abi,
                 build_call=lambda contract: contract.functions.setMembershipFee(amount),
                 event_name="MembershipFeeUpdated",
+            )
+
+    async def activate_free_membership(self, wallet: str, payment_id: str) -> ConfirmedContractTransaction:
+        async with self._write_lock:
+            return await asyncio.to_thread(
+                self._send,
+                private_key=settings.membership_treasury_manager_private_key,
+                contract_address=settings.membership_payment_contract_address,
+                abi=self.membership_gateway_abi,
+                build_call=lambda contract: contract.functions.activateFreeMembership(
+                    Web3.to_checksum_address(wallet), bytes32_from_hex(payment_id)
+                ),
+                event_name="MembershipPaid",
             )
 
     async def withdraw_membership_fees(self, amount: int | None = None) -> ConfirmedContractTransaction:

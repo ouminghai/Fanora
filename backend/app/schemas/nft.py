@@ -208,6 +208,30 @@ class MyCollectionResponse(BaseModel):
     applications: list[NftApplicationResponse]
 
 
+class PublicCollectionUserResponse(BaseModel):
+    id: str
+    display_name: str
+    username: str | None
+    avatar_url: str | None
+    bio: str | None
+    level: str
+    is_official_member: bool
+    official_member_since: datetime | None
+    fan_token_balance: int
+    fan_token_lifetime_earned: int
+    fan_type: str
+    created_at: datetime
+
+
+class PublicCollectionResponse(BaseModel):
+    chain_id: int
+    network_name: str = "Monad Testnet"
+    user: PublicCollectionUserResponse
+    identity: MembershipIdentityResponse | None
+    collectibles: list[CollectibleResponse]
+    creations: list[FanNftListingResponse]
+
+
 class MembershipCardActionResponse(BaseModel):
     collection: MyCollectionResponse
     fan_token_balance: int

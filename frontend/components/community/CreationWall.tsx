@@ -1,14 +1,17 @@
 "use client";
 
-import axios from "axios";
+import NiceModal from "@ebay/nice-modal-react";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import MarkdownEditor from "@/components/community/MarkdownEditor";
 import PostDetail from "@/components/community/PostDetail";
-import UserAvatar from "@/components/profile/UserAvatar";
+import GlobalInfoModal from "@/components/modals/GlobalInfoModal";
+import GlobalProcessModal, { hideGlobalProcessModal } from "@/components/modals/GlobalProcessModal";
+import UserIdentityLink from "@/components/profile/UserIdentityLink";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { api } from "@/lib/api/client";
-import type { CommunityPostDetail, CommunityPostSummary, FanTask, OfficialCommunity, PostEngagement } from "@/lib/api/types";
+import { apiErrorMessage } from "@/lib/api/errors";
+import type { CommunityPostDetail, CommunityPostSummary, FanNftListing, FanTask, OfficialCommunity, PostEngagement } from "@/lib/api/types";
 
 const categories = [
   { id: "all", label: "推荐" },
@@ -21,11 +24,6 @@ const categories = [
 const labels: Record<string, string> = { creation: "共创", story: "故事", music: "音乐", discussion: "讨论" };
 const POST_PAGE_SIZE = 25;
 
-function message(error: unknown) {
-  if (axios.isAxiosError(error)) return error.response?.data?.detail || "操作没有完成。";
-  return error instanceof Error ? error.message : "操作没有完成。";
-}
-
 export default function CreationWall() {
   const { user, refreshUser } = useAuth();
   const [posts, setPosts] = useState<CommunityPostSummary[]>([]);
@@ -35,8 +33,9 @@ export default function CreationWall() {
   const [columnCount, setColumnCount] = useState(1);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ title: "", body: "", category: "creation", image_urls: [] as string[] });
+  const [draft, setDraft] = useState({ title: "", body: "", category: "creation", image_urls: [] as string[], linked_nft_creation_id: "" });
   const [tasks, setTasks] = useState<FanTask[]>([]);
+  const [myNftItems, setMyNftItems] = useState<FanNftListing[]>([]);
   const tagInjectedForOpenComposer = useRef(false);
   const nextOffset = useRef(0);
   const loadingPosts = useRef(false);
@@ -83,7 +82,7 @@ export default function CreationWall() {
     await Promise.all([loadContext(), loadPostPage(true)]);
   }, [loadContext, loadPostPage]);
 
-  useEffect(() => { void reload().catch((error) => setNotice(message(error))); }, [reload, user]);
+  useEffect(() => { void reload().catch((error) => setNotice(apiErrorMessage(error))); }, [reload, user]);
   useEffect(() => {
     const handlePopState = () => {
       if (!window.location.pathname.startsWith("/community/posts/")) {
@@ -119,13 +118,22 @@ export default function CreationWall() {
     if (requestedCategory && categories.some((item) => item.id === requestedCategory)) setCategory(requestedCategory);
     if (params.get("composer") === "1" && user?.is_official_member && joined) setComposer(true);
   }, [joined, user]);
+  useEffect(() => {
+    if (!user?.is_official_member || !joined) {
+      setMyNftItems([]);
+      return;
+    }
+    void api.get<FanNftListing[]>("/nft/me/creations")
+      .then((response) => setMyNftItems(response.data))
+      .catch(() => setMyNftItems([]));
+  }, [joined, user?.is_official_member]);
   const visiblePosts = useMemo(() => category === "all" ? posts : category === "bookmarked" ? posts.filter((post) => post.bookmarked) : posts.filter((post) => post.category === category), [category, posts]);
   useEffect(() => {
     const sentinel = loadMoreSentinel.current;
     if (!sentinel || !hasMorePosts) return;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) void loadPostPage().catch((error) => setNotice(message(error)));
+        if (entry.isIntersecting) void loadPostPage().catch((error) => setNotice(apiErrorMessage(error)));
       },
       { rootMargin: "600px 0px" },
     );
@@ -158,7 +166,7 @@ export default function CreationWall() {
       const response = await api.post<PostEngagement>(`/community/posts/${post.id}/${action}`);
       updateEngagement(response.data);
       if (action === "like") await refreshUser();
-    } catch (error) { setNotice(message(error)); } finally { setBusy(null); }
+    } catch (error) { setNotice(apiErrorMessage(error)); } finally { setBusy(null); }
   };
 
   const openPost = (postId: string, section?: "comments") => {
@@ -189,9 +197,12 @@ export default function CreationWall() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [closePost, selectedPostId]);
 
-  const requiredTags = tasks.filter((task) => task.task_type === "content_publish" && task.participation_status === "claimed")
-    .map((task) => task.required_tag)
-    .filter((tag): tag is string => Boolean(tag));
+  const requiredTags = useMemo(
+    () => tasks.filter((task) => task.task_type === "content_publish" && task.participation_status === "claimed")
+      .map((task) => task.required_tag)
+      .filter((tag): tag is string => Boolean(tag)),
+    [tasks],
+  );
   const requiredTagKey = requiredTags.join("\n");
   useEffect(() => {
     if (!composer) {
@@ -204,18 +215,43 @@ export default function CreationWall() {
       return missingTags.length ? { ...current, body: [...missingTags, current.body].filter(Boolean).join("\n\n") } : current;
     });
     tagInjectedForOpenComposer.current = true;
-  }, [composer, requiredTagKey]);
+  }, [composer, requiredTagKey, requiredTags]);
 
   const publish = async (event: FormEvent) => {
     event.preventDefault();
     setBusy("publish");
+    setNotice(null);
+    void NiceModal.show(GlobalProcessModal, {
+      title: "AI 正在审核创作",
+      message: "正在确认内容与社区相关，并排除广告、垃圾信息和无意义内容。简短、普通的真实粉丝表达不会因此被拒绝。",
+      eyebrow: "COMMUNITY REVIEW",
+      gifUrl: "/img/process/cyancat.gif",
+    });
     try {
-      const response = await api.post<CommunityPostDetail>("/community/posts", { ...draft, body: draft.body.trim(), cover_url: draft.image_urls[0] || null });
-      setDraft({ title: "", body: "", category: "creation", image_urls: [] });
+      const response = await api.post<CommunityPostDetail>("/community/posts", {
+        ...draft,
+        body: draft.body.trim(),
+        cover_url: draft.image_urls[0] || null,
+        linked_nft_creation_id: draft.linked_nft_creation_id || null,
+      });
+      setDraft({ title: "", body: "", category: "creation", image_urls: [], linked_nft_creation_id: "" });
       setComposer(false);
       await Promise.all([reload(), refreshUser()]);
+      await hideGlobalProcessModal();
       setNotice(`《${response.data.title}》已发布。`);
-    } catch (error) { setNotice(message(error)); } finally { setBusy(null); }
+    } catch (error) {
+      const detail = apiErrorMessage(error, "这次发布没有完成，请检查内容后重试。");
+      await hideGlobalProcessModal();
+      void NiceModal.show(GlobalInfoModal, {
+        title: "这次发布没有完成",
+        message: detail,
+        tone: "error",
+        eyebrow: "PUBLISH ERROR",
+        confirmLabel: "返回修改",
+      });
+    } finally {
+      setBusy(null);
+    }
   };
 
   return (
@@ -234,6 +270,32 @@ export default function CreationWall() {
           <div>
             <div className="grid gap-4 md:grid-cols-[1fr_150px]"><input required minLength={4} maxLength={120} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="创作标题" className="rounded-xl border-white/10 bg-white/[.06] text-white placeholder:text-white/30" /><select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} className="rounded-xl border-white/10 bg-[#181d49] text-white"><option value="creation">共创</option><option value="story">故事</option><option value="music">音乐</option><option value="discussion">讨论</option></select></div>
             <MarkdownEditor value={draft.body} onChange={(body) => setDraft((current) => ({ ...current, body }))} imageUrls={draft.image_urls} onImageUrlsChange={(image_urls) => setDraft((current) => ({ ...current, image_urls }))} onImageError={setNotice} />
+            {myNftItems.length ? (
+              <div className="mt-5 rounded-2xl border border-white/10 bg-white/[.035] p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="text-sm font-semibold text-white">关联 NFT 产品</p>
+                  {draft.linked_nft_creation_id ? <button type="button" onClick={() => setDraft((current) => ({ ...current, linked_nft_creation_id: "" }))} className="text-xs font-semibold text-white/45 hover:text-white">取消关联</button> : null}
+                </div>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                  {myNftItems.slice(0, 6).map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onClick={() => setDraft((current) => ({ ...current, linked_nft_creation_id: current.linked_nft_creation_id === item.id ? "" : item.id }))}
+                      className={`flex min-w-0 items-center gap-3 rounded-lg border p-3 text-left transition-colors ${draft.linked_nft_creation_id === item.id ? "border-accent bg-accent/10" : "border-white/10 bg-white/[.04] hover:border-white/25"}`}
+                    >
+                      <span className="block h-14 w-14 shrink-0 overflow-hidden rounded-md bg-black/30">
+                        {item.image_url ? <img src={item.image_url} alt="" className="h-full w-full object-cover" /> : null}
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-white">{item.name}</span>
+                        <span className="mt-1 block text-xs text-accent-lighter">{item.price_fan_tokens} FAN</span>
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             <button disabled={busy === "publish"} className="web3-action-button mt-4 rounded-full px-7 py-3 font-semibold text-white disabled:opacity-50">{busy === "publish" ? "发布中…" : "发布创作"}</button>
           </div>
         </form>}
@@ -248,7 +310,9 @@ export default function CreationWall() {
                 <span className="rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent-lighter">{labels[post.category] || post.category}</span>
                 <Link href={`/community/posts/${post.id}`} onClick={(event) => { event.preventDefault(); openPost(post.id); }}><h2 className="mt-3 font-display text-base font-semibold leading-6 transition-colors hover:text-accent-light">{post.title}</h2></Link>
                 <p className="mt-2 line-clamp-2 text-xs leading-5 text-white/45">{post.body_preview}</p>
-                <div className="mt-4 flex items-center gap-2"><UserAvatar avatarUrl={post.author.avatar_url} seed={post.author.id} displayName={post.author.display_name} className="h-7 w-7 rounded-full" /><span className="min-w-0 flex-1 truncate text-xs text-white/55">{post.author.display_name}</span></div>
+                <div className="mt-4 flex items-center gap-2">
+                  <UserIdentityLink author={post.author} avatarClassName="h-7 w-7 rounded-full" nameClassName="text-xs text-white/55" compact />
+                </div>
                 <div className="mt-4 flex items-center gap-1 border-t border-white/5 pt-3">
                   <button onClick={() => void toggle(post, "like")} disabled={busy === `like:${post.id}`} aria-label="点赞创作" className={`creation-action ${post.liked ? "is-active" : ""}`}><span>{post.liked ? "♥" : "♡"}</span>{post.like_count}</button>
                   <Link href={`/community/posts/${post.id}#comments`} onClick={(event) => { event.preventDefault(); openPost(post.id, "comments"); }} className="creation-action"><span>◯</span>{post.reply_count}</Link>

@@ -39,4 +39,12 @@ test("unpaid users are routed to the backend-verified membership fee flow", () =
   assert.match(checkout, /membership\.fee_mon/);
   assert.doesNotMatch(checkout, /treasuryAddress:\s*"0x[a-fA-F0-9]{40}"/);
   assert.doesNotMatch(authProvider, /to:\s*treasuryAddress/);
+  assert.match(checkout, /membership\?\.fee_wei === "0"/);
+  assert.match(checkout, /"\/membership\/activate-free"/);
+  assert.match(checkout, /限时免费/);
+  assert.match(checkout, /isFree \? activateFree\(\) :/);
+  assert.match(checkout, /fanora\.membership\.card\.onboarding/);
+  assert.match(checkout, /router\.push\("\/collection\?welcome=member-card"\)/);
+  const freeActivation = checkout.slice(checkout.indexOf("const activateFree"), checkout.indexOf("if (!user || loading)"));
+  assert.ok(freeActivation.indexOf("await hideGlobalProcessModal()") < freeActivation.indexOf("void refreshUser().catch"));
 });

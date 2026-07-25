@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, func, select
 
+from app.api.routes.nft import _fan_nft_listing_response
 from app.core.database import get_database_session
 from app.core.security import get_current_identity, get_optional_identity, require_official_member
 from app.models.base import utc_now
@@ -17,6 +18,7 @@ from app.models.community import (
     CommunityReplyLike,
     FanTokenLedger,
 )
+from app.models.nft import NftApplication
 from app.models.user import Community, CommunityMember, User, UserProfile, UserRole
 from app.schemas.community import (
     AuthorSummary,
@@ -30,6 +32,7 @@ from app.schemas.community import (
     ReplyEngagementResponse,
     ReplyResponse,
 )
+from app.services.community_moderation import moderate_community_content
 from app.services.fan_tokens import fan_token_service
 from app.services.identity import AuthenticatedIdentity
 from app.services.task_completion import TaskCompletionEvent, complete_claimed_tasks
@@ -78,6 +81,15 @@ async def author_summary(session: AsyncSession, user_id: str) -> AuthorSummary:
         avatar_url=profile.avatar_url if profile else None,
         level=profile.level if profile and profile.is_official_member else "社区成员",
     )
+
+
+async def linked_nft_response(session: AsyncSession, post: CommunityPost, user_id: str | None):
+    if not post.linked_nft_creation_id:
+        return None
+    application = await session.get(NftApplication, post.linked_nft_creation_id)
+    if application is None or application.status not in {"MINTED", "MINTING", "FAILED"}:
+        return None
+    return await _fan_nft_listing_response(session, application, user_id=user_id)
 
 
 async def post_engagement(
@@ -311,6 +323,7 @@ async def list_posts(
                 liked=liked,
                 bookmarked=bookmarked,
                 author=await author_summary(session, post.author_user_id),
+                linked_nft=await linked_nft_response(session, post, identity.user_id if identity else None),
                 created_at=post.created_at,
                 updated_at=post.updated_at,
             )
@@ -341,6 +354,27 @@ async def create_post(
     ).scalar_one_or_none()
     if membership is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Join the official community first")
+    moderation = await moderate_community_content(
+        content_type="post",
+        source_id="pre-publish",
+        title=payload.title,
+        body=payload.body,
+        category=payload.category,
+    )
+    if moderation.decision == "rejected":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="内容与社区主题不够相关，或像无意义/垃圾信息。")
+    if payload.linked_nft_creation_id:
+        linked_nft = await session.get(NftApplication, payload.linked_nft_creation_id)
+        if (
+            linked_nft is None
+            or linked_nft.user_id != identity.user_id
+            or linked_nft.status not in {"MINTED", "MINTING", "FAILED"}
+            or not linked_nft.collectible_token_type_id
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Linked NFT must be one of your published NFT items",
+            )
     post = CommunityPost(
         community_id=community.id,
         author_user_id=identity.user_id,
@@ -384,6 +418,7 @@ async def create_post(
         liked=False,
         bookmarked=False,
         author=await author_summary(session, post.author_user_id),
+        linked_nft=await linked_nft_response(session, post, identity.user_id),
         replies=[],
         has_more_replies=False,
         next_replies_offset=None,
@@ -456,6 +491,7 @@ async def get_post(
         liked=liked,
         bookmarked=bookmarked,
         author=await author_summary(session, post.author_user_id),
+        linked_nft=await linked_nft_response(session, post, identity.user_id if identity else None),
         replies=await build_reply_tree(session, [*roots, *children], identity.user_id if identity else None),
         has_more_replies=has_more_replies,
         next_replies_offset=reply_offset + reply_limit if has_more_replies else None,
@@ -484,6 +520,14 @@ async def create_reply(
     ).scalar_one_or_none()
     if membership is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Join the official community first")
+    moderation = await moderate_community_content(
+        content_type="reply",
+        source_id=f"post:{post.id}",
+        body=payload.body,
+        category=post.category,
+    )
+    if moderation.decision == "rejected":
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="回复与社区主题不够相关，或像无意义/垃圾信息。")
 
     parent_reply_id = payload.parent_reply_id
     if parent_reply_id:
@@ -583,6 +627,7 @@ async def toggle_post_reaction(
         )
     if field == "bookmarked" and next_value and post.author_user_id != user_id:
         await session.execute(select(CommunityPost.id).where(CommunityPost.id == post.id).with_for_update())
+        author_profile = await session.get(UserProfile, post.author_user_id)
         rewarded_bookmarks = (
             await session.execute(
                 select(func.count(col(FanTokenLedger.id))).where(
@@ -591,7 +636,7 @@ async def toggle_post_reaction(
                 )
             )
         ).scalar_one()
-        if rewarded_bookmarks < 10:
+        if author_profile is not None and rewarded_bookmarks < 10:
             await fan_token_service.award_rule(
                 session,
                 user_id=post.author_user_id,

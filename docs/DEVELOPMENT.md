@@ -157,13 +157,13 @@ npm run dev
 - `POST /api/v1/nft/creations/{creation_id}/buy`：使用 FAN 购买，买家扣 FAN、创作者得 FAN，后端铸造 ERC-1155 给买家。
 - `POST /api/v1/nft/collectibles/{token_type_id}/avatar`：将已持有收藏品设置为个人头像。
 
-任务完成统一收敛到任务完成模块：`post_reply` 由有效回复触发，`daily_check_in` 由签到触发，`content_publish` 由符合分类的社区创作触发，`page_action` 由专属活动页触发；`streak`、`event_check_in` 和 `future` 用于即将开放任务。所有已支持模式均不需要人工审核，奖励使用领取时快照，FAN 流水使用唯一幂等键，重放请求不会重复发奖。`frontend/data/fanora.ts` 的 `fanTaskCatalog` 是首页活动、热门任务和任务中心共用的展示目录，后端仍是领取状态、验证结果和积分流水的事实来源。
+任务完成统一收敛到任务完成模块：`post_reply` 由有效回复触发，`daily_check_in` 由签到触发，`content_publish` 由符合分类的社区创作触发，`page_action` 由专属活动页触发；`streak`、`event_check_in` 和 `future` 用于即将开放任务。`content_publish`、`post_reply`、`page_action` 会经过宽松的真实参与审核；审核只排除明显无关、无意义字符、广告垃圾和刷任务空话，不评价文采。奖励使用领取时快照，FAN 流水使用唯一幂等键，重放请求不会重复发奖。`frontend/data/fanora.ts` 的 `fanTaskCatalog` 是首页活动、热门任务和任务中心共用的展示目录，后端仍是领取状态、验证结果和积分流水的事实来源。
 
 当前代码仍保留通用社区表和部分复数路由，但不要在 MVP 中创建第二个社区，也不要继续开发社区搜索、分页、独立积分、独立任务、独立等级、Badge 命名空间或多管理员能力。目标 API 将逐步收敛为单数 `/community` 路径。
 
 创作正文前端使用 `MarkdownEditor` 编辑和预览，详情与编辑预览统一通过 `MarkdownContent` 渲染 GitHub Flavored Markdown。渲染器不启用原始 HTML；文章详情采用“分类与标题 → 作者 → 大幅首图 → Markdown 正文”的顺序。列表摘要由服务端移除常见 Markdown 标记后生成。
 
-迁移 `20260720_0012` 只写入前端兜底图片 URL，不读取本机文件，因此 Railway 可以安全执行全量迁移。上线且完成迁移后，从已经验证过的本地测试 PostgreSQL 直接同步数据到 Railway：
+新 Railway 数据库使用单文件 `20260723_v1` Alembic 基线，应用启动时会幂等补齐默认社区、帖子、任务、会员等级和业务 FAN 规则。需要把测试库中的额外内容同步到 Railway 时再执行：
 
 ```bash
 cd backend
@@ -319,9 +319,9 @@ npm test
 
 ## 9. 常见问题
 
-### 新测试数据库初始化时报种子图片缺失
+### 新数据库没有默认社区或任务
 
-`backend/app/services/product_seed.py` 只在自动建表时创建系统用户和官方社区这两类父记录，不创建 `community_posts` 或 `fan_tasks`。真实 Echo/Quests 数据由上述数据库同步脚本从已验证的测试库原样复制。Railway 生产环境仍应使用 `AUTO_CREATE_SCHEMA=false`，并由 Alembic 管理表结构和基础数据。
+`backend/app/services/product_seed.py` 会在 schema 就绪后幂等补齐系统用户、官方社区、默认帖子、任务、会员等级和当前业务使用的 FAN 规则，不覆盖运营人员已经维护的记录。Railway 生产环境应使用 `AUTO_CREATE_SCHEMA=false`，由 Alembic 管理表结构；部署细节见 `RAILWAY_DEPLOYMENT.md`。
 
 ### 数据库连接等待时间长
 

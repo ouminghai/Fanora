@@ -52,8 +52,6 @@ describe("FanoraMembershipGateway", function () {
     const { gateway, admin, fan } = await fixture();
     const nextFee = ethers.parseEther("2.5");
     await expect(gateway.connect(fan).setMembershipFee(nextFee)).to.be.reverted;
-    await expect(gateway.connect(admin).setMembershipFee(0))
-      .to.be.revertedWithCustomError(gateway, "InvalidMembershipFee");
     await expect(gateway.connect(admin).setMembershipFee(nextFee))
       .to.emit(gateway, "MembershipFeeUpdated")
       .withArgs(ethers.parseEther("1"), nextFee);
@@ -61,6 +59,34 @@ describe("FanoraMembershipGateway", function () {
     await expect(gateway.connect(fan).join(ethers.id("old-fee"), { value: ethers.parseEther("1") }))
       .to.be.revertedWithCustomError(gateway, "IncorrectMembershipFee");
     await gateway.connect(fan).join(ethers.id("new-fee"), { value: nextFee });
+  });
+
+  it("allows a zero membership fee for limited free membership windows", async function () {
+    const { gateway, admin, fan } = await fixture();
+    const paymentId = ethers.id("membership:free");
+    await expect(gateway.connect(admin).setMembershipFee(0))
+      .to.emit(gateway, "MembershipFeeUpdated")
+      .withArgs(ethers.parseEther("1"), 0);
+    await expect(gateway.connect(fan).join(paymentId, { value: 1 }))
+      .to.be.revertedWithCustomError(gateway, "IncorrectMembershipFee");
+    await expect(gateway.connect(fan).join(paymentId))
+      .to.emit(gateway, "MembershipPaid")
+      .withArgs(fan.address, paymentId, await gateway.treasury(), 0);
+    expect(await ethers.provider.getBalance(await gateway.getAddress())).to.equal(0);
+    expect(await gateway.hasPaid(fan.address)).to.equal(true);
+  });
+
+  it("lets the treasury manager relay free membership without a user payable transaction", async function () {
+    const { gateway, admin, fan } = await fixture();
+    const paymentId = ethers.id("membership:relayed-free");
+    await expect(gateway.connect(admin).activateFreeMembership(fan.address, paymentId))
+      .to.be.revertedWithCustomError(gateway, "MembershipFeeNotFree");
+    await gateway.connect(admin).setMembershipFee(0);
+    await expect(gateway.connect(fan).activateFreeMembership(fan.address, paymentId)).to.be.reverted;
+    await expect(gateway.connect(admin).activateFreeMembership(fan.address, paymentId))
+      .to.emit(gateway, "MembershipPaid")
+      .withArgs(fan.address, paymentId, await gateway.treasury(), 0);
+    expect(await gateway.hasPaid(fan.address)).to.equal(true);
   });
 
   it("allows the treasury manager to withdraw held fees", async function () {

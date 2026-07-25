@@ -38,16 +38,8 @@ export default function Auction() {
   }, [loadLevels]);
 
   return (
-    <section id="badges" className="relative isolate overflow-hidden bg-[#09051c] py-24">
-      <Image
-        fill
-        src="/img/gradient_creative.jpg"
-        alt=""
-        aria-hidden="true"
-        className="pointer-events-none -z-20 object-cover object-bottom"
-        sizes="100vw"
-      />
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-[#080518]/10 via-[#170d3c]/20 to-[#080518]/85" />
+    <section id="badges" className="relative isolate overflow-hidden py-24">
+      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
       <div className="container relative">
         <h2 className="mb-3 text-center font-display text-3xl text-white">

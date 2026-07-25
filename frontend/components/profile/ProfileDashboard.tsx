@@ -3,7 +3,7 @@
 import axios from "axios";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ChangeEvent, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import FanTokenAmount from "@/components/common/FanTokenAmount";
 import { useAuth } from "@/components/providers/AuthProvider";
 import UserAvatar from "./UserAvatar";
@@ -67,18 +67,6 @@ export default function ProfileDashboard() {
   const updateField = (field: keyof typeof form, value: string) => {
     setForm((current) => ({ ...current, [field]: value }));
     setNotice(null);
-  };
-
-  const selectAvatar = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!(["image/jpeg", "image/png", "image/webp", "image/gif"].includes(file.type)) || file.size > 1024 * 1024) {
-      setNotice({ kind: "error", text: "头像仅支持 JPEG、PNG、WebP 或 GIF，且不能超过 1 MB。" });
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => updateField("avatar_url", String(reader.result || ""));
-    reader.readAsDataURL(file);
   };
 
   const save = async (event: FormEvent) => {
@@ -245,14 +233,7 @@ export default function ProfileDashboard() {
               <textarea rows={4} maxLength={280} value={form.bio} onChange={(event) => updateField("bio", event.target.value)} className={`${fieldClass} mt-2 resize-none`} placeholder="分享你支持的创作者和加入社区的故事…" />
               <span className="mt-1 block text-right text-xs font-normal text-jacarta-400">{form.bio.length}/280</span>
             </label>
-            <div className="mt-6 grid gap-6 sm:grid-cols-2">
-              <label className="text-sm font-semibold text-jacarta-700 dark:text-white">
-                头像
-                <span className="mt-2 flex cursor-pointer items-center justify-center rounded-xl border border-dashed border-accent/40 bg-accent/5 px-4 py-3 text-accent transition-colors hover:bg-accent/10">
-                  选择图片（最大 1 MB）
-                  <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" onChange={selectAvatar} className="hidden" />
-                </span>
-              </label>
+            <div className="mt-6 grid gap-6">
               <label className="text-sm font-semibold text-jacarta-700 dark:text-white">
                 公开范围
                 <select value={form.profile_visibility} onChange={(event) => updateField("profile_visibility", event.target.value)} className={`${fieldClass} mt-2`}>

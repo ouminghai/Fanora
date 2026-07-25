@@ -41,14 +41,15 @@ class DatabaseService:
         self.session_factory = async_sessionmaker(self.engine, expire_on_commit=False, class_=AsyncSession)
 
     async def initialize(self) -> None:
+        from app.services.product_seed import seed_product_defaults
+
         if settings.auto_create_schema:
             import app.models.database  # noqa: F401
-            from app.services.product_seed import seed_product_defaults
 
             async with self.engine.begin() as connection:
                 await connection.run_sync(SQLModel.metadata.create_all)
-            async with self.session_factory() as session:
-                await seed_product_defaults(session)
+        async with self.session_factory() as session:
+            await seed_product_defaults(session)
         logger.info("database_initialized", auto_create_schema=settings.auto_create_schema)
 
     @asynccontextmanager

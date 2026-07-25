@@ -37,6 +37,8 @@ from app.schemas.nft import (
     NftApplicationCreate,
     NftApplicationResponse,
     NftCreatorResponse,
+    PublicCollectionResponse,
+    PublicCollectionUserResponse,
 )
 from app.schemas.nft_agent import NftDraftRequest, NftDraftResponse
 from app.services.identity import AuthenticatedIdentity
@@ -211,64 +213,52 @@ async def _fan_nft_listing_response(
     )
 
 
-@router.get("/me", response_model=MyCollectionResponse)
-async def my_collection(
-    identity: AuthenticatedIdentity = Depends(get_current_identity),
-    session: AsyncSession = Depends(get_database_session),
-) -> MyCollectionResponse:
+async def _identity_response_for_user(session: AsyncSession, user_id: str) -> tuple[MembershipIdentityResponse | None, str]:
     identity_nft = (
-        await session.execute(select(MembershipIdentityNft).where(MembershipIdentityNft.user_id == identity.user_id))
+        await session.execute(select(MembershipIdentityNft).where(MembershipIdentityNft.user_id == user_id))
     ).scalar_one_or_none()
-    identity_response = None
-    if identity_nft is not None:
-        user = await session.get(User, identity.user_id)
-        profile = await session.get(UserProfile, identity.user_id)
-        operation = (
-            await session.get(ChainOperation, identity_nft.chain_operation_id)
-            if identity_nft.chain_operation_id
-            else None
-        )
-        mint_operation = (
-            (
-                await session.execute(
-                    select(ChainOperation)
-                    .where(
-                        ChainOperation.user_id == identity.user_id,
-                        ChainOperation.operation_type == "IDENTITY_MINT",
-                        ChainOperation.contract_address == identity_nft.contract_address,
-                    )
-                    .order_by(col(ChainOperation.created_at).desc())
-                )
-            )
-            .scalars()
-            .first()
-        )
-        metadata = (
+    if identity_nft is None:
+        sync_status = "READY" if monad_contract_adapter.identity_configured and pinata_adapter.configured else "NOT_CONFIGURED"
+        return None, sync_status
+    user = await session.get(User, user_id)
+    profile = await session.get(UserProfile, user_id)
+    operation = (
+        await session.get(ChainOperation, identity_nft.chain_operation_id)
+        if identity_nft.chain_operation_id
+        else None
+    )
+    mint_operation = (
+        (
             await session.execute(
-                select(NftMetadataVersion).where(
-                    NftMetadataVersion.subject_type == "MEMBERSHIP_IDENTITY",
-                    NftMetadataVersion.subject_id == identity.user_id,
-                    NftMetadataVersion.version == identity_nft.metadata_version,
+                select(ChainOperation)
+                .where(
+                    ChainOperation.user_id == user_id,
+                    ChainOperation.operation_type == "IDENTITY_MINT",
+                    ChainOperation.contract_address == identity_nft.contract_address,
                 )
+                .order_by(col(ChainOperation.created_at).desc())
             )
-        ).scalar_one_or_none()
-        image_url = pinata_adapter.gateway_url(metadata.image_cid) if metadata else None
-        card_needs_refresh = False
-        if identity_nft.is_member_card and user is not None and profile is not None:
-            level = await nft_service._identity_level_for_profile(session, profile)
-            if level is not None:
-                current_hash = nft_service.membership_card_content_hash(
-                    user=user,
-                    profile=profile,
-                    level=level,
-                    record=identity_nft,
-                )
-                card_needs_refresh = (
-                    identity_nft.card_content_hash != current_hash
-                    or identity_nft.card_level_code != level.code
-                    or identity_nft.level_id != level.rank
-                )
-        identity_response = MembershipIdentityResponse(
+        )
+        .scalars()
+        .first()
+    )
+    metadata = (
+        await session.execute(
+            select(NftMetadataVersion).where(
+                NftMetadataVersion.subject_type == "MEMBERSHIP_IDENTITY",
+                NftMetadataVersion.subject_id == user_id,
+                NftMetadataVersion.version == identity_nft.metadata_version,
+            )
+        )
+    ).scalar_one_or_none()
+    image_url = pinata_adapter.gateway_url(metadata.image_cid) if metadata else None
+    card_needs_refresh = False
+    if identity_nft.is_member_card and user is not None and profile is not None:
+        level = await nft_service._identity_level_for_profile(session, profile)
+        if level is not None:
+            card_needs_refresh = identity_nft.card_level_code != level.code or identity_nft.level_id != level.rank
+    return (
+        MembershipIdentityResponse(
             token_id=identity_nft.token_id,
             level_id=identity_nft.level_id,
             level_code=identity_nft.level_code,
@@ -293,13 +283,17 @@ async def my_collection(
             minted_at=identity_nft.minted_at,
             mint_operation=ChainOperationResponse.model_validate(mint_operation) if mint_operation else None,
             operation=ChainOperationResponse.model_validate(operation) if operation else None,
-        )
+        ),
+        identity_nft.status,
+    )
 
+
+async def _collectibles_for_user(session: AsyncSession, user_id: str) -> list[CollectibleResponse]:
     rows = (
         await session.execute(
             select(CollectibleOwnership, CollectibleTokenType)
             .join(CollectibleTokenType, col(CollectibleTokenType.id) == CollectibleOwnership.token_type_id)
-            .where(CollectibleOwnership.user_id == identity.user_id)
+            .where(CollectibleOwnership.user_id == user_id)
             .order_by(col(CollectibleOwnership.created_at).desc())
         )
     ).all()
@@ -341,30 +335,88 @@ async def my_collection(
                 operation=ChainOperationResponse.model_validate(operation) if operation else None,
             )
         )
-    applications = list(
+    return collectibles
+
+
+async def _applications_for_user(session: AsyncSession, user_id: str) -> list[NftApplication]:
+    return list(
         (
             await session.execute(
                 select(NftApplication)
-                .where(NftApplication.user_id == identity.user_id)
+                .where(NftApplication.user_id == user_id)
                 .order_by(col(NftApplication.created_at).desc())
             )
         )
         .scalars()
         .all()
     )
-    sync_status = (
-        identity_nft.status
-        if identity_nft
-        else (
-            "READY" if monad_contract_adapter.identity_configured and pinata_adapter.configured else "NOT_CONFIGURED"
-        )
-    )
+
+
+@router.get("/me", response_model=MyCollectionResponse)
+async def my_collection(
+    identity: AuthenticatedIdentity = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_database_session),
+) -> MyCollectionResponse:
+    identity_response, sync_status = await _identity_response_for_user(session, identity.user_id)
+    collectibles = await _collectibles_for_user(session, identity.user_id)
+    applications = await _applications_for_user(session, identity.user_id)
     return MyCollectionResponse(
         chain_id=settings.monad_chain_id,
         identity_sync_status=sync_status,
         identity=identity_response,
         collectibles=collectibles,
         applications=[_application_response(item) for item in applications],
+    )
+
+
+@router.get("/me/creations", response_model=list[FanNftListingResponse])
+async def my_fan_nft_creations(
+    identity: AuthenticatedIdentity = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_database_session),
+) -> list[FanNftListingResponse]:
+    applications = [
+        item
+        for item in await _applications_for_user(session, identity.user_id)
+        if item.status in {"MINTED", "MINTING", "FAILED"} and item.collectible_token_type_id
+    ]
+    return [await _fan_nft_listing_response(session, item, user_id=identity.user_id) for item in applications]
+
+
+@router.get("/users/{user_id}", response_model=PublicCollectionResponse)
+async def public_collection(
+    user_id: str,
+    session: AsyncSession = Depends(get_database_session),
+) -> PublicCollectionResponse:
+    user = await session.get(User, user_id)
+    profile = await session.get(UserProfile, user_id)
+    if user is None or profile is None or profile.profile_visibility != "public":
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Public profile not found")
+    identity_response, _ = await _identity_response_for_user(session, user_id)
+    collectibles = await _collectibles_for_user(session, user_id)
+    applications = [
+        item
+        for item in await _applications_for_user(session, user_id)
+        if item.status in {"MINTED", "MINTING", "FAILED"} and item.collectible_token_type_id
+    ]
+    return PublicCollectionResponse(
+        chain_id=settings.monad_chain_id,
+        user=PublicCollectionUserResponse(
+            id=user.id,
+            display_name=user.display_name or profile.username or "Fanora Member",
+            username=profile.username,
+            avatar_url=profile.avatar_url,
+            bio=profile.bio,
+            level=profile.level if profile.is_official_member else "待入会",
+            is_official_member=profile.is_official_member,
+            official_member_since=profile.official_member_since,
+            fan_token_balance=profile.fan_token_balance,
+            fan_token_lifetime_earned=profile.fan_token_lifetime_earned,
+            fan_type=profile.fan_type,
+            created_at=user.created_at,
+        ),
+        identity=identity_response,
+        collectibles=collectibles,
+        creations=[await _fan_nft_listing_response(session, item, user_id=None) for item in applications],
     )
 
 

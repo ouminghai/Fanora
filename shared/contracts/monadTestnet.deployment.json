@@ -1,11 +1,11 @@
 {
   "network": "monadTestnet",
   "chainId": 10143,
-  "deployedAt": "2026-07-22T06:07:55.584Z",
+  "deployedAt": "2026-07-23T10:53:00.884Z",
   "deployer": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
   "admin": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
   "treasury": "0x5f2984012287D703a9a42e15BBd50D1B1CE9427b",
-  "membershipFeeWei": "1000000000000000000",
+  "membershipFeeWei": "0",
   "membershipLevelRanks": [
     1,
     2,
@@ -30,9 +30,9 @@
   "compiler": "0.8.28",
   "contracts": {
     "FanoraMembershipGateway": {
-      "address": "0xd966Fb616cBFd6c54d317Fc1d87344455e1F7A93",
-      "transactionHash": "0xd0f463fbeaad2f5a28d246f7843fdc3312468abeb05d36a0f588551cc19ad904",
-      "startBlock": 46839663
+      "address": "0x5e03167C671c40e40435769E2A5a0ba0D1c22b9F",
+      "transactionHash": "0x30ec2f24de4e7a07f22266cae4770a107c5e4dcd5d80c8237ea58fb20fc7f8b6",
+      "startBlock": 47389315
     },
     "FanoraMembershipIdentity": {
       "address": "0xeE3c3F36fF43aCB44F0F8271fbE7cdbAAcaF5c85",

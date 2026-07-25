@@ -1,6 +1,12 @@
-"""LangGraph workflow for creator-confirmed fan NFT metadata and image drafts."""
+"""LangGraph workflow for creator-confirmed fan NFT metadata and image drafts.
+
+This Agent creates editable drafts only. Publishing, FAN fee checks, Pinata
+pinning, and ERC-1155 writes are intentionally handled by the NFT service after
+the creator confirms the form.
+"""
 
 import base64
+import io
 from typing import Any, Required, TypedDict
 
 import httpx
@@ -18,11 +24,14 @@ from app.services.llm.service import LLMUnavailable
 
 
 class NftCreationState(TypedDict, total=False):
+    """Draft state shared by metadata and optional image-generation nodes."""
+
     theme: Required[str]
     story: Required[str]
     visual_style: Required[str]
     preferred_name: str | None
     reference_notes: str | None
+    reference_image_data_url: str | None
     generate_image: Required[bool]
     name: Required[str]
     description: Required[str]
@@ -36,6 +45,8 @@ class NftCreationState(TypedDict, total=False):
 
 
 def prepare_brief(state: NftCreationState) -> dict[str, Any]:
+    """Normalize creator input before it reaches rules or a model prompt."""
+
     return {
         "theme": state["theme"].strip(),
         "story": state["story"].strip(),
@@ -46,6 +57,8 @@ def prepare_brief(state: NftCreationState) -> dict[str, Any]:
 
 
 def _rule_draft(state: NftCreationState) -> dict[str, Any]:
+    """Build a usable deterministic draft when the model path is unavailable."""
+
     name = state.get("preferred_name") or f"{state['theme']} · Fanora Limited"
     story = state["story"].strip()
     description = story if len(story) <= 1000 else f"{story[:997]}..."
@@ -71,6 +84,8 @@ def _rule_draft(state: NftCreationState) -> dict[str, Any]:
 
 def build_nft_creation_graph(model_service: LLMService = llm_service) -> CompiledStateGraph:
     async def draft_metadata(state: NftCreationState) -> dict[str, Any]:
+        """Generate collection metadata text, falling back to the rule draft."""
+
         fallback = _rule_draft(state)
         if not model_service.available:
             return fallback
@@ -104,6 +119,8 @@ def build_nft_creation_graph(model_service: LLMService = llm_service) -> Compile
             return {**fallback, "degraded": True}
 
     async def generate_image(state: NftCreationState) -> dict[str, Any]:
+        """Optionally call the image model and return a data URL for form preview."""
+
         if not state.get("generate_image", True):
             return {"image_data_url": None, "image_source": "not_requested", "image_error": None}
         if not settings.openai_api_key or not settings.openai_image_model:
@@ -119,12 +136,30 @@ def build_nft_creation_graph(model_service: LLMService = llm_service) -> Compile
             timeout=settings.image_generation_timeout_seconds,
         )
         try:
-            response = await client.images.generate(
-                model=settings.openai_image_model,
-                prompt=state["image_prompt"],
-                size=settings.openai_image_size,
-                n=1,
-            )
+            reference_image = state.get("reference_image_data_url")
+            if reference_image:
+                header, encoded_reference = reference_image.split(",", 1)
+                mime_type = header[5:].split(";", 1)[0]
+                extension = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}.get(mime_type, "png")
+                image_file = io.BytesIO(base64.b64decode(encoded_reference, validate=True))
+                image_file.name = f"fanora-reference.{extension}"
+                response = await client.images.edit(
+                    model=settings.openai_image_model,
+                    image=image_file,
+                    prompt=state["image_prompt"],
+                    size=settings.openai_image_size,
+                    n=1,
+                    response_format="b64_json",
+                    input_fidelity="high",
+                )
+            else:
+                response = await client.images.generate(
+                    model=settings.openai_image_model,
+                    prompt=state["image_prompt"],
+                    size=settings.openai_image_size,
+                    n=1,
+                    response_format="b64_json",
+                )
             if not response.data:
                 raise RuntimeError("Image generation response did not include a result")
             item = response.data[0]
@@ -142,7 +177,7 @@ def build_nft_creation_graph(model_service: LLMService = llm_service) -> Compile
                 "image_source": "openai",
                 "image_error": None,
             }
-        except (OpenAIError, httpx.HTTPError, RuntimeError) as error:
+        except (OpenAIError, httpx.HTTPError, RuntimeError, ValueError) as error:
             logger.exception("fan_nft_image_generation_failed", error_type=type(error).__name__)
             return {
                 "image_data_url": None,
@@ -151,6 +186,8 @@ def build_nft_creation_graph(model_service: LLMService = llm_service) -> Compile
                 "degraded": True,
             }
 
+    # The image node depends on the metadata prompt, but the graph still returns
+    # a useful draft if image generation is disabled or fails.
     workflow = StateGraph(NftCreationState)
     workflow.add_node("prepare_brief", prepare_brief)
     workflow.add_node("draft_metadata", draft_metadata)
@@ -163,6 +200,8 @@ def build_nft_creation_graph(model_service: LLMService = llm_service) -> Compile
 
 
 class NftCreationAgent:
+    """Facade for the /nft/creations/ai-draft endpoint."""
+
     def __init__(self, model_service: LLMService = llm_service) -> None:
         self._graph = build_nft_creation_graph(model_service)
 

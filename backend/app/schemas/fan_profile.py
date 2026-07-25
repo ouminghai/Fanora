@@ -79,3 +79,12 @@ class FanProfileAnalysis(BaseModel):
     badge_eligible: bool
     badge_draft: BadgeDraft | None = None
     recommended_tasks: list[TaskRecommendation] = Field(default_factory=list, max_length=8)
+
+
+class PublicFanProfileAnalysis(BaseModel):
+    scores: FanProfileScores
+    fan_type: FanType
+    labels: list[str]
+    summary: str
+    analysis_source: Literal["rules", "llm"]
+    degraded: bool

@@ -22,3 +22,18 @@ llm_inference_duration_seconds = Histogram(
     "LLM inference duration",
     ["model"],
 )
+membership_fee_cache_total = Counter(
+    "fanora_membership_fee_cache_total",
+    "Membership fee cache lookups and refresh results",
+    ["result"],
+)
+membership_fee_rpc_duration_seconds = Histogram(
+    "fanora_membership_fee_rpc_duration_seconds",
+    "Monad membership fee RPC duration",
+    ["result"],
+)
+nft_publish_stage_duration_seconds = Histogram(
+    "fanora_nft_publish_stage_duration_seconds",
+    "Fan NFT publishing duration by pipeline stage",
+    ["stage", "status"],
+)

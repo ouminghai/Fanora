@@ -170,7 +170,7 @@ cd backend
 uv run alembic upgrade head
 ```
 
-迁移 `20260723_0028_agent_quest_reviews_and_nft_rewards.py` 会创建内容审核和任务 NFT 奖励表。
+新数据库统一使用 `20260723_v1_baseline.py` 创建最终 schema；旧 `0028` 等迁移保存在 `backend/alembic/legacy_versions/` 作为历史审计。
 
 ### 模型配置
 
@@ -224,4 +224,4 @@ PINATA_JWT=
 - 后端测试覆盖规则画像、画像图节点、内容审核、NFT 草稿、Quest 审核和任务 NFT 幂等编排。
 - 测试环境显式设置 `CHAIN_WRITES_ENABLED=false`，避免读取本地 `.env` 后意外发送真实链上交易。
 - 前端类型检查、生产构建和 FEAR and DREAMS 页面交互已验证。
-- 全新 SQLite 从最早 Alembic 版本迁移仍受历史 PostgreSQL 专用 `ALTER` 语句影响；新增 `0028` 迁移本身不是该失败来源，生产迁移应在 PostgreSQL 备份或临时数据库先验证。
+- V1 基线已在全新 SQLite 上验证可一次迁移到 head；Railway 生产仍应在临时 PostgreSQL 或 staging 服务验证迁移、种子与健康检查。

@@ -20,9 +20,12 @@ export default function HomePage() {
       <main>
         <Hero />
         <CoverFlowSlider />
-        <Collections />
-        <Auction />
-        <Process />
+        <div className="relative isolate overflow-hidden bg-[#09051c]">
+          <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_15%_8%,rgba(101,69,220,.25),transparent_30%),radial-gradient(circle_at_88%_48%,rgba(45,184,224,.12),transparent_27%),radial-gradient(circle_at_30%_92%,rgba(131,88,255,.16),transparent_32%),linear-gradient(180deg,#0d0a28_0%,#100a2c_38%,#0d0a27_72%,#0a071f_100%)]" />
+          <Collections />
+          <Auction />
+          <Process />
+        </div>
         <Featured />
         <Partners />
       </main>

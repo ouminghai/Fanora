@@ -14,14 +14,14 @@ contract FanoraMembershipGateway is AccessControl, Pausable, ReentrancyGuard {
     bytes32 public constant TREASURY_MANAGER_ROLE = keccak256("TREASURY_MANAGER_ROLE");
     /// @notice 可在异常情况下暂停或恢复入会功能的角色。
     bytes32 public constant PAUSER_ROLE = keccak256("PAUSER_ROLE");
-    /// @notice 当前入会费用，单位 wei；初始值为 1 MON。
+    /// @notice 当前入会费用，单位 wei；可为 0，用于限时免费入会。
     uint256 public membershipFee = 1 ether;
 
     // 自定义错误比 revert 字符串更节省 Gas，名称直接描述失败原因。
     error InvalidAccount();
     error InvalidPaymentId();
     error IncorrectMembershipFee();
-    error InvalidMembershipFee();
+    error MembershipFeeNotFree();
     error PaymentAlreadyProcessed();
     error WalletAlreadyPaid();
     error TreasuryTransferFailed();
@@ -63,14 +63,31 @@ contract FanoraMembershipGateway is AccessControl, Pausable, ReentrancyGuard {
     /// @dev 必须由用户钱包直接调用并精确附带当前 membershipFee；paymentId 由后端生成后传给前端。
     /// @param paymentId 本次入会订单的 bytes32 唯一标识。
     function join(bytes32 paymentId) external payable whenNotPaused nonReentrant {
-        if (paymentId == bytes32(0)) revert InvalidPaymentId();
         if (msg.value != membershipFee) revert IncorrectMembershipFee();
+        _recordMembership(msg.sender, paymentId, msg.value);
+    }
+
+    /// @notice 在会费为 0 时由平台运营账户为用户执行免钱包付款入会。
+    /// @dev 用户不需要发起 payable 交易；调用者必须持有资金管理角色。
+    function activateFreeMembership(address account, bytes32 paymentId)
+        external
+        onlyRole(TREASURY_MANAGER_ROLE)
+        whenNotPaused
+        nonReentrant
+    {
+        if (membershipFee != 0) revert MembershipFeeNotFree();
+        _recordMembership(account, paymentId, 0);
+    }
+
+    function _recordMembership(address account, bytes32 paymentId, uint256 amount) private {
+        if (account == address(0)) revert InvalidAccount();
+        if (paymentId == bytes32(0)) revert InvalidPaymentId();
         if (processedPaymentIds[paymentId]) revert PaymentAlreadyProcessed();
-        if (hasPaid[msg.sender]) revert WalletAlreadyPaid();
+        if (hasPaid[account]) revert WalletAlreadyPaid();
 
         processedPaymentIds[paymentId] = true;
-        hasPaid[msg.sender] = true;
-        emit MembershipPaid(msg.sender, paymentId, treasury, msg.value);
+        hasPaid[account] = true;
+        emit MembershipPaid(account, paymentId, treasury, amount);
     }
 
     /// @notice 修改管理员提现时使用的最终收款地址。
@@ -83,10 +100,9 @@ contract FanoraMembershipGateway is AccessControl, Pausable, ReentrancyGuard {
     }
 
     /// @notice 修改后续新用户需要支付的入会费用。
-    /// @dev 已成功支付的历史记录不受影响；新金额必须大于 0。
+    /// @dev 已成功支付的历史记录不受影响；新金额可以为 0，表示限时免费入会。
     /// @param nextFee 新入会费用，单位 wei。
     function setMembershipFee(uint256 nextFee) external onlyRole(TREASURY_MANAGER_ROLE) {
-        if (nextFee == 0) revert InvalidMembershipFee();
         uint256 previousFee = membershipFee;
         membershipFee = nextFee;
         emit MembershipFeeUpdated(previousFee, nextFee);

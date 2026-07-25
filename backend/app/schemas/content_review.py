@@ -18,7 +18,7 @@ class ContentReviewRequest(BaseModel):
     body: str = Field(min_length=1, max_length=10_000)
     category: str | None = Field(default=None, max_length=40)
     required_tag: str | None = Field(default=None, max_length=140)
-    minimum_length: int = Field(default=10, ge=1, le=2000)
+    minimum_length: int = Field(default=4, ge=1, le=2000)
 
 
 class LlmContentReview(BaseModel):

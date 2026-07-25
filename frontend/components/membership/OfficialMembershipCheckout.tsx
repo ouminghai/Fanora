@@ -1,15 +1,18 @@
 "use client";
 
 import axios from "axios";
+import NiceModal from "@ebay/nice-modal-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/providers/AuthProvider";
+import GlobalInfoModal from "@/components/modals/GlobalInfoModal";
+import GlobalProcessModal, { hideGlobalProcessModal } from "@/components/modals/GlobalProcessModal";
 import { api } from "@/lib/api/client";
 import type { OfficialMembershipStatus } from "@/lib/api/types";
 
-type PaymentPhase = "idle" | "wallet" | "verifying" | "success";
+type PaymentPhase = "idle" | "wallet" | "verifying" | "free" | "success";
 
 const VERIFY_ATTEMPTS = 20;
 const VERIFY_INTERVAL_MS = 3_000;
@@ -137,6 +140,42 @@ export default function OfficialMembershipCheckout() {
     }
   };
 
+  const activateFree = async () => {
+    if (!user) return;
+    setError(null);
+    setPhase("free");
+    void NiceModal.show(GlobalProcessModal, {
+      title: "正在激活正式会员",
+      message: "正在确认免费入会资格并等待 Monad 完成会员关系确认。",
+      eyebrow: "MEMBERSHIP ACTIVATION",
+      gifUrl: null,
+      phase: "processing",
+      progressKind: "identity",
+      artifactName: `${user.level || "Fanora"} Membership`,
+    });
+    try {
+      const response = await api.post<OfficialMembershipStatus>("/membership/activate-free");
+      setMembership(response.data);
+      window.localStorage.removeItem(pendingPaymentKey(user.id));
+      setPhase("success");
+      window.sessionStorage.setItem("fanora.membership.card.onboarding", user.id);
+      await hideGlobalProcessModal();
+      void refreshUser().catch(() => undefined);
+      router.push("/collection?welcome=member-card");
+    } catch (freeError) {
+      await hideGlobalProcessModal();
+      setError(paymentErrorMessage(freeError));
+      setPhase("idle");
+      void NiceModal.show(GlobalInfoModal, {
+        title: "免费入会没有完成",
+        message: paymentErrorMessage(freeError),
+        tone: "error",
+        eyebrow: "MEMBERSHIP ERROR",
+        confirmLabel: "返回重试",
+      });
+    }
+  };
+
   if (!user || loading) {
     return (
       <main className="flex min-h-screen items-center justify-center bg-[#09051c] pt-24 text-white">
@@ -148,7 +187,8 @@ export default function OfficialMembershipCheckout() {
 
   const isActive = membership?.is_official_member || phase === "success";
   const isPaying = phase === "wallet" || phase === "verifying";
-  const feeLabel = membership?.fee_mon ? `${membership.fee_mon} MON` : "当前会费";
+  const isFree = membership?.fee_wei === "0";
+  const feeLabel = isFree ? "限时免费" : membership?.fee_mon ? `${membership.fee_mon} MON` : "当前会费";
   const walletLabel = "RainbowKit 直连钱包";
 
   return (
@@ -176,8 +216,8 @@ export default function OfficialMembershipCheckout() {
               {isActive ? "你已成为正式会员" : "Activate your on-chain identity and become part of Fanora."}
             </h1>
             <p className="mx-auto mt-4 max-w-xl leading-7 text-white/65">
-              使用{walletLabel}确认 {feeLabel} 入会交易。
-              交易由你的钱包直接签名，Fanora 不会读取、保存或上传你的钱包私钥。
+              {isFree ? "当前处于限时免费入会窗口，无需钱包支付交易。" : `使用${walletLabel}确认 ${feeLabel} 入会交易。`}
+              {!isFree ? "交易由你的钱包直接签名，Fanora 不会读取、保存或上传你的钱包私钥。" : "登录后点击即可激活正式会员身份。"}
             </p>
           </div>
 
@@ -199,7 +239,7 @@ export default function OfficialMembershipCheckout() {
               </div>
             </div>
 
-            {!membership?.payment_contract_address && !isActive && (
+            {!isFree && !membership?.payment_contract_address && !isActive && (
               <div className="mt-6 rounded-2xl border border-orange/25 bg-orange/10 px-5 py-4 text-sm leading-6 text-orange">
                 后端尚未配置入会付款合约。部署后设置 `MEMBERSHIP_PAYMENT_CONTRACT_ADDRESS`，系统不会把普通地址转账当作入会凭证。
               </div>
@@ -241,11 +281,15 @@ export default function OfficialMembershipCheckout() {
                   type="button"
                   disabled={
                     isPaying ||
+                    phase === "free" ||
+                    (isFree && !membership?.payment_contract_address) ||
+                    (!isFree && (
                     !membership?.payment_contract_address ||
                     !membership.payment_id
+                    ))
                   }
                   onClick={() => {
-                    const action = transactionHash ? verifyTransaction(transactionHash) : pay();
+                    const action = isFree ? activateFree() : transactionHash ? verifyTransaction(transactionHash) : pay();
                     void action.catch((verificationError) => {
                       setError(paymentErrorMessage(verificationError));
                     });
@@ -255,13 +299,17 @@ export default function OfficialMembershipCheckout() {
                   {isPaying && (
                     <span className="mr-3 h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" />
                   )}
-                  {phase === "wallet"
+                  {phase === "free"
+                    ? "正在激活免费会员..."
+                    : phase === "wallet"
                     ? `请在钱包中确认 ${feeLabel} 交易`
                     : phase === "verifying"
                       ? "正在等待 Monad 确认…"
                       : transactionHash
                         ? "继续确认已提交的交易"
-                        : `使用钱包确认支付 ${feeLabel}`}
+                        : isFree
+                          ? "限时免费入会"
+                          : `使用钱包确认支付 ${feeLabel}`}
                 </button>
                 {transactionHash && phase === "idle" && (
                   <p className="mt-3 text-center text-sm text-white/55">
@@ -272,8 +320,8 @@ export default function OfficialMembershipCheckout() {
             )}
 
             <div className="mt-8 grid gap-3 text-sm leading-6 text-white/55 sm:grid-cols-3">
-              <p>✓ 支持 RainbowKit、MetaMask、WalletConnect 等直连钱包</p>
-              <p>✓ 合约精确校验并托管当前会费，管理员可审计提现</p>
+              <p>✓ {isFree ? "免费窗口无需发起钱包付款" : "支持 RainbowKit、MetaMask、WalletConnect 等直连钱包"}</p>
+              <p>✓ {isFree ? "费用恢复后仍由合约精确校验" : "合约精确校验并托管当前会费，管理员可审计提现"}</p>
               <p>✓ Fanora 不接触用户私钥，paymentId 与钱包仅可入会一次</p>
             </div>
           </div>

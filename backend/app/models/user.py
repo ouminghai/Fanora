@@ -68,7 +68,7 @@ class OfficialMembershipPayment(SQLModel, table=True):
     __table_args__ = (
         UniqueConstraint("user_id", name="uq_official_membership_payment_user"),
         UniqueConstraint("transaction_hash", name="uq_official_membership_payment_transaction"),
-        CheckConstraint("amount_wei > 0", name="ck_official_membership_payment_amount_positive"),
+        CheckConstraint("amount_wei >= 0", name="ck_official_membership_payment_amount_nonnegative"),
     )
 
     id: str = Field(default_factory=new_id, primary_key=True)

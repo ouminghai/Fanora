@@ -357,6 +357,9 @@ async def complete_page_task(
             )
         else:
             await session.commit()
+        refreshed_task = await session.get(FanTask, task_id)
+        if refreshed_task is not None:
+            task = refreshed_task
     return await to_task_response(
         session,
         task,

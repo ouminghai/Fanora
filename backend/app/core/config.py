@@ -3,7 +3,7 @@
 from enum import StrEnum
 from functools import lru_cache
 
-from pydantic import model_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -67,8 +67,11 @@ class Settings(BaseSettings):
 
     monad_rpc_url: str = "https://testnet-rpc.monad.xyz"
     monad_chain_id: int = 10143
+    monad_rpc_request_timeout_seconds: float = 5.0
     membership_treasury_address: str = ""
     membership_fee_wei: int = 1_000_000_000_000_000_000
+    membership_fee_cache_ttl_seconds: int = 60
+    membership_fee_rpc_timeout_seconds: float = 5.0
     membership_min_confirmations: int = 1
     membership_payment_contract_address: str = ""
     membership_identity_contract_address: str = ""
@@ -127,6 +130,17 @@ class Settings(BaseSettings):
     @property
     def llm_enabled(self) -> bool:
         return bool(self.openai_api_key and self.llm_models)
+
+    @field_validator("database_url", mode="before")
+    @classmethod
+    def normalize_database_url(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        if value.startswith("postgres://"):
+            return value.replace("postgres://", "postgresql+psycopg://", 1)
+        if value.startswith("postgresql://"):
+            return value.replace("postgresql://", "postgresql+psycopg://", 1)
+        return value
 
     @property
     def postgres_connect_args(self) -> dict[str, int]:

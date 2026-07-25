@@ -6,5 +6,8 @@ if [ "${RUN_MIGRATIONS:-true}" = "true" ]; then
   /app/.venv/bin/alembic upgrade head
 fi
 
-exec "$@"
+if [ "${1:-}" = "/app/.venv/bin/uvicorn" ]; then
+  set -- "$@" --port "${PORT:-8000}"
+fi
 
+exec "$@"

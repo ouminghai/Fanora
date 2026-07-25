@@ -124,7 +124,11 @@ contract FanoraCollectibles is ERC1155, AccessControl, Pausable {
         if (tokenId == 0) revert InvalidTokenId();
         if (tokenTypes[tokenId].exists) revert TokenTypeAlreadyExists();
         _validateMetadataUri(metadataUri);
-        if (maxSupply == 0 || perWalletLimit == 0 || perWalletLimit > maxSupply) revert InvalidSupply();
+        uint256 effectivePerWalletLimit =
+            category == TokenCategory.FAN_LIMITED_NFT ? maxSupply : perWalletLimit;
+        if (maxSupply == 0 || effectivePerWalletLimit == 0 || effectivePerWalletLimit > maxSupply) {
+            revert InvalidSupply();
+        }
         if (mintEnd <= mintStart) revert InvalidMintWindow();
         if (category == TokenCategory.CUSTOM_BADGE && (maxSupply != 1 || perWalletLimit != 1 || transferable)) {
             revert InvalidCategoryConfiguration();
@@ -137,7 +141,7 @@ contract FanoraCollectibles is ERC1155, AccessControl, Pausable {
             category: category,
             maxSupply: maxSupply,
             mintedSupply: 0,
-            perWalletLimit: perWalletLimit,
+            perWalletLimit: effectivePerWalletLimit,
             mintStart: mintStart,
             mintEnd: mintEnd,
             transferable: transferable,
@@ -147,7 +151,7 @@ contract FanoraCollectibles is ERC1155, AccessControl, Pausable {
         });
         _tokenUris[tokenId] = metadataUri;
         emit TokenTypeCreated(
-            tokenId, category, metadataUri, maxSupply, perWalletLimit, mintStart, mintEnd, transferable
+            tokenId, category, metadataUri, maxSupply, effectivePerWalletLimit, mintStart, mintEnd, transferable
         );
     }
 

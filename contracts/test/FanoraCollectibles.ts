@@ -39,7 +39,21 @@ describe("FanoraCollectibles", function () {
     await expect(collectibles.connect(manager).createTokenType(3, 2, "ipfs://task", 10, 2, now, now + 3600, false))
       .to.be.revertedWithCustomError(collectibles, "InvalidCategoryConfiguration");
     await collectibles.connect(manager).createTokenType(4, 3, "ipfs://fan-limited", 25, 1, now, now + 3600, true);
-    expect((await collectibles.tokenTypes(4)).maxSupply).to.equal(25);
+    const fanLimited = await collectibles.tokenTypes(4);
+    expect(fanLimited.maxSupply).to.equal(25);
+    expect(fanLimited.perWalletLimit).to.equal(25);
+  });
+
+  it("allows one wallet to repeatedly mint fan-limited NFTs until total supply is exhausted", async function () {
+    const { collectibles, manager, minter, fan, now } = await fixture();
+    await collectibles.connect(manager).createTokenType(5, 3, "ipfs://repeatable", 3, 1, now, now + 3600, true);
+    await collectibles.connect(minter).mintCollectible(fan.address, 5, 1, ethers.id("repeat-1"));
+    await collectibles.connect(minter).mintCollectible(fan.address, 5, 1, ethers.id("repeat-2"));
+    await collectibles.connect(minter).mintCollectible(fan.address, 5, 1, ethers.id("repeat-3"));
+    expect(await collectibles.balanceOf(fan.address, 5)).to.equal(3);
+    expect(await collectibles.mintedByWallet(5, fan.address)).to.equal(3);
+    await expect(collectibles.connect(minter).mintCollectible(fan.address, 5, 1, ethers.id("repeat-4")))
+      .to.be.revertedWithCustomError(collectibles, "MaxSupplyExceeded");
   });
 
   it("blocks non-transferable single and batch transfers while allowing concert cards", async function () {

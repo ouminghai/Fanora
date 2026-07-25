@@ -22,8 +22,8 @@ from app.schemas.membership import (
     OfficialMembershipVerifyRequest,
 )
 from app.services.identity import AuthenticatedIdentity
+from app.services.membership_fee import membership_fee_service
 from app.services.membership_payment import official_membership_payment_service
-from app.services.nft import nft_service
 
 router = APIRouter(prefix="/membership")
 
@@ -37,13 +37,7 @@ async def require_admin(session: AsyncSession, user_id: str) -> None:
 
 
 async def current_membership_fee() -> int:
-    if not settings.membership_payment_contract_address:
-        return settings.membership_fee_wei
-    try:
-        return await monad_contract_adapter.membership_fee()
-    except Exception:
-        logger.warning("membership_fee_chain_read_failed_using_fallback")
-        return settings.membership_fee_wei
+    return await membership_fee_service.get_status_fee()
 
 
 async def status_response(
@@ -110,21 +104,40 @@ async def verify_membership_payment(
     )
     profile = await session.get(UserProfile, identity.user_id)
     assert profile is not None
-    identity_configured = pinata_adapter.configured and monad_contract_adapter.identity_configured
-    if identity_configured:
-        try:
-            identity_nft = await nft_service.ensure_membership_identity(session, identity)
-            identity_nft_status = identity_nft.status if identity_nft else "PENDING"
-        except Exception:
-            logger.exception("membership_identity_sync_failed", user_id=identity.user_id)
-            await session.rollback()
-            identity_nft_status = (
-                await session.execute(
-                    select(MembershipIdentityNft.status).where(MembershipIdentityNft.user_id == identity.user_id)
-                )
-            ).scalar_one_or_none() or "RETRYABLE"
-    else:
-        identity_nft_status = "NOT_CONFIGURED"
+    identity_nft_status = (
+        await session.execute(
+            select(MembershipIdentityNft.status).where(MembershipIdentityNft.user_id == identity.user_id)
+        )
+    ).scalar_one_or_none() or (
+        "READY" if pinata_adapter.configured and monad_contract_adapter.identity_configured else "NOT_CONFIGURED"
+    )
+    return await status_response(profile, payment, identity_nft_status)
+
+
+@router.post("/activate-free", response_model=OfficialMembershipStatusResponse)
+async def activate_free_membership(
+    identity: AuthenticatedIdentity = Depends(get_current_identity),
+    session: AsyncSession = Depends(get_database_session),
+) -> OfficialMembershipStatusResponse:
+    try:
+        fee_wei = await membership_fee_service.get_live_fee()
+    except Exception as error:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Unable to verify the current membership fee",
+        ) from error
+    if fee_wei != 0:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Official membership is not free right now")
+    payment = await official_membership_payment_service.activate_free_membership(session, identity)
+    profile = await session.get(UserProfile, identity.user_id)
+    assert profile is not None
+    identity_nft_status = (
+        await session.execute(
+            select(MembershipIdentityNft.status).where(MembershipIdentityNft.user_id == identity.user_id)
+        )
+    ).scalar_one_or_none() or (
+        "READY" if pinata_adapter.configured and monad_contract_adapter.identity_configured else "NOT_CONFIGURED"
+    )
     return await status_response(profile, payment, identity_nft_status)
 
 
@@ -187,7 +200,8 @@ async def update_membership_fee(
         )
     try:
         receipt = await monad_contract_adapter.set_membership_fee(payload.fee_wei)
-        fee_wei = await monad_contract_adapter.membership_fee()
+        fee_wei = payload.fee_wei
+        await membership_fee_service.set_fee(fee_wei)
     except Exception as error:
         logger.exception("membership_fee_update_failed", user_id=identity.user_id)
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail="Membership fee update failed") from error

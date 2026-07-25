@@ -1,4 +1,4 @@
-"""LangGraph workflow for Quest post, reply, and page-submission review."""
+"""LangGraph workflow for Quest participation review."""
 
 import re
 from typing import Any, Required, TypedDict
@@ -22,7 +22,11 @@ _WORD = re.compile(r"[A-Za-z][A-Za-z0-9'-]{2,}|[\u3400-\u9fff]{2,4}")
 _UNSAFE = re.compile(
     r"(色情|博彩|代开发票|仇恨言论|人肉搜索|暴力威胁|porn|casino|doxx|kill\s+yourself)", re.IGNORECASE
 )
-_PLACEHOLDER = re.compile(r"^(测试|哈哈|呵呵|打卡|路过|支持|不错|好棒|来了|111|666|test)[!！.。\s\d]*$", re.IGNORECASE)
+_PLACEHOLDER = re.compile(r"^(测试|test|111+|666+)[!！.。\s\d]*$", re.IGNORECASE)
+_AD_SPAM = re.compile(
+    r"(加微|私信我|推广|代购|返利|空投群|点击链接|薅羊毛|刷单|telegram|whatsapp|airdrop|giveaway|promo|discount)",
+    re.IGNORECASE,
+)
 _STOP_WORDS = {
     "任务",
     "完成",
@@ -105,6 +109,20 @@ def _semantic_topics(value: str) -> set[str]:
         "story": ("故事", "陪伴", "入坑", "第一次", "回忆", "经历", "感受"),
         "creation": ("共创", "创作", "设计", "海报", "图片", "视觉", "灵感"),
         "anniversary": ("周年", "祝福", "纪念", "生日"),
+        "fan_expression": (
+            "粉丝",
+            "喜欢",
+            "支持",
+            "期待",
+            "感动",
+            "好听",
+            "爱了",
+            "泪目",
+            "太棒",
+            "加油",
+            "fan",
+            "love",
+        ),
     }
     lowered = value.casefold()
     return {topic for topic, terms in topics.items() if any(term in lowered for term in terms)}
@@ -119,29 +137,47 @@ def deterministic_checks(state: ContentReviewState) -> dict[str, Any]:
     )
     compact = re.sub(r"\s+", "", text)
     unique_ratio = len(set(compact.casefold())) / max(len(compact), 1)
-    spam = bool(_REPEATED.search(compact)) or bool(_PLACEHOLDER.fullmatch(compact))
+    spam = bool(_REPEATED.search(compact)) or bool(_PLACEHOLDER.fullmatch(compact)) or bool(_AD_SPAM.search(text))
     if meaningful_length >= 20 and unique_ratio < 0.16:
         spam = True
-    meaningful = meaningful_length >= state.get("minimum_length", 10) and not spam
+    minimum = int(state.get("minimum_length", 4))
+    lenient_minimum = min(minimum, 4 if state.get("content_type") in {"reply", "page_action"} else 6)
+    meaningful = meaningful_length >= lenient_minimum and not spam
     policy_safe = not bool(_UNSAFE.search(text))
 
     context = "\n".join([state["task_title"], state.get("task_description", ""), state.get("interaction_prompt", "")])
     context_keywords = _keywords(context)
     content_keywords = _keywords(text)
+    context_topics = _semantic_topics(context)
+    content_topics = _semantic_topics(text)
+    related_topic_pairs = {
+        frozenset(("story", "concert_memory")),
+        frozenset(("music", "concert_memory")),
+        frozenset(("story", "anniversary")),
+    }
+    semantic_relevant = (
+        bool(context_topics & content_topics)
+        or "fan_expression" in content_topics
+        or any(
+            frozenset((context_topic, content_topic)) in related_topic_pairs
+            for context_topic in context_topics
+            for content_topic in content_topics
+        )
+    )
     relevant = (
         not context_keywords
         or bool(context_keywords & content_keywords)
-        or bool(_semantic_topics(context) & _semantic_topics(text))
+        or semantic_relevant
     )
 
     score = 100
     reasons: list[str] = []
     if not tag_present:
-        score -= 40
-        reasons.append(f"缺少任务要求的标签 {required_tag}")
+        score -= 8
+        reasons.append(f"缺少任务建议标签 {required_tag}")
     if not meaningful:
         score -= 45
-        reasons.append("有效内容过短或主要由重复、占位字符组成")
+        reasons.append("内容缺少可识别的真实表达或主要由占位字符组成")
     if spam:
         score -= 35
         reasons.append("检测到明显灌水或低信息量重复内容")
@@ -154,10 +190,10 @@ def deterministic_checks(state: ContentReviewState) -> dict[str, Any]:
     if not reasons:
         reasons.append("标签、有效长度、信息量和主题相关性通过基础检查")
 
-    if not policy_safe or not tag_present or not meaningful or spam:
+    if not policy_safe or not meaningful or spam:
         decision = "rejected"
     elif not relevant:
-        decision = "manual_review"
+        decision = "rejected"
     else:
         decision = "approved"
     return {
@@ -177,17 +213,18 @@ def deterministic_checks(state: ContentReviewState) -> dict[str, Any]:
 
 def build_content_review_graph(model_service: LLMService = llm_service) -> CompiledStateGraph:
     async def llm_review(state: ContentReviewState) -> dict[str, Any]:
-        hard_rejected = (
-            not state["tag_present"] or not state["meaningful"] or state["spam"] or not state["policy_safe"]
-        )
+        hard_rejected = not state["meaningful"] or state["spam"] or not state["policy_safe"] or not state["relevant"]
         if hard_rejected or not model_service.available:
             return {"degraded": model_service.available is False}
         messages = [
             SystemMessage(
                 content=(
-                    "你是 Fanora Quest 内容质量审核 Agent。只审核提交是否真实回应任务，不发积分、不修改任务、"
-                    "不调用链上工具。重点判断相关性、信息量、灌水、无意义字符、合规性，以及明显模板化或 AI 痕迹。"
-                    "不应仅因文笔普通拒绝真实粉丝表达；无法可靠判断时返回 manual_review。"
+                    "你是 Fanora Quest 真实参与判定 Agent。只判断用户提交是否与任务主题相关，并体现真实参与、"
+                    "观点、情绪或粉丝互动；不评价文采、专业程度、原创性或表达丰富度，不发积分、不修改任务、"
+                    "不调用链上工具。允许简短、普通、情绪化、常见粉丝表达，允许有轻微 AI 感。"
+                    "不要仅因内容简单、与其他用户表达相似、使用常见粉丝话术、语言不丰富而拒绝。"
+                    "只有明显无关、大量无意义字符、与任务无关的复制粘贴、广告垃圾信息、明显刷任务空话才拒绝。"
+                    "缺少标签只能作为弱信号；如果内容相关且体现参与，应通过。"
                 )
             ),
             HumanMessage(
@@ -203,7 +240,7 @@ def build_content_review_graph(model_service: LLMService = llm_service) -> Compi
         try:
             review = await model_service.call_structured(messages, LlmContentReview)
             decision = review.decision
-            if not review.policy_safe or review.spam or not review.meaningful:
+            if not review.policy_safe or review.spam or not review.meaningful or not review.relevant:
                 decision = "rejected"
             return {
                 "decision": decision,
@@ -224,11 +261,11 @@ def build_content_review_graph(model_service: LLMService = llm_service) -> Compi
     def validate_decision(state: ContentReviewState) -> dict[str, Any]:
         decision = state["decision"]
         reasons = list(state["reasons"])
-        if not state["tag_present"] or not state["meaningful"] or state["spam"] or not state["policy_safe"]:
+        if not state["meaningful"] or state["spam"] or not state["policy_safe"]:
             decision = "rejected"
         if decision == "approved" and not state["relevant"]:
-            decision = "manual_review"
-            reasons.append("主题相关性不足，转人工确认")
+            decision = "rejected"
+            reasons.append("内容与任务主题明显无关")
         return {"decision": decision, "reasons": list(dict.fromkeys(reasons))[:8]}
 
     workflow = StateGraph(ContentReviewState)

@@ -12,10 +12,20 @@ const taskGallerySource = readFileSync(new URL("../components/community/TaskGall
 const creationWallSource = readFileSync(new URL("../components/community/CreationWall.tsx", import.meta.url), "utf8");
 const taskCatalogSource = readFileSync(new URL("../data/fanora.ts", import.meta.url), "utf8");
 const fearTicketSource = readFileSync(new URL("../components/community/FearAndDreamsTicket.tsx", import.meta.url), "utf8");
+const globalInfoModalSource = readFileSync(new URL("../components/modals/GlobalInfoModal.tsx", import.meta.url), "utf8");
+const globalProcessModalSource = readFileSync(new URL("../components/modals/GlobalProcessModal.tsx", import.meta.url), "utf8");
+const providerSource = readFileSync(new URL("../components/providers/Web3Provider.tsx", import.meta.url), "utf8");
+const transactionProgressSource = readFileSync(new URL("../components/nft/ChainTransactionProgress.tsx", import.meta.url), "utf8");
 const markdownEditorSource = readFileSync(new URL("../components/community/MarkdownEditor.tsx", import.meta.url), "utf8");
 const markdownContentSource = readFileSync(new URL("../components/community/MarkdownContent.tsx", import.meta.url), "utf8");
 const coverFlowSource = readFileSync(new URL("../components/homes/home/CoverFlowSlider.tsx", import.meta.url), "utf8");
 const collectionsSource = readFileSync(new URL("../components/homes/common/Collections.tsx", import.meta.url), "utf8");
+const identityLinkSource = readFileSync(new URL("../components/profile/UserIdentityLink.tsx", import.meta.url), "utf8");
+const publicProfileSource = readFileSync(new URL("../components/profile/PublicCollectionDashboard.tsx", import.meta.url), "utf8");
+const nftMarketSource = readFileSync(new URL("../components/nft/FanNftMarket.tsx", import.meta.url), "utf8");
+const fanProfileSummarySource = readFileSync(new URL("../components/profile/FanProfileSummary.tsx", import.meta.url), "utf8");
+const confettiSource = readFileSync(new URL("../lib/ui/confetti.ts", import.meta.url), "utf8");
+const stylesSource = readFileSync(new URL("../public/styles/style.css", import.meta.url), "utf8");
 
 test("header exposes the on-chain community and its requested modules", () => {
   assert.match(navSource, /href: "\/community\/creations"/);
@@ -48,6 +58,7 @@ test("replying to a post refreshes automatic task completion and Fan Token state
   assert.match(postSource, /`\/community\/posts\/\$\{postId\}\/replies`/);
   assert.match(postSource, /participation_status === "claimed"/);
   assert.match(postSource, /refreshUser\(\)/);
+  assert.match(postSource, /\[load, user\?\.id\]/);
 });
 
 test("separate task and creation pages expose gallery and masonry layouts", () => {
@@ -128,6 +139,56 @@ test("FEAR and DREAMS uses AI review and an ERC-1155 memorial ticket reward", ()
   assert.match(fearTicketSource, /nft_reward_status === "CONFIRMED"/);
   assert.match(fearTicketSource, /nft_explorer_url/);
   assert.match(fearTicketSource, /不伪造交易/);
+  assert.match(providerSource, /NiceModal\.Provider/);
+  assert.match(fearTicketSource, /NiceModal\.show\(GlobalInfoModal/);
+  assert.match(globalInfoModalSource, /@ebay\/nice-modal-react/);
+  assert.match(fearTicketSource, /NiceModal\.show\(GlobalProcessModal/);
+  assert.match(fearTicketSource, /progressKind: "quest-reward"/);
+  assert.match(globalProcessModalSource, /<ChainTransactionProgress/);
+  assert.match(globalProcessModalSource, /fixed inset-0 z-\[1450\]/);
+  assert.match(globalProcessModalSource, /NiceModal\.remove\(GlobalProcessModal\)/);
+  assert.match(transactionProgressSource, /"quest-reward": \["AI 审核", "写入 IPFS", "提交铸造", "获得 NFT"]/);
+  assert.match(fearTicketSource, /reward-ticket-stage/);
+  assert.match(fearTicketSource, /Sealed until mint confirmed/);
+  assert.match(fearTicketSource, /获得 FEAR and DREAMS 纪念票/);
+  assert.match(fearTicketSource, /celebrate: true/);
+  assert.match(globalInfoModalSource, /nft-tilt-surface nft-flow-border/);
+  assert.match(globalInfoModalSource, /startRealisticConfetti\(3000\)/);
+  assert.match(confettiSource, /startVelocity: 30, spread: 360, ticks: 60/);
+  assert.match(confettiSource, /window\.setInterval\(fire, 250\)/);
+});
+
+test("post publishing and replies use a blocking AI review modal and shared errors", () => {
+  assert.match(creationWallSource, /NiceModal\.show\(GlobalProcessModal/);
+  assert.match(creationWallSource, /\/img\/process\/cyancat\.gif/);
+  assert.match(creationWallSource, /NiceModal\.show\(GlobalInfoModal/);
+  assert.match(postSource, /NiceModal\.show\(GlobalProcessModal/);
+  assert.match(postSource, /\/img\/process\/cyancat\.gif/);
+  assert.match(postSource, /NiceModal\.show\(GlobalInfoModal/);
+  assert.match(globalInfoModalSource, /tone\?: "success" \| "warning" \| "error" \| "info"/);
+  assert.doesNotMatch(globalInfoModalSource, /backdrop-blur/);
+  assert.match(globalProcessModalSource, /useBodyScrollLock\(modal\.visible\)/);
+  assert.match(globalProcessModalSource, /pointer-events-none cursor-default/);
+  assert.match(globalProcessModalSource, /border-cyan-300\/35/);
+  assert.match(globalProcessModalSource, /imageUrl=\{imageUrl\} embedded/);
+  assert.match(globalInfoModalSource, /border-cyan-300\/35/);
+  assert.match(globalInfoModalSource, /flex w-full flex-col items-center text-center/);
+  assert.match(stylesSource, /\.chain-transaction-progress\.is-embedded \{/);
+  assert.match(stylesSource, /\.chain-transaction-progress\.is-embedded \{[\s\S]*?border: 0;[\s\S]*?background: transparent;/);
+  assert.match(creationWallSource, /apiErrorMessage\(error/);
+  assert.match(postSource, /apiErrorMessage\(error/);
+});
+
+test("fan NFT AI generation accepts a reference image and requires clicking the result to select it", () => {
+  assert.match(nftMarketSource, /reference_image_data_url: referenceImageDataUrl \|\| null/);
+  assert.match(nftMarketSource, /上传 AI 参考图/);
+  assert.match(nftMarketSource, /点击选择作为 NFT 图片/);
+  assert.match(nftMarketSource, /image_data_url: aiGeneratedImage/);
+  assert.match(nftMarketSource, /showFormError\("请选择 NFT 图片"/);
+  const aiButtonIndex = nftMarketSource.indexOf('{aiBusy ? "AI 生成中…" : "AI 生成草稿与图片"}');
+  const aiNoticeIndex = nftMarketSource.indexOf("{aiNotice ?", aiButtonIndex);
+  const generatedImageIndex = nftMarketSource.indexOf("{aiGeneratedImage ?", aiButtonIndex);
+  assert.ok(aiButtonIndex >= 0 && aiNoticeIndex > aiButtonIndex && aiNoticeIndex < generatedImageIndex);
 });
 
 test("creation publishing supports Markdown, task tags and multiple images", () => {
@@ -143,4 +204,37 @@ test("creation publishing supports Markdown, task tags and multiple images", () 
   assert.match(postSource, /<MarkdownContent content=\{post\.body\}/);
   assert.match(postSource, /<ImageGallery images=\{postImages\}/);
   assert.match(postSource, /<CommentComposer/);
+});
+
+test("Echo, Gallery, posts, and comments expose member-card hover profiles", () => {
+  assert.match(identityLinkSource, /`\/users\/\$\{author\.id\}`/);
+  assert.match(identityLinkSource, /\/nft\/users\/\$\{userId\}/);
+  assert.match(identityLinkSource, /createPortal/);
+  assert.match(identityLinkSource, /style=\{\{ left: cardPosition\.left/);
+  assert.match(identityLinkSource, /fixed z-\[1600\]/);
+  assert.match(identityLinkSource, /Fanora 会员证/);
+  assert.match(hubSource, /<UserIdentityLink author=\{post\.author\}/);
+  assert.match(creationWallSource, /<UserIdentityLink author=\{post\.author\}/);
+  assert.match(postSource, /<UserIdentityLink author=\{reply\.author\}/);
+  assert.match(nftMarketSource, /<UserIdentityLink[\s\S]*author=\{item\.creator\}/);
+  assert.match(publicProfileSource, /TA 发布的 NFT/);
+  assert.match(publicProfileSource, /TA 的链上收藏/);
+  assert.match(publicProfileSource, /\/profile\/users\/\$\{userId\}/);
+  assert.match(publicProfileSource, /<FanProfileSummary/);
+  assert.match(fanProfileSummarySource, /Proof of Fandom/);
+});
+
+test("community cards do not nest user profile anchors inside post anchors", () => {
+  const nestedProfileLink = /<Link(?=[^>]*href=\{`\/community\/posts\/\$\{post\.id\}`\})[^>]*[^/]>(?:(?!<\/Link>)[\s\S])*<UserIdentityLink/;
+
+  assert.doesNotMatch(hubSource, nestedProfileLink);
+  assert.doesNotMatch(creationWallSource, nestedProfileLink);
+});
+
+test("community posts can link an owned NFT and open its purchase drawer", () => {
+  assert.match(creationWallSource, /\/nft\/me\/creations/);
+  assert.match(creationWallSource, /linked_nft_creation_id/);
+  assert.match(postSource, /post\.linked_nft/);
+  assert.match(postSource, /购买并铸造/);
+  assert.match(postSource, /<FanNftMarket mode="item" itemId=\{itemId\} variant="drawer"/);
 });

@@ -51,7 +51,7 @@ class MembershipTreasuryWithdrawRequest(BaseModel):
 
 
 class MembershipFeeUpdateRequest(BaseModel):
-    fee_wei: int = Field(gt=0)
+    fee_wei: int = Field(ge=0)
 
 
 class MembershipFeeResponse(BaseModel):

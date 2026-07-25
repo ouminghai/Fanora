@@ -86,12 +86,12 @@ async def require_official_member(
     identity: AuthenticatedIdentity = Depends(get_current_identity),
     session: AsyncSession = Depends(get_database_session),
 ) -> AuthenticatedIdentity:
-    """Require the signed-in user to have a verified 1 MON membership payment."""
+    """Require the signed-in user to have an active official membership."""
 
     profile = await session.get(UserProfile, identity.user_id)
     if profile is None or not profile.is_official_member:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Official membership required. Pay 1 MON before joining check-ins or tasks.",
+            detail="Official membership required before joining check-ins or tasks.",
         )
     return identity

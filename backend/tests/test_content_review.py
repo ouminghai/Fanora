@@ -41,3 +41,41 @@ async def test_content_review_rejects_missing_tag_and_spam() -> None:
     assert result.decision == "rejected"
     assert result.tag_present is False
     assert result.spam is True
+
+
+@pytest.mark.asyncio
+async def test_content_review_allows_short_emotional_fan_participation() -> None:
+    result = await content_review_agent.review(
+        ContentReviewRequest(
+            task_id="concert-memory-task",
+            task_title="演唱会现场记忆",
+            task_description="分享一次真实的粉丝现场感受",
+            content_type="page_action",
+            source_id="submission-short",
+            body="太难忘了",
+            minimum_length=10,
+        )
+    )
+
+    assert result.decision == "approved"
+    assert result.meaningful is True
+    assert result.relevant is True
+
+
+@pytest.mark.asyncio
+async def test_content_review_treats_missing_tag_as_weak_signal() -> None:
+    result = await content_review_agent.review(
+        ContentReviewRequest(
+            task_id="story-task",
+            task_title="粉丝故事图文征集",
+            task_description="发布一段真实粉丝故事",
+            content_type="post",
+            source_id="post-without-tag",
+            title="散场以后",
+            body="灯光熄灭以后，大家还留在座位上一起合唱。",
+            required_tag="#粉丝故事图文征集",
+        )
+    )
+
+    assert result.tag_present is False
+    assert result.decision == "approved"

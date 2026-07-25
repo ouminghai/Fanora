@@ -14,7 +14,6 @@ from app.models.user import OfficialMembershipPayment, User, UserProfile, UserSe
 from app.services.auth import hash_session_token
 from app.services.identity import AuthenticatedIdentity
 from app.services.membership_payment import ConfirmedChainPayment, official_membership_payment_service
-from app.services.nft import nft_service
 
 
 def test_membership_payment_id_is_a_prefixed_bytes32():
@@ -84,23 +83,20 @@ async def test_verified_one_mon_payment_activates_official_membership(client, mo
     transaction_hash = "0x" + "ab" * 32
 
     async with database_service.session() as session:
-        session.add(
-            MembershipLevel(
-                code="mild-neuro",
-                name="轻度神经",
-                description="初级活跃会员",
-                rank=2,
-                min_token_balance=100,
-                max_token_balance=499,
-                badge_image_url="/img/badges/mild.png",
-            )
-        )
+        level = await session.get(MembershipLevel, "mild-neuro")
+        assert level is not None
+        level.rank = 10_000
         user = User(display_name="Pending Member")
         session.add(user)
         await session.flush()
         session.add_all(
             [
-                UserProfile(user_id=user.id, fan_token_balance=100, level="新生儿"),
+                UserProfile(
+                    user_id=user.id,
+                    fan_token_balance=100,
+                    fan_token_lifetime_earned=100,
+                    level="新生儿",
+                ),
                 Wallet(
                     user_id=user.id,
                     address=account.address,
@@ -119,10 +115,12 @@ async def test_verified_one_mon_payment_activates_official_membership(client, mo
         user_id = user.id
 
     gateway = Account.create().address
+    monkeypatch.setattr(settings, "membership_fee_wei", 10**18)
     monkeypatch.setattr(settings, "membership_payment_contract_address", gateway)
     monkeypatch.setattr(settings, "membership_identity_contract_address", Account.create().address)
     monkeypatch.setattr(settings, "identity_minter_private_key", "0x" + "11" * 32)
     monkeypatch.setattr(settings, "pinata_jwt", "test-pinata-jwt")
+    monkeypatch.setattr(settings, "chain_writes_enabled", True)
 
     async def current_fee() -> int:
         return settings.membership_fee_wei
@@ -143,13 +141,6 @@ async def test_verified_one_mon_payment_activates_official_membership(client, mo
         )
 
     monkeypatch.setattr(official_membership_payment_service, "_load_chain_payment", confirmed_payment)
-    identity_syncs: list[str] = []
-
-    async def sync_identity(_session, identity):
-        identity_syncs.append(identity.user_id)
-        return SimpleNamespace(status="CONFIRMED")
-
-    monkeypatch.setattr(nft_service, "ensure_membership_identity", sync_identity)
     headers = {"Authorization": f"Bearer {raw_token}"}
 
     pending_response = client.get("/api/v1/membership/me", headers=headers)
@@ -166,8 +157,7 @@ async def test_verified_one_mon_payment_activates_official_membership(client, mo
     assert verify_response.status_code == 200
     assert verify_response.json()["status"] == "active"
     assert verify_response.json()["transaction_hash"] == transaction_hash
-    assert verify_response.json()["identity_nft_status"] == "CONFIRMED"
-    assert identity_syncs == [user_id]
+    assert verify_response.json()["identity_nft_status"] == "READY"
 
     repeated_response = client.post(
         "/api/v1/membership/verify",
@@ -192,7 +182,7 @@ async def test_verified_one_mon_payment_activates_official_membership(client, mo
     assert me_response.json()["level"] == "轻度神经"
 
 
-async def test_membership_status_does_not_offer_payment_without_gateway(client):
+async def test_membership_status_does_not_offer_payment_without_gateway(client, monkeypatch):
     account = Account.create()
     raw_token = "membership-unconfigured-session-token"
 
@@ -213,9 +203,71 @@ async def test_membership_status_does_not_offer_payment_without_gateway(client):
         )
         await session.commit()
 
+    monkeypatch.setattr(settings, "membership_payment_contract_address", "")
     response = client.get(
         "/api/v1/membership/me",
         headers={"Authorization": f"Bearer {raw_token}"},
     )
     assert response.status_code == 200
     assert response.json()["payment_contract_address"] is None
+
+
+async def test_zero_fee_membership_activates_without_chain_payment(client, monkeypatch):
+    account = Account.create()
+    raw_token = "free-membership-session-token"
+
+    async with database_service.session() as session:
+        user = User(display_name="Free Window Member")
+        session.add(user)
+        await session.flush()
+        session.add_all(
+            [
+                UserProfile(user_id=user.id),
+                Wallet(user_id=user.id, address=account.address, wallet_type="external", is_primary=True),
+                UserSession(
+                    user_id=user.id,
+                    token_hash=hash_session_token(raw_token),
+                    expires_at=utc_now() + timedelta(hours=1),
+                ),
+            ]
+        )
+        await session.commit()
+
+    monkeypatch.setattr(settings, "membership_fee_wei", 0)
+    monkeypatch.setattr(settings, "membership_payment_contract_address", Account.create().address)
+    monkeypatch.setattr(settings, "membership_treasury_manager_private_key", "0x" + "22" * 32)
+    monkeypatch.setattr(settings, "chain_writes_enabled", True)
+    monkeypatch.setattr(settings, "membership_identity_contract_address", "")
+    monkeypatch.setattr(settings, "pinata_jwt", "")
+    async def current_fee() -> int:
+        return 0
+
+    relayed_users: list[str] = []
+
+    async def relay_free_membership(wallet: str, payment_id: str):
+        relayed_users.append(wallet)
+        return SimpleNamespace(
+            transaction_hash="0x" + "ef" * 32,
+            block_number=456,
+            event_args={"treasury": Account.create().address, "paymentId": payment_id},
+        )
+
+    monkeypatch.setattr(monad_contract_adapter, "membership_fee", current_fee)
+    monkeypatch.setattr(monad_contract_adapter, "activate_free_membership", relay_free_membership)
+    headers = {"Authorization": f"Bearer {raw_token}"}
+
+    status_response = client.get("/api/v1/membership/me", headers=headers)
+    assert status_response.status_code == 200
+    assert status_response.json()["fee_wei"] == "0"
+    assert status_response.json()["payment_id"] is not None
+
+    activation_response = client.post("/api/v1/membership/activate-free", headers=headers)
+    assert activation_response.status_code == 200
+    assert activation_response.json()["is_official_member"] is True
+    assert activation_response.json()["transaction_hash"] == "0x" + "ef" * 32
+    assert relayed_users == [account.address]
+
+    repeated_response = client.post("/api/v1/membership/activate-free", headers=headers)
+    assert repeated_response.status_code == 200
+    assert repeated_response.json()["transaction_hash"] == activation_response.json()["transaction_hash"]
+    assert relayed_users == [account.address]

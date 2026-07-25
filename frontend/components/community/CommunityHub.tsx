@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import FanTokenAmount from "@/components/common/FanTokenAmount";
 import CheckInCalendar from "@/components/community/CheckInCalendar";
 import UserAvatar from "@/components/profile/UserAvatar";
+import UserIdentityLink from "@/components/profile/UserIdentityLink";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { fanTaskCatalogByKey } from "@/data/fanora";
 import { api } from "@/lib/api/client";
@@ -391,7 +392,12 @@ export default function CommunityHub() {
 
               <div className="mt-7 grid gap-5 md:grid-cols-2">
                 {posts.map((post, postIndex) => (
-                  <Link key={post.id} style={{ animationDelay: `${Math.min(postIndex, 7) * 65}ms` }} href={`/community/posts/${post.id}`} className="community-grid-card group overflow-hidden rounded-3xl border border-jacarta-100 dark:border-white/10">
+                  <article key={post.id} style={{ animationDelay: `${Math.min(postIndex, 7) * 65}ms` }} className="community-grid-card group relative overflow-hidden rounded-3xl border border-jacarta-100 dark:border-white/10">
+                    <Link
+                      href={`/community/posts/${post.id}`}
+                      aria-label={`查看创作：${post.title}`}
+                      className="absolute inset-0 z-10 rounded-3xl"
+                    />
                     <div className="h-44 overflow-hidden bg-jacarta-100 dark:bg-jacarta-700">
                       {post.cover_url ? <Image src={post.cover_url} alt="" width={720} height={360} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" /> : <div className="h-full bg-gradient-to-br from-accent/60 to-[#45BFEF]/40" />}
                     </div>
@@ -403,12 +409,13 @@ export default function CommunityHub() {
                       <h3 className="mt-4 font-display text-lg font-semibold text-jacarta-700 transition-colors group-hover:text-accent dark:text-white">{post.title}</h3>
                       <p className="mt-3 line-clamp-2 text-sm leading-6 text-jacarta-500 dark:text-jacarta-300">{post.body_preview}</p>
                       <div className="mt-5 flex items-center gap-2">
-                        <UserAvatar avatarUrl={post.author.avatar_url} seed={post.author.id} displayName={post.author.display_name} className="h-7 w-7 rounded-full" />
-                        <span className="text-xs font-semibold text-jacarta-500 dark:text-jacarta-300">{post.author.display_name}</span>
+                        <span className="relative z-20 inline-flex min-w-0">
+                          <UserIdentityLink author={post.author} avatarClassName="h-7 w-7 rounded-full" nameClassName="text-xs font-semibold text-jacarta-500 dark:text-jacarta-300" compact />
+                        </span>
                         <span className="ml-auto text-xs text-jacarta-400">{formatDate(post.updated_at)}</span>
                       </div>
                     </div>
-                  </Link>
+                  </article>
                 ))}
               </div>
             </section>

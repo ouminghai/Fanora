@@ -6,12 +6,18 @@ from typing import Literal
 from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.schemas.auth import validate_image_url
+from app.schemas.nft import FanNftListingResponse
 
 
 def validate_image_urls(value: list[str]) -> list[str]:
     if len(value) > 6:
         raise ValueError("A maximum of 6 images is allowed")
-    return [validate_image_url(item, label="Image") for item in value]
+    validated: list[str] = []
+    for item in value:
+        image_url = validate_image_url(item, label="Image")
+        if image_url is not None:
+            validated.append(image_url)
+    return validated
 
 
 class AuthorSummary(BaseModel):
@@ -44,6 +50,7 @@ class PostCreate(BaseModel):
     category: Literal["discussion", "music", "story", "creation"] = "discussion"
     cover_url: str | None = None
     image_urls: list[str] = Field(default_factory=list)
+    linked_nft_creation_id: str | None = Field(default=None, max_length=100)
 
     @field_validator("title", "body")
     @classmethod
@@ -62,7 +69,7 @@ class PostCreate(BaseModel):
 
 
 class ReplyCreate(BaseModel):
-    body: str = Field(min_length=10, max_length=2000)
+    body: str = Field(min_length=2, max_length=2000)
     parent_reply_id: str | None = None
     image_urls: list[str] = Field(default_factory=list)
 
@@ -103,6 +110,7 @@ class PostSummaryResponse(BaseModel):
     liked: bool
     bookmarked: bool
     author: AuthorSummary
+    linked_nft: FanNftListingResponse | None = None
     created_at: datetime
     updated_at: datetime
 
@@ -120,6 +128,7 @@ class PostDetailResponse(BaseModel):
     liked: bool
     bookmarked: bool
     author: AuthorSummary
+    linked_nft: FanNftListingResponse | None = None
     replies: list[ReplyResponse]
     has_more_replies: bool = False
     next_replies_offset: int | None = None
@@ -154,7 +163,7 @@ class TaskCreate(BaseModel):
     end_at: datetime | None = None
     reward_fan_tokens: int = Field(gt=0, le=100_000)
     target_post_id: str | None = None
-    minimum_reply_length: int = Field(default=10, ge=10, le=500)
+    minimum_reply_length: int = Field(default=4, ge=1, le=500)
     content_categories: list[str] = Field(default_factory=list, max_length=8)
     presentation: TaskPresentation = Field(default_factory=TaskPresentation)
     participation_limit: int | None = Field(default=None, gt=0)
@@ -177,7 +186,7 @@ class TaskStatusUpdate(BaseModel):
 
 
 class TaskPageCompletion(BaseModel):
-    interaction_note: str = Field(min_length=10, max_length=300)
+    interaction_note: str = Field(min_length=2, max_length=300)
     image_urls: list[str] = Field(default_factory=list)
 
     @field_validator("image_urls")

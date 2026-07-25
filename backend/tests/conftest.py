@@ -11,6 +11,10 @@ os.environ["CHECKPOINT_DATABASE_URL"] = ""
 os.environ["CHAIN_WRITES_ENABLED"] = "false"
 os.environ["OPENAI_API_KEY"] = ""
 os.environ["OPENAI_MODEL"] = ""
+os.environ["MEMBERSHIP_FEE_WEI"] = "1000000000000000000"
+os.environ["MEMBERSHIP_PAYMENT_CONTRACT_ADDRESS"] = ""
+os.environ["MEMBERSHIP_IDENTITY_CONTRACT_ADDRESS"] = ""
+os.environ["PINATA_JWT"] = ""
 
 from app.core.database import database_service  # noqa: E402
 from app.main import app  # noqa: E402
@@ -30,8 +34,7 @@ async def seed_test_community_content() -> None:
     """Provide explicit lightweight content for in-memory API tests."""
 
     async with database_service.session() as session:
-        session.add_all(
-            [
+        posts = [
                 CommunityPost(
                     id=WELCOME_POST_ID,
                     community_id=OFFICIAL_COMMUNITY_ID,
@@ -51,9 +54,8 @@ async def seed_test_community_content() -> None:
                     category="music",
                 ),
             ]
-        )
         for post_id, title, _body, cover_url, category in CREATION_SEEDS:
-            session.add(
+            posts.append(
                 CommunityPost(
                     id=post_id,
                     community_id=OFFICIAL_COMMUNITY_ID,
@@ -64,15 +66,19 @@ async def seed_test_community_content() -> None:
                     category=category,
                 )
             )
+        for post in posts:
+            if await session.get(CommunityPost, post.id) is None:
+                session.add(post)
         await session.flush()
         for task_seed in TASK_SEEDS:
-            session.add(
-                FanTask(
-                    community_id=OFFICIAL_COMMUNITY_ID,
-                    created_by_user_id=SYSTEM_USER_ID,
-                    **deepcopy(task_seed),
+            if await session.get(FanTask, task_seed["id"]) is None:
+                session.add(
+                    FanTask(
+                        community_id=OFFICIAL_COMMUNITY_ID,
+                        created_by_user_id=SYSTEM_USER_ID,
+                        **deepcopy(task_seed),
+                    )
                 )
-            )
         await session.commit()
 
 

@@ -4,13 +4,14 @@ import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
 
 export type TransactionPhase = "idle" | "processing" | "complete";
-type TransactionKind = "publish" | "mint" | "identity" | "member-card";
+export type TransactionKind = "publish" | "mint" | "identity" | "member-card" | "quest-reward";
 
 const stepLabels: Record<TransactionKind, string[]> = {
   publish: ["提交发布", "写入 IPFS", "合约铸造", "链上确认"],
   mint: ["提交购买", "扣除 FAN", "铸造 NFT", "钱包确认"],
   identity: ["读取身份", "同步等级", "验证 Owner", "区块确认"],
   "member-card": ["验证会员身份", "合成会员证", "写入 IPFS", "链上确认"],
+  "quest-reward": ["AI 审核", "写入 IPFS", "提交铸造", "获得 NFT"],
 };
 
 export default function ChainTransactionProgress({
@@ -21,6 +22,7 @@ export default function ChainTransactionProgress({
   artifactName,
   imageUrl,
   compact = false,
+  embedded = false,
 }: {
   phase: Exclude<TransactionPhase, "idle">;
   kind: TransactionKind;
@@ -29,6 +31,7 @@ export default function ChainTransactionProgress({
   artifactName: string;
   imageUrl?: string | null;
   compact?: boolean;
+  embedded?: boolean;
 }) {
   const steps = useMemo(() => stepLabels[kind], [kind]);
   const [activeStep, setActiveStep] = useState(0);
@@ -46,7 +49,7 @@ export default function ChainTransactionProgress({
   }, [phase, steps.length]);
 
   return (
-    <div className={`chain-transaction-progress ${compact ? "is-compact" : ""}`} aria-live="polite">
+    <div className={`chain-transaction-progress ${compact ? "is-compact" : ""} ${embedded ? "is-embedded" : ""}`} aria-live="polite">
       <div className="text-center">
         <p className="text-[10px] font-bold uppercase tracking-[.18em] text-[#45bfef]">Monad Transaction</p>
         <h3 className={`${compact ? "mt-2 text-lg" : "mt-3 text-2xl"} font-display font-semibold text-jacarta-700 dark:text-white`}>{title}</h3>

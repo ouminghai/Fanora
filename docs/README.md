@@ -1,17 +1,19 @@
 # Fanora 文档中心
 
-> 更新日期：2026-07-23\
-> 当前产品基线：v1.6，RainbowKit 钱包登录 + 单一 Fanora 官方社区 + 全局 FAN/终身等级 + ERC-721 会员证 + ERC-1155 粉丝 NFT 市场 + Pinata IPFS + Monad Testnet
-![alt text](image.png)
+> 更新日期：2026-07-23
+> 当前产品基线：v1.7，钱包登录 + 官方社区 + Agent 审核/画像/NFT 草稿 + 全局 FAN/终身等级 + ERC-721 会员证 + ERC-1155 粉丝 NFT + Pinata + Monad Testnet
+
 ## 1. 文档层级
 
 | 文档 | 定位 | 是否作为当前基线 |
 | --- | --- | --- |
 | [PRODUCT_REQUIREMENTS.md](./PRODUCT_REQUIREMENTS.md) | 产品范围、编号需求、验收标准和 MVP 完成定义 | 是，需求事实源 |
 | [ARCHITECTURE.md](./ARCHITECTURE.md) | 系统边界、数据归属、三合约、Pinata、部署和安全设计 | 是，技术架构事实源 |
+| [AI_AGENTS.md](./AI_AGENTS.md) | LangGraph Agent 代码入口、职责边界、模型配置、数据表和验证命令 | 是，Agent 工程说明 |
 | [MVP_ROADMAP.md](./MVP_ROADMAP.md) | 按依赖关系排列的实施阶段、交付物和退出条件 | 是，执行顺序基线 |
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 当前代码可执行的本地启动、测试和配置说明 | 是，开发操作基线 |
 | [CONTRACT_DEPLOYMENT.md](./CONTRACT_DEPLOYMENT.md) | Monad 合约编译、发布、角色配置和前后端参数同步 | 是，合约发布操作指南 |
+| [RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md) | Railway Docker、PostgreSQL、V1 Alembic 基线和上线检查 | 是，后端云部署指南 |
 | [week3/README.md](./week3/README.md) | Week 3 初步版本交付、运行方式、真实功能、Mock 范围和问题清单 | 是，团队演示入口 |
 | [week3/DEMO_GUIDE.md](./week3/DEMO_GUIDE.md) | 钱包、社区、会员证与 NFT 市场的演示脚本 | 是，演示操作指南 |
 | [DELIVERY_SUMMARY_2026-07-23.md](./DELIVERY_SUMMARY_2026-07-23.md) | 钱包登录、终身等级、会员证与粉丝 NFT 市场的当前交付证据 | 是，当前交付证据 |
@@ -53,9 +55,11 @@ PRODUCT_REQUIREMENTS
 
 1. `DELIVERY_SUMMARY_2026-07-23.md` 了解当前已经交付的完整范围与剩余工作。
 2. `DEVELOPMENT.md` 启动当前前端、后端、PostgreSQL 和正式合约。
-3. `PRODUCT_REQUIREMENTS.md` 查找需求编号与验收条件。
-4. `ARCHITECTURE.md` 确认模块边界、数据库事实源、Pinata 和链上写入约束。
-5. `CONTRACT_DEPLOYMENT.md` 执行测试网发布与三端配置同步。
+3. `AI_AGENTS.md` 查看 LangGraph Agent 职责、模型配置和测试入口。
+4. `PRODUCT_REQUIREMENTS.md` 查找需求编号与验收条件。
+5. `ARCHITECTURE.md` 确认模块边界、数据库事实源、Pinata 和链上写入约束。
+6. `CONTRACT_DEPLOYMENT.md` 执行测试网发布与三端配置同步。
+7. `RAILWAY_DEPLOYMENT.md` 部署后端与 PostgreSQL。
 
 ### 了解历史进度
 

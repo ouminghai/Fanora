@@ -19,10 +19,13 @@ from app.models.nft import (
     CollectibleOwnership,
     CollectibleTokenType,
     MembershipIdentityNft,
+    NftApplication,
     NftMetadataVersion,
+    TaskNftReward,
 )
 from app.models.user import Community, User, UserProfile, Wallet
 from app.services.identity import AuthenticatedIdentity
+from app.services.fan_tokens import fan_token_service
 from app.services.nft import NftService, NftValidationError
 
 
@@ -38,6 +41,118 @@ def test_custom_badge_image_validation_accepts_safe_png() -> None:
     assert content
     assert mime_type == "image/png"
     assert (width, height) == (256, 256)
+
+
+def test_token_ids_remain_stable_after_local_gallery_data_is_cleared() -> None:
+    fan_token_id = NftService._token_id("fan-nft", "creation-1")
+
+    assert fan_token_id == NftService._token_id("fan-nft", "creation-1")
+    assert fan_token_id != NftService._token_id("fan-nft", "creation-2")
+    assert fan_token_id != NftService._token_id("task-reward", "creation-1")
+    assert 0 < fan_token_id < 2**63
+
+
+@pytest.mark.asyncio
+async def test_fan_nft_can_be_purchased_repeatedly_by_the_same_wallet(monkeypatch) -> None:
+    monkeypatch.setattr(settings, "chain_writes_enabled", True)
+    monkeypatch.setattr(settings, "collectibles_contract_address", "0x" + "22" * 20)
+    monkeypatch.setattr(settings, "collectible_type_manager_private_key", "0x" + "1" * 64)
+    monkeypatch.setattr(settings, "collectible_minter_private_key", "0x" + "2" * 64)
+    minted_claims: list[str] = []
+
+    async def mint_collectible(_wallet: str, _token_id: int, _amount: int, claim_hash: str):
+        minted_claims.append(claim_hash)
+        return ConfirmedContractTransaction(
+            transaction_hash="0x" + f"{len(minted_claims):064x}",
+            block_number=len(minted_claims),
+            confirmations=1,
+            event_args={},
+        )
+
+    async def award(_session, **_kwargs):
+        return None
+
+    monkeypatch.setattr(monad_contract_adapter, "mint_collectible", mint_collectible)
+    monkeypatch.setattr(fan_token_service, "award", award)
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
+    async with engine.begin() as connection:
+        await connection.run_sync(SQLModel.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    try:
+        async with factory() as session:
+            creator = User(display_name="Creator")
+            buyer = User(display_name="Repeat Buyer")
+            session.add_all([creator, buyer])
+            await session.flush()
+            session.add_all([
+                UserProfile(user_id=creator.id, is_official_member=True),
+                UserProfile(user_id=buyer.id, is_official_member=True),
+                Wallet(
+                    user_id=buyer.id,
+                    address="0x1111111111111111111111111111111111111111",
+                    wallet_type="external",
+                    is_primary=True,
+                ),
+            ])
+            application = NftApplication(
+                user_id=creator.id,
+                name="Repeatable NFT",
+                description="Repeatable development NFT",
+                theme="repeat",
+                copyright_declaration="Original development asset",
+                price_fan_tokens=10,
+                max_supply=10,
+                image_mime_type="image/png",
+                image_size_bytes=100,
+                image_width=256,
+                image_height=256,
+                status="MINTED",
+            )
+            session.add(application)
+            await session.flush()
+            token_type = CollectibleTokenType(
+                token_id=77,
+                category="FAN_LIMITED_NFT",
+                name=application.name,
+                description=application.description,
+                chain_id=settings.monad_chain_id,
+                contract_address=settings.collectibles_contract_address,
+                metadata_cid="repeatable-metadata",
+                max_supply=10,
+                minted_supply=1,
+                per_wallet_limit=10,
+                mint_start=application.created_at,
+                mint_end=application.created_at,
+                transferable=True,
+                source_type="FAN_NFT",
+                source_id=application.id,
+                status="CONFIRMED",
+            )
+            session.add(token_type)
+            await session.flush()
+            application.collectible_token_type_id = token_type.id
+            await session.commit()
+            identity = AuthenticatedIdentity(
+                user_id=buyer.id,
+                primary_wallet="0x1111111111111111111111111111111111111111",
+                wallet_type="external",
+                provider="wallet",
+            )
+
+            first = await NftService().buy_fan_nft(session, identity, application)
+            second = await NftService().buy_fan_nft(session, identity, application)
+
+            assert first.id == second.id
+            assert second.amount == 2
+            assert token_type.minted_supply == 3
+            assert len(minted_claims) == 2
+            assert minted_claims[0] != minted_claims[1]
+    finally:
+        await engine.dispose()
 
 
 def test_custom_badge_image_validation_rejects_small_images() -> None:
@@ -94,7 +209,7 @@ async def test_membership_card_renders_downloadable_png_with_qr_panel() -> None:
         assert lightest > 240
 
 
-def test_membership_card_refresh_fingerprint_tracks_lifetime_level_data() -> None:
+def test_membership_card_refresh_fingerprint_only_tracks_membership_level() -> None:
     service = NftService()
     level = MembershipLevel(
         code="newborn",
@@ -120,7 +235,18 @@ def test_membership_card_refresh_fingerprint_tracks_lifetime_level_data() -> Non
     before = service.membership_card_content_hash(user=user, profile=profile, level=level, record=record)
     profile.fan_token_lifetime_earned = 500
     after = service.membership_card_content_hash(user=user, profile=profile, level=level, record=record)
-    assert before != after
+    assert before == after
+    upgraded = MembershipLevel(
+        code="mild-neuro",
+        name="轻度神经",
+        description="活跃会员",
+        rank=2,
+        min_token_balance=100,
+        max_token_balance=499,
+        badge_image_url="/img/badges/mild.png",
+    )
+    upgraded_hash = service.membership_card_content_hash(user=user, profile=profile, level=upgraded, record=record)
+    assert before != upgraded_hash
 
 
 @pytest.mark.asyncio
@@ -253,6 +379,100 @@ async def test_fear_task_reward_mints_once_with_local_concert_image(monkeypatch)
             assert first is not None and first.status == "CONFIRMED"
             assert second is not None and second.id == first.id
             assert chain_calls == ["create", "mint"]
+    finally:
+        await engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_task_reward_pinata_failure_returns_retryable_without_missing_greenlet(monkeypatch) -> None:
+    async def pin_image(filename: str, content: bytes, mime_type: str) -> PinnedFile:
+        raise RuntimeError("Pinata upload failed after bounded retries")
+
+    monkeypatch.setattr(settings, "chain_writes_enabled", True)
+    monkeypatch.setattr(settings, "pinata_jwt", "test-pinata-jwt")
+    monkeypatch.setattr(settings, "collectibles_contract_address", "0x2222222222222222222222222222222222222222")
+    monkeypatch.setattr(settings, "collectible_type_manager_private_key", "0x" + "1" * 64)
+    monkeypatch.setattr(settings, "collectible_minter_private_key", "0x" + "2" * 64)
+    monkeypatch.setattr(pinata_adapter, "pin_image", pin_image)
+
+    engine = create_async_engine(
+        "sqlite+aiosqlite:///:memory:",
+        poolclass=StaticPool,
+        connect_args={"check_same_thread": False},
+    )
+    async with engine.begin() as connection:
+        await connection.run_sync(SQLModel.metadata.create_all)
+    factory = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+    try:
+        async with factory() as session:
+            user = User(display_name="Retryable Reward Fan")
+            session.add(user)
+            await session.flush()
+            community = Community(
+                owner_user_id=user.id,
+                slug="retryable-reward-test",
+                name="Retryable Reward Test",
+                description="Task reward retry test community",
+                logo_url="/img/logo.png",
+            )
+            session.add_all(
+                [
+                    UserProfile(user_id=user.id, is_official_member=True),
+                    Wallet(
+                        user_id=user.id,
+                        address="0x1111111111111111111111111111111111111111",
+                        wallet_type="external",
+                        is_primary=True,
+                    ),
+                    community,
+                ]
+            )
+            await session.flush()
+            task = FanTask(
+                community_id=community.id,
+                created_by_user_id=user.id,
+                title="FEAR and DREAMS 纪念票任务",
+                description="分享真实现场记忆并领取纪念票",
+                task_type="page_action",
+                status="published",
+                reward_fan_tokens=500,
+                validation_rule={
+                    "nft_reward": {
+                        "enabled": True,
+                        "version": 1,
+                        "category": "CONCERT_CARD",
+                        "name": "FEAR and DREAMS 纪念票",
+                        "image_path": "/img/fanora/eason-concert.webp",
+                        "max_supply": 10000,
+                        "per_wallet_limit": 1,
+                        "transferable": False,
+                    }
+                },
+            )
+            session.add(task)
+            await session.flush()
+            participation = TaskParticipation(
+                task_id=task.id,
+                user_id=user.id,
+                status="rewarded",
+                reward_snapshot=500,
+            )
+            session.add(participation)
+            await session.commit()
+
+            reward = await NftService().mint_task_reward(
+                session,
+                task=task,
+                participation=participation,
+                user_id=user.id,
+            )
+
+            assert reward is not None
+            assert reward.status == "RETRYABLE"
+            assert reward.failure_reason == "Pinata upload failed after bounded retries"
+            persisted = await session.get(TaskNftReward, reward.id)
+            assert persisted is not None
+            assert persisted.status == "RETRYABLE"
     finally:
         await engine.dispose()
 

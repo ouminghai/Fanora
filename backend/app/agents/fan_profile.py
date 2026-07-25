@@ -1,4 +1,8 @@
-"""Complete LangGraph fan-profile workflow: prepare, score, recommend, and persist."""
+"""Complete LangGraph fan-profile workflow: prepare, score, recommend, and persist.
+
+The profile Agent reads verified Fanora data and writes an analysis record. It
+does not grant FAN, change membership levels, or perform chain writes.
+"""
 
 from collections.abc import Awaitable, Callable
 from typing import Any, Required, TypedDict
@@ -42,6 +46,8 @@ from app.services.llm.service import LLMUnavailable
 
 
 class FanProfileState(TypedDict, total=False):
+    """Shared graph state passed between deterministic and optional LLM nodes."""
+
     run_id: Required[str]
     user_id: str | None
     wallet_address: Required[str]
@@ -84,6 +90,8 @@ def prepare_supplied_data(state: FanProfileState) -> dict[str, Any]:
 
 
 def calculate_scores(state: FanProfileState) -> dict[str, Any]:
+    """Convert raw activity counters into bounded 0-100 scoring dimensions."""
+
     activity = min(state.get("completed_tasks", 0) * 8 + state.get("active_days", 0) * 2, 100)
     loyalty = min(state.get("active_days", 0) * 5 + state.get("fan_token_balance", 0) // 20, 100)
     influence = min(state.get("referrals", 0) * 20 + state.get("onchain_actions", 0) * 3, 100)
@@ -102,6 +110,8 @@ def calculate_scores(state: FanProfileState) -> dict[str, Any]:
 
 
 def classify_fan(state: FanProfileState) -> dict[str, FanType]:
+    """Assign the primary fan type and supplemental labels from rule scores."""
+
     score = state["scores"]["total"]
     if score >= 80:
         fan_type: FanType = "high_value_contributor"
@@ -152,6 +162,8 @@ def _rule_badge_draft(state: FanProfileState) -> dict[str, Any] | None:
 
 
 def recommend_tasks(state: FanProfileState) -> dict[str, Any]:
+    """Rank already-eligible task candidates for the user's current fan type."""
+
     preferences = {
         "emerging_fan": ["daily_check_in", "post_reply", "page_action"],
         "active_fan": ["content_publish", "page_action", "post_reply"],
@@ -193,11 +205,15 @@ def build_fan_profile_graph(
     persist_result: PersistResult | None = None,
 ) -> CompiledStateGraph:
     async def prepare(state: FanProfileState) -> dict[str, Any]:
+        """Switch between caller-supplied metrics and database-backed metrics."""
+
         if prepare_data is None:
             return prepare_supplied_data(state)
         return await prepare_data(state)
 
     async def enrich_with_llm(state: FanProfileState) -> dict[str, Any]:
+        """Let the model improve narration while rules remain the source of scores."""
+
         fallback = {
             "summary": _rule_summary(state),
             "analysis_source": "rules",
@@ -248,10 +264,14 @@ def build_fan_profile_graph(
             return fallback
 
     async def persist(state: FanProfileState) -> dict[str, Any]:
+        """Optional persistence hook used by API flows with a database session."""
+
         if persist_result is not None:
             await persist_result(state)
         return {}
 
+    # Keep the graph acyclic and explicit so each analysis run is easy to audit:
+    # raw facts -> scores -> type -> optional language -> recommendations -> save.
     workflow = StateGraph(FanProfileState)
     workflow.add_node("prepare_data", prepare)
     workflow.add_node("calculate_scores", calculate_scores)
@@ -289,6 +309,8 @@ class FanProfileAgent:
         wallet_address: str,
         _: FanProfileState,
     ) -> dict[str, Any]:
+        """Aggregate the user's database-backed fandom facts for /profile/me."""
+
         profile = await session.get(UserProfile, user_id)
         if profile is None:
             raise ValueError("User profile not found")
@@ -430,6 +452,8 @@ class FanProfileAgent:
         }
 
     async def _persist_analysis(self, session: AsyncSession, state: FanProfileState) -> dict[str, Any]:
+        """Persist the full run output and mirror the latest fan type on profile."""
+
         source = state.get("analysis_source", "rules")
         input_payload = {
             key: state.get(key)
@@ -480,6 +504,8 @@ class FanProfileAgent:
         return {}
 
     def _to_analysis(self, run_id: str, result: dict[str, Any]) -> FanProfileAnalysis:
+        """Convert raw graph state into the public API schema."""
+
         source = result.get("analysis_source", "rules")
         return FanProfileAnalysis(
             run_id=run_id,

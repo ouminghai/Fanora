@@ -12,9 +12,9 @@ function requiredAddress(name: string, fallback?: string): string {
   return ethers.getAddress(value);
 }
 
-function positiveBigInt(name: string, fallback: bigint): bigint {
+function nonNegativeBigInt(name: string, fallback: bigint): bigint {
   const value = BigInt(process.env[name] || fallback.toString());
-  if (value <= 0n) throw new Error(`${name} must be greater than zero`);
+  if (value < 0n) throw new Error(`${name} must be zero or greater`);
   return value;
 }
 
@@ -55,7 +55,7 @@ async function main() {
 
   const admin = requiredAddress("CONTRACT_ADMIN_ADDRESS", deployer.address);
   const treasury = requiredAddress("MEMBERSHIP_TREASURY_ADDRESS", deployer.address);
-  const fee = positiveBigInt("MEMBERSHIP_FEE_WEI", ethers.parseEther("1"));
+  const fee = nonNegativeBigInt("MEMBERSHIP_FEE_WEI", ethers.parseEther("1"));
   const levelRanks = membershipLevelRanks();
 
   console.log(`Deploying Fanora contracts to ${network.name} (${chain.chainId})`);

@@ -1,7 +1,11 @@
-"""Idempotent parent records for auto-created development and test databases."""
+"""Idempotent product defaults for fresh and migrated Fanora databases."""
+
+from copy import deepcopy
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.community import CommunityPost, FanTask
+from app.models.membership import FanTokenConfig, FanTokenRule, MembershipLevel
 from app.models.user import Community, User
 
 SYSTEM_USER_ID = "00000000-0000-0000-0000-000000000001"
@@ -339,9 +343,30 @@ TASK_SEEDS = [
     },
 ]
 
+MEMBERSHIP_LEVEL_SEEDS = [
+    ("newborn", "新生儿", "刚注册的新会员", 1, 0, 99, "/img/badges/new.png", False),
+    ("mild-neuro", "轻度神经", "初级活跃会员", 2, 100, 499, "/img/badges/mild.png", False),
+    ("moderate-neuro", "中度神经", "开始活跃发帖、签到", 3, 500, 1499, "/img/badges/moderate.png", False),
+    ("severe-neuro", "重度神经", "持续活跃会员", 4, 1500, 3999, "/img/badges/severe.png", False),
+    ("terminal-neuro", "病入膏肓", "高等级会员", 5, 4000, 9999, "/img/badges/terminal.png", False),
+    ("incurable", "无药可救", "资深会员", 6, 10000, None, "/img/badges/incurable.png", False),
+    ("neuro-leader", "神经领袖", "管理员或版主管理身份，不通过 FAN 自动获得", 100, None, None, "/img/badges/leader.png", True),
+]
+
+FAN_TOKEN_RULE_SEEDS = [
+    ("daily-check-in", "每日签到", "每日完成一次有效签到", "activity", 20, "system", "daily", 1, 31, 30),
+    ("seven-day-streak", "连续签到 7 天", "连续七天签到的额外奖励", "activity", 100, "system", "weekly", 1, 5, 40),
+    ("join-community", "加入社区", "首次加入官方社区", "community", 50, "system", "once-per-community", 1, 1, 50),
+    ("post-reply", "回复帖子", "发布一条通过审核的评论或回复", "content", 1, "system", "once-per-reply", None, None, 61),
+    ("post-like", "点赞帖子", "首次点赞一篇社区帖子", "content", 1, "system", "once-per-user-post", None, None, 62),
+    ("post-publish", "发布帖子", "成功发布一篇通过审核的社区帖子", "content", 5, "system", "once-per-post", None, None, 63),
+    ("post-bookmark-received", "帖子被收藏", "帖子被不同用户首次收藏时奖励作者", "content", 1, "system", "up-to-10-per-post", None, None, 64),
+    ("membership-nft-mint", "首次铸造会员 NFT", "会员身份 NFT 首次链上铸造成功", "onchain", 50, "onchain-receipt", "once-per-user", None, None, 121),
+]
+
 
 async def seed_product_defaults(session: AsyncSession) -> None:
-    """Create only the parent records required by an auto-created database."""
+    """Create stable defaults without overwriting operator-managed records."""
 
     if await session.get(User, SYSTEM_USER_ID) is None:
         session.add(User(id=SYSTEM_USER_ID, display_name="Fanora Protocol", status="system"))
@@ -358,4 +383,77 @@ async def seed_product_defaults(session: AsyncSession) -> None:
             )
         )
         await session.flush()
+
+    if await session.get(FanTokenConfig, "default") is None:
+        session.add(
+            FanTokenConfig(
+                id="default",
+                description=(
+                    "Fanora 站内活动、任务、等级和奖励统一使用的粉丝积分单位；"
+                    "当前不代表真实 ETH 或已发行的链上代币。"
+                ),
+            )
+        )
+
+    for code, name, description, rank, minimum, maximum, badge_url, is_management in MEMBERSHIP_LEVEL_SEEDS:
+        if await session.get(MembershipLevel, code) is None:
+            session.add(
+                MembershipLevel(
+                    code=code,
+                    name=name,
+                    description=description,
+                    rank=rank,
+                    min_token_balance=minimum,
+                    max_token_balance=maximum,
+                    badge_image_url=badge_url,
+                    is_management=is_management,
+                )
+            )
+
+    for code, name, description, category, delta, method, policy, daily, monthly, sort_order in FAN_TOKEN_RULE_SEEDS:
+        if await session.get(FanTokenRule, code) is None:
+            session.add(
+                FanTokenRule(
+                    code=code,
+                    name=name,
+                    description=description,
+                    category=category,
+                    token_delta=delta,
+                    verification_method=method,
+                    repeat_policy=policy,
+                    daily_limit=daily,
+                    monthly_limit=monthly,
+                    sort_order=sort_order,
+                )
+            )
+
+    core_posts = [
+        (WELCOME_POST_ID, "你与喜欢的音乐，第一次相遇在什么时候？", "/img/fanora/activity-community.jpg", "story"),
+        (MUSIC_POST_ID, "本周循环：安利一首你舍不得切掉的歌", "/img/fanora/activity-music.jpg", "music"),
+    ]
+    core_posts.extend((post_id, title, cover_url, category) for post_id, title, _body, cover_url, category in CREATION_SEEDS)
+    for post_id, title, cover_url, category in core_posts:
+        if await session.get(CommunityPost, post_id) is None:
+            session.add(
+                CommunityPost(
+                    id=post_id,
+                    community_id=OFFICIAL_COMMUNITY_ID,
+                    author_user_id=SYSTEM_USER_ID,
+                    title=title,
+                    body=POST_MARKDOWN_BODIES[post_id],
+                    cover_url=cover_url,
+                    category=category,
+                )
+            )
+    await session.flush()
+
+    for task_seed in TASK_SEEDS:
+        if await session.get(FanTask, task_seed["id"]) is None:
+            session.add(
+                FanTask(
+                    community_id=OFFICIAL_COMMUNITY_ID,
+                    created_by_user_id=SYSTEM_USER_ID,
+                    **deepcopy(task_seed),
+                )
+            )
     await session.commit()

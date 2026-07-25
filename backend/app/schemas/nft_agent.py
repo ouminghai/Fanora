@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.schemas.nft import PublicAttribute
 
@@ -13,7 +13,18 @@ class NftDraftRequest(BaseModel):
     visual_style: str = Field(default="premium music memorabilia", min_length=2, max_length=240)
     preferred_name: str | None = Field(default=None, max_length=100)
     reference_notes: str | None = Field(default=None, max_length=500)
+    reference_image_data_url: str | None = Field(default=None, max_length=7_000_000)
     generate_image: bool = True
+
+    @field_validator("reference_image_data_url")
+    @classmethod
+    def validate_reference_image(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        allowed_prefixes = ("data:image/png;base64,", "data:image/jpeg;base64,", "data:image/webp;base64,")
+        if not value.startswith(allowed_prefixes):
+            raise ValueError("reference image must be a PNG, JPEG, or WebP base64 data URL")
+        return value
 
 
 class NftMetadataNarrative(BaseModel):

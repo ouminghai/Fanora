@@ -72,6 +72,12 @@ def test_wallet_register_login_profile_and_logout(client):
     assert public_response.status_code == 200
     assert public_response.json()["email"] is None
 
+    public_fan_profile_response = client.get(f"/api/v1/profile/users/{login['user']['id']}")
+    assert public_fan_profile_response.status_code == 200
+    public_fan_profile = public_fan_profile_response.json()
+    assert public_fan_profile["scores"]["total"] == 0
+    assert "wallet_address" not in public_fan_profile
+
     logout_response = client.post("/api/v1/auth/logout", headers=headers)
     assert logout_response.status_code == 204
     assert client.get("/api/v1/users/me", headers=headers).status_code == 401
