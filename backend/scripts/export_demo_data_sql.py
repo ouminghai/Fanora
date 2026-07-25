@@ -15,7 +15,8 @@ from sqlmodel import SQLModel
 import app.models.database  # noqa: F401
 from app.core.config import settings
 
-DEFAULT_OUTPUT = "fanora_demo_data.sql"
+BACKEND_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_OUTPUT = BACKEND_ROOT / "fanora_demo_data.sql"
 
 EXPORT_TABLES = [
     "users",
@@ -64,9 +65,7 @@ def async_database_url(url: str) -> str:
 def create_engine(url: str) -> AsyncEngine:
     normalized_url = async_database_url(url)
     options = (
-        {}
-        if normalized_url.startswith("sqlite")
-        else {"pool_pre_ping": True, "connect_args": {"connect_timeout": 30}}
+        {} if normalized_url.startswith("sqlite") else {"pool_pre_ping": True, "connect_args": {"connect_timeout": 30}}
     )
     return create_async_engine(normalized_url, **options)
 
@@ -107,14 +106,16 @@ def upsert_statement(table: Table, row: dict[str, Any]) -> str:
             f"ON CONFLICT ({conflict_sql}) DO NOTHING;"
         )
 
-    update_sql = ", ".join(f"{sql_identifier(column)} = EXCLUDED.{sql_identifier(column)}" for column in update_columns)
+    update_sql = ", ".join(
+        f"{sql_identifier(column)} = EXCLUDED.{sql_identifier(column)}" for column in update_columns
+    )
     return (
         f"INSERT INTO {sql_identifier(table.name)} ({column_sql}) VALUES ({value_sql}) "
         f"ON CONFLICT ({conflict_sql}) DO UPDATE SET {update_sql};"
     )
 
 
-async def export_sql(database_url: str, output_path: Path) -> None:
+async def export_sql(database_url: str, output_path: Path, *, tables: set[str] | None) -> None:
     engine = create_engine(database_url)
     metadata = SQLModel.metadata
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -124,6 +125,8 @@ async def export_sql(database_url: str, output_path: Path) -> None:
             file.write("-- Import with scripts/import_demo_data_sql.py inside Railway.\n\n")
             async with engine.connect() as connection:
                 for table_name in EXPORT_TABLES:
+                    if tables is not None and table_name not in tables:
+                        continue
                     table = metadata.tables.get(table_name)
                     if table is None:
                         print(f"Warning: skipped unknown table {table_name}")
@@ -147,7 +150,12 @@ def parse_args() -> argparse.Namespace:
         default=os.getenv("SOURCE_DATABASE_URL") or settings.database_url,
         help="Source database URL, defaults to SOURCE_DATABASE_URL or DATABASE_URL",
     )
-    parser.add_argument("--output", default=DEFAULT_OUTPUT, help=f"Output SQL file, default: {DEFAULT_OUTPUT}")
+    parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help=f"Output SQL file, default: {DEFAULT_OUTPUT}")
+    parser.add_argument(
+        "--tables",
+        default="",
+        help="Optional comma-separated table names to export. Default exports the full demo table set.",
+    )
     return parser.parse_args()
 
 
@@ -155,4 +163,10 @@ if __name__ == "__main__":
     import asyncio
 
     args = parse_args()
-    asyncio.run(export_sql(args.source_database_url, Path(args.output)))
+    asyncio.run(
+        export_sql(
+            args.source_database_url,
+            Path(args.output),
+            tables={table.strip() for table in args.tables.split(",") if table.strip()} or None,
+        )
+    )

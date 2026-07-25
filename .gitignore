@@ -26,7 +26,7 @@ __pycache__/
 venv/
 *.egg-info/
 *.db
-backend/*.sql
+#backend/*.sql
 backend/exports/
 logs/
 .dbg/
