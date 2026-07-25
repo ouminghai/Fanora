@@ -20,6 +20,7 @@ type DeploymentManifest = {
 
 const contractsRoot = resolve(__dirname, "..");
 const workspaceRoot = resolve(contractsRoot, "..");
+const contractNames = ["FanoraMembershipGateway", "FanoraMembershipIdentity", "FanoraCollectibles"];
 
 function updateEnvFile(path: string, updates: Record<string, string>) {
   if (!existsSync(path)) throw new Error(`Environment file does not exist: ${path}`);
@@ -102,9 +103,19 @@ function main() {
   const sharedManifest = join(sharedDirectory, `${networkName}.deployment.json`);
   copyFileSync(manifestPath, sharedManifest);
 
+  const backendContractsDirectory = join(workspaceRoot, "backend", "app", "contracts");
+  mkdirSync(backendContractsDirectory, { recursive: true });
+  for (const contractName of contractNames) {
+    copyFileSync(
+      join(sharedDirectory, `${contractName}.json`),
+      join(backendContractsDirectory, `${contractName}.json`),
+    );
+  }
+
   console.log(`Backend configuration synchronized: ${basename(backendEnv)}`);
   console.log(`Frontend configuration synchronized: ${basename(frontendEnv)}`);
   console.log(`Public deployment manifest synchronized: ${sharedManifest}`);
+  console.log(`Backend contract ABIs synchronized: ${backendContractsDirectory}`);
 }
 
 main();

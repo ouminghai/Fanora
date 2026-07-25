@@ -15,6 +15,12 @@ from app.models.user import Community, User, UserProfile
 from app.services.product_seed import OFFICIAL_COMMUNITY_ID
 
 
+# Fill these values directly when you want to run the script without passing
+# SOURCE_DATABASE_URL / TARGET_DATABASE_URL in the shell.
+SOURCE_DATABASE_URL = ""
+TARGET_DATABASE_URL = ""
+
+
 @dataclass(frozen=True, slots=True)
 class CommunitySnapshot:
     users: list[dict[str, Any]]
@@ -213,13 +219,13 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--source-database-url",
-        default=os.getenv("SOURCE_DATABASE_URL") or settings.database_url,
-        help="Database containing the verified test data (default: SOURCE_DATABASE_URL or DATABASE_URL)",
+        default=SOURCE_DATABASE_URL or os.getenv("SOURCE_DATABASE_URL") or settings.database_url,
+        help="Database containing the verified test data (default: SOURCE_DATABASE_URL constant, env, or DATABASE_URL)",
     )
     parser.add_argument(
         "--target-database-url",
-        default=os.getenv("TARGET_DATABASE_URL"),
-        help="Destination database (default: TARGET_DATABASE_URL)",
+        default=TARGET_DATABASE_URL or os.getenv("TARGET_DATABASE_URL"),
+        help="Destination database (default: TARGET_DATABASE_URL constant or env)",
     )
     parser.add_argument("--community-id", default=OFFICIAL_COMMUNITY_ID, help="Community data to synchronize")
     parser.add_argument("--dry-run", action="store_true", help="Validate source data without writing to the target")
