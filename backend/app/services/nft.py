@@ -47,6 +47,21 @@ class NftValidationError(ValueError):
     pass
 
 
+def _public_roots() -> tuple[Path, ...]:
+    backend_root = Path(__file__).resolve().parents[2]
+    return (backend_root / "public",)
+
+
+def _public_asset_path(source: str) -> Path | None:
+    relative = source.lstrip("/")
+    for public_root in _public_roots():
+        root = public_root.resolve()
+        path = (root / relative).resolve()
+        if path.is_relative_to(root) and path.is_file():
+            return path
+    return None
+
+
 def _explorer(address: str, token_id: int | None = None) -> str:
     suffix = f"?a={token_id}" if token_id is not None else ""
     return f"https://testnet.monadexplorer.com/address/{address}{suffix}"
@@ -96,9 +111,8 @@ class NftService:
                 content = response.content
                 mime_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
         else:
-            public_root = Path(__file__).resolve().parents[3] / "frontend" / "public"
-            path = (public_root / source.lstrip("/")).resolve()
-            if not path.is_relative_to(public_root.resolve()) or not path.is_file():
+            path = _public_asset_path(source)
+            if path is None:
                 raise NftValidationError(f"Membership level image does not exist: {source}")
             content = path.read_bytes()
             mime_type = mimetypes.guess_type(path.name)[0] or "application/octet-stream"
@@ -121,15 +135,15 @@ class NftService:
 
     @staticmethod
     def _member_card_font(size: int, *, display: bool = False) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
-        public_fonts = Path(__file__).resolve().parents[3] / "frontend" / "public" / "fonts"
+        public_font_roots = [root / "fonts" for root in _public_roots()]
         candidates = (
-            [public_fonts / "CalSans-SemiBold.ttf"]
+            [font_root / "CalSans-SemiBold.ttf" for font_root in public_font_roots]
             if display
             else [
                 Path("/System/Library/Fonts/PingFang.ttc"),
                 Path("/System/Library/Fonts/Supplemental/Songti.ttc"),
                 Path("/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"),
-                public_fonts / "DM_Sans" / "DMSans-Medium.ttf",
+                *(font_root / "DM_Sans" / "DMSans-Medium.ttf" for font_root in public_font_roots),
             ]
         )
         for path in candidates:
@@ -169,9 +183,8 @@ class NftService:
     ) -> bytes:
         if record.token_id is None:
             raise NftValidationError("Membership identity token is not confirmed")
-        public_root = Path(__file__).resolve().parents[3] / "frontend" / "public"
-        template_path = public_root / "img" / "membercard" / "membercard.jpg"
-        if not template_path.is_file():
+        template_path = _public_asset_path("/img/membercard/membercard.jpg")
+        if template_path is None:
             raise NftValidationError("Membership card template is unavailable")
 
         scale = 2
@@ -251,8 +264,8 @@ class NftService:
         card.alpha_composite(qr_image.convert("RGBA"), (qr_x, qr_y))
         draw.text((291 * scale, 592 * scale), "SCAN ON MONAD", font=small_font, fill=muted)
 
-        fanora_logo_path = public_root / "img" / "logo.png"
-        if not fanora_logo_path.is_file():
+        fanora_logo_path = _public_asset_path("/img/logo.png")
+        if fanora_logo_path is None:
             raise NftValidationError("Membership card brand assets are unavailable")
         with Image.open(fanora_logo_path) as source_logo:
             fanora_logo = ImageOps.contain(
@@ -843,9 +856,8 @@ class NftService:
                 .first()
             )
             if token_type is None:
-                public_root = Path(__file__).resolve().parents[3] / "frontend" / "public"
-                image_path = (public_root / str(config.get("image_path", "")).lstrip("/")).resolve()
-                if not image_path.is_relative_to(public_root.resolve()) or not image_path.is_file():
+                image_path = _public_asset_path(str(config.get("image_path", "")))
+                if image_path is None:
                     raise NftValidationError("Task NFT reward image is unavailable")
                 content = image_path.read_bytes()
                 mime_type = mimetypes.guess_type(image_path.name)[0] or "application/octet-stream"

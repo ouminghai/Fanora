@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 640" role="img" aria-labelledby="title">
+  <title id="title">Core Fan Badge</title>
+  <defs>
+    <radialGradient id="bg" cx="35%" cy="25%" r="85%">
+      <stop offset="0" stop-color="#83fff1"/>
+      <stop offset="0.42" stop-color="#7b5cff"/>
+      <stop offset="1" stop-color="#17133d"/>
+    </radialGradient>
+    <linearGradient id="ring" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#8ffff1"/>
+      <stop offset="0.48" stop-color="#a473ff"/>
+      <stop offset="1" stop-color="#ffffff"/>
+    </linearGradient>
+  </defs>
+  <rect width="640" height="640" rx="54" fill="#090916"/>
+  <circle cx="320" cy="300" r="225" fill="url(#bg)" stroke="url(#ring)" stroke-width="18"/>
+  <circle cx="320" cy="300" r="178" fill="none" stroke="#fff" stroke-opacity=".32" stroke-width="3"/>
+  <path d="M320 125l139 80v160l-139 80-139-80V205z" fill="none" stroke="#fff" stroke-width="20"/>
+  <path d="M320 174l42 84 92 13-67 65 16 92-83-43-83 43 16-92-67-65 92-13z" fill="#fff"/>
+  <circle cx="320" cy="300" r="48" fill="#6650dd"/>
+  <text x="320" y="520" fill="#fff" font-family="Arial, sans-serif" font-size="38" font-weight="700" text-anchor="middle" letter-spacing="7">CORE FAN</text>
+  <text x="320" y="560" fill="#91fff2" font-family="Arial, sans-serif" font-size="20" text-anchor="middle" letter-spacing="5">FANORA · LV.4</text>
+</svg>

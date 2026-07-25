@@ -30,6 +30,7 @@ dependencies = [
   "tenacity>=9.1",
   "uvicorn[standard]>=0.34",
   "web3>=7.0",
+  "pysocks>=1.7",
 ]
 
 [project.optional-dependencies]
