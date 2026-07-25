@@ -19,10 +19,14 @@ from app.services.product_seed import OFFICIAL_COMMUNITY_ID
 # Fill these values directly when you want to run the script without passing
 # SOURCE_DATABASE_URL / TARGET_DATABASE_URL in the shell.
 SOURCE_DATABASE_URL = "postgresql+psycopg://fanora:fanora-local-password@127.0.0.1:5432/fanora"
-TARGET_DATABASE_URL = "postgresql://postgres:IXgBXHSpLkMWzLyVTRWqrOPfPNqPmdTk@sakura.proxy.rlwy.net:54128/railway?sslmode=require"
+TARGET_DATABASE_URL = "postgresql://postgres:==========@sakura.proxy.rlwy.net:54128/railway?sslmode=require"
 TARGET_MAX_ATTEMPTS = 5
 TARGET_RETRY_DELAY_SECONDS = 8
 CONTINUE_ON_ROW_ERROR = True
+TARGET_PROXY_ENABLED = True
+TARGET_PROXY_HOST = "127.0.0.1"
+TARGET_PROXY_PORT = 7892
+TARGET_PROXY_TYPE = "socks5"
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,6 +58,30 @@ def create_engine(url: str) -> AsyncEngine:
         {} if normalized_url.startswith("sqlite") else {"pool_pre_ping": True, "connect_args": {"connect_timeout": 30}}
     )
     return create_async_engine(normalized_url, **options)
+
+
+def enable_target_proxy(*, host: str, port: int, proxy_type: str) -> None:
+    """Route Python TCP sockets through a local proxy before connecting to Railway Postgres."""
+
+    try:
+        import socks
+    except ImportError as error:
+        raise RuntimeError("PySocks is required for proxy mode. Run: uv add 'PySocks>=1.7'") from error
+
+    proxy_types = {
+        "socks5": socks.SOCKS5,
+        "socks4": socks.SOCKS4,
+        "http": socks.HTTP,
+    }
+    normalized_type = proxy_type.lower()
+    if normalized_type not in proxy_types:
+        raise RuntimeError("TARGET_PROXY_TYPE must be one of: socks5, socks4, http")
+
+    socks.set_default_proxy(proxy_types[normalized_type], host, port)
+    import socket
+
+    socket.socket = socks.socksocket
+    print(f"Target database proxy enabled: {normalized_type}://{host}:{port}")
 
 
 def image_url_from_task(task: FanTask) -> str:
@@ -311,6 +339,10 @@ async def synchronize(
     target_max_attempts: int,
     target_retry_delay_seconds: float,
     continue_on_row_error: bool,
+    target_proxy_enabled: bool,
+    target_proxy_host: str,
+    target_proxy_port: int,
+    target_proxy_type: str,
 ) -> None:
     normalized_source = async_database_url(source_database_url)
     normalized_target = async_database_url(target_database_url) if target_database_url else None
@@ -333,6 +365,12 @@ async def synchronize(
         if not normalized_target:
             raise RuntimeError("Target database URL is required unless --dry-run is used")
 
+        if target_proxy_enabled:
+            enable_target_proxy(
+                host=target_proxy_host,
+                port=target_proxy_port,
+                proxy_type=target_proxy_type,
+            )
         target_engine = create_engine(normalized_target)
         written = await apply_snapshot_with_retries(
             target_engine,
@@ -377,6 +415,19 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Stop on the first row write error instead of warning and continuing",
     )
+    parser.add_argument(
+        "--no-target-proxy",
+        action="store_true",
+        help="Disable the local proxy for the target Railway database",
+    )
+    parser.add_argument("--target-proxy-host", default=TARGET_PROXY_HOST, help="Local proxy host for target database")
+    parser.add_argument("--target-proxy-port", type=int, default=TARGET_PROXY_PORT, help="Local proxy port")
+    parser.add_argument(
+        "--target-proxy-type",
+        default=TARGET_PROXY_TYPE,
+        choices=["socks5", "socks4", "http"],
+        help="Local proxy protocol",
+    )
     return parser.parse_args()
 
 
@@ -391,5 +442,9 @@ if __name__ == "__main__":
             target_max_attempts=arguments.target_max_attempts,
             target_retry_delay_seconds=arguments.target_retry_delay_seconds,
             continue_on_row_error=CONTINUE_ON_ROW_ERROR and not arguments.strict,
+            target_proxy_enabled=TARGET_PROXY_ENABLED and not arguments.no_target_proxy,
+            target_proxy_host=arguments.target_proxy_host,
+            target_proxy_port=arguments.target_proxy_port,
+            target_proxy_type=arguments.target_proxy_type,
         )
     )
