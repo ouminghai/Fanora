@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.example
+# Deployment env files for platform copy/import. Keep them local.
+frontend/.env.vercel
+backend/.env.railway
 
 # Frontend / contracts
 node_modules/

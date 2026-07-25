@@ -14,6 +14,7 @@
 | [DEVELOPMENT.md](./DEVELOPMENT.md) | 当前代码可执行的本地启动、测试和配置说明 | 是，开发操作基线 |
 | [CONTRACT_DEPLOYMENT.md](./CONTRACT_DEPLOYMENT.md) | Monad 合约编译、发布、角色配置和前后端参数同步 | 是，合约发布操作指南 |
 | [RAILWAY_DEPLOYMENT.md](./RAILWAY_DEPLOYMENT.md) | Railway Docker、PostgreSQL、V1 Alembic 基线和上线检查 | 是，后端云部署指南 |
+| [VERCEL_RAILWAY_DEPLOYMENT.md](./VERCEL_RAILWAY_DEPLOYMENT.md) | 前端 Vercel、后端 Railway、环境变量、CORS 和联调验证 | 是，完整上线指南 |
 | [week3/README.md](./week3/README.md) | Week 3 初步版本交付、运行方式、真实功能、Mock 范围和问题清单 | 是，团队演示入口 |
 | [week3/DEMO_GUIDE.md](./week3/DEMO_GUIDE.md) | 钱包、社区、会员证与 NFT 市场的演示脚本 | 是，演示操作指南 |
 | [DELIVERY_SUMMARY_2026-07-23.md](./DELIVERY_SUMMARY_2026-07-23.md) | 钱包登录、终身等级、会员证与粉丝 NFT 市场的当前交付证据 | 是，当前交付证据 |

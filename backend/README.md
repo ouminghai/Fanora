@@ -44,7 +44,7 @@ grafana/              # Grafana provisioning
 prometheus/           # Prometheus 配置
 ```
 
-新数据库从单文件 `alembic/versions/20260723_v1_baseline.py` 开始；V1 之前的历史迁移保存在 `alembic/legacy_versions/`。Railway 部署步骤见 [`../docs/RAILWAY_DEPLOYMENT.md`](../docs/RAILWAY_DEPLOYMENT.md)。
+新数据库从单文件 `alembic/versions/20260723_v1_baseline.py` 开始；V1 之前的历史迁移保存在 `alembic/legacy_versions/`。Railway 后端部署步骤见 [`../docs/RAILWAY_DEPLOYMENT.md`](../docs/RAILWAY_DEPLOYMENT.md)，前端 Vercel + 后端 Railway 联动上线步骤见 [`../docs/VERCEL_RAILWAY_DEPLOYMENT.md`](../docs/VERCEL_RAILWAY_DEPLOYMENT.md)。
 
 ## 本地启动
 

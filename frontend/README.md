@@ -20,6 +20,10 @@ npm run dev
 
 请在 WalletConnect Cloud 创建项目并配置 `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`。钱包私钥和账户备份始终由用户选择的钱包应用管理，Fanora 前后端不提供私钥导出能力。
 
+## Vercel 部署
+
+Vercel 项目 Root Directory 设置为 `frontend`，环境变量至少配置 `NEXT_PUBLIC_APP_URL`、`NEXT_PUBLIC_API_URL` 和 `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`。完整步骤见 [`../docs/VERCEL_RAILWAY_DEPLOYMENT.md`](../docs/VERCEL_RAILWAY_DEPLOYMENT.md)。
+
 ## 目录建议
 
 - `app/`：主页、登录、资料维护、社区、正式入会、个人收藏和 NFT 市场路由。

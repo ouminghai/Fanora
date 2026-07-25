@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     debug: bool = True
     api_prefix: str = "/api/v1"
     frontend_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
+    frontend_origin_regex: str = ""
     internal_api_key: str = ""
     auth_challenge_ttl_seconds: int = 300
     auth_session_ttl_seconds: int = 604800
@@ -121,6 +122,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [origin.strip() for origin in self.frontend_origins.split(",") if origin.strip()]
+
+    @property
+    def cors_origin_regex(self) -> str | None:
+        return self.frontend_origin_regex.strip() or None
 
     @property
     def llm_models(self) -> list[str]:
