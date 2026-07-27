@@ -4,6 +4,10 @@ Fanora 是一个由 AI Agent 驱动的 Web3 链上粉丝身份与互动协议。
 
 ## 阶段交付摘要
 
+### demo线上链接： https://fanora-orpin.vercel.app/ 
+
+
+
 如果只想快速了解项目当前真实完成度、验证结果和剩余风险，请直接阅读 [2026-07-23 交付总结](docs/DELIVERY_SUMMARY_2026-07-23.md)。
 
 ## 项目结构
