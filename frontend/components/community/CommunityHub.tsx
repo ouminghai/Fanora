@@ -307,6 +307,9 @@ export default function CommunityHub() {
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="rounded-full border border-green/25 bg-green/10 px-4 py-2 text-xs font-semibold text-green">自动验证</span>
+                  <Link href="/community/leaderboard" className="group inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs font-semibold text-white transition-colors hover:border-accent hover:bg-accent">
+                    排行榜 <span className="transition-transform group-hover:translate-x-1">→</span>
+                  </Link>
                   <Link href="/community/tasks" className="group inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-xs font-semibold text-white transition-colors hover:border-accent hover:bg-accent">
                     更多 <span className="transition-transform group-hover:translate-x-1">→</span>
                   </Link>

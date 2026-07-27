@@ -7,8 +7,8 @@ from sqlmodel import col, select
 from app.core.database import get_database_session
 from app.core.security import get_current_identity
 from app.models.community import FanTokenLedger
-from app.models.user import User, UserRole
-from app.schemas.community import FanTokenAdjustmentCreate, FanTokenLedgerResponse
+from app.models.user import User, UserProfile, UserRole
+from app.schemas.community import FanTokenAdjustmentCreate, FanTokenLeaderboardUser, FanTokenLedgerResponse
 from app.services.fan_tokens import fan_token_service
 from app.services.identity import AuthenticatedIdentity
 
@@ -33,6 +33,36 @@ async def get_my_ledger(
         .scalars()
         .all()
     )
+
+
+@router.get("/leaderboard", response_model=list[FanTokenLeaderboardUser])
+async def get_fan_token_leaderboard(
+    limit: int = Query(default=10, ge=1, le=10),
+    session: AsyncSession = Depends(get_database_session),
+) -> list[FanTokenLeaderboardUser]:
+    rows = (
+        await session.execute(
+            select(User, UserProfile)
+            .join(UserProfile, UserProfile.user_id == User.id)
+            .where(User.status == "active", UserProfile.profile_visibility == "public")
+            .order_by(col(UserProfile.fan_token_balance).desc(), col(UserProfile.fan_token_lifetime_earned).desc())
+            .limit(limit)
+        )
+    ).all()
+    return [
+        FanTokenLeaderboardUser(
+            rank=index + 1,
+            user_id=user.id,
+            display_name=user.display_name or profile.username or "Fanora 用户",
+            username=profile.username,
+            avatar_url=profile.avatar_url,
+            level=profile.level,
+            fan_token_balance=profile.fan_token_balance,
+            fan_token_lifetime_earned=profile.fan_token_lifetime_earned,
+            is_official_member=profile.is_official_member,
+        )
+        for index, (user, profile) in enumerate(rows)
+    ]
 
 
 @router.post("/admin/adjustments", response_model=FanTokenLedgerResponse)

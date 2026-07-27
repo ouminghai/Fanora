@@ -29,7 +29,7 @@ const statusLabels: Record<string, string> = {
   PENDING: "等待链上提交",
   SUBMITTED: "已提交链上",
   CONFIRMING: "确认中",
-  CONFIRMED: "链上已确认",
+  CONFIRMED: "已确认",
   RETRYABLE: "可重新同步",
   FAILED: "同步失败",
   DRAFT: "草稿",

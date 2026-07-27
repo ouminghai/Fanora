@@ -9,6 +9,7 @@ const postSource = readFileSync(new URL("../components/community/PostDetail.tsx"
 const imageGallerySource = readFileSync(new URL("../components/community/ImageGallery.tsx", import.meta.url), "utf8");
 const commentPhotoGallerySource = readFileSync(new URL("../components/community/CommentPhotoGallery.tsx", import.meta.url), "utf8");
 const taskGallerySource = readFileSync(new URL("../components/community/TaskGallery.tsx", import.meta.url), "utf8");
+const leaderboardSource = readFileSync(new URL("../components/community/FanTokenLeaderboard.tsx", import.meta.url), "utf8");
 const creationWallSource = readFileSync(new URL("../components/community/CreationWall.tsx", import.meta.url), "utf8");
 const taskCatalogSource = readFileSync(new URL("../data/fanora.ts", import.meta.url), "utf8");
 const fearTicketSource = readFileSync(new URL("../components/community/FearAndDreamsTicket.tsx", import.meta.url), "utf8");
@@ -45,6 +46,7 @@ test("community hub connects check-in and tasks, then routes creation to the ful
     /const taskAction = claimed \|\| rewarded\s*\? `\/community\/posts\/\$\{task\.target_post_id\}`/,
   );
   assert.match(hubSource, /href="\/community\/creations\?composer=1"/);
+  assert.match(hubSource, /href="\/community\/leaderboard"/);
   assert.match(hubSource, /<CheckInCalendar checkIn=\{checkIn\}/);
   assert.match(checkInCalendarSource, /monthly_reward_fan_tokens/);
   assert.match(checkInCalendarSource, /monthly_records/);
@@ -52,6 +54,14 @@ test("community hub connects check-in and tasks, then routes creation to the ful
   assert.match(hubSource, /community-section-enter/);
   assert.match(hubSource, /community-list-item/);
   assert.doesNotMatch(hubSource, /showComposer/);
+});
+
+test("community exposes a Fan Token leaderboard powered by the public API", () => {
+  assert.match(leaderboardSource, /\/fan-tokens\/leaderboard\?limit=10/);
+  assert.match(leaderboardSource, /leaders\.slice\(0, 3\)/);
+  assert.match(leaderboardSource, /leaders\.slice\(3\)/);
+  assert.match(leaderboardSource, /\/users\/\$\{leader\.user_id\}/);
+  assert.match(leaderboardSource, /FanTokenAmount amount=\{leader\.fan_token_balance\}/);
 });
 
 test("replying to a post refreshes automatic task completion and Fan Token state", () => {

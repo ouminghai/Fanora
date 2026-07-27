@@ -219,6 +219,18 @@ export type FanTokenLedgerEntry = {
   created_at: string;
 };
 
+export type FanTokenLeaderboardUser = {
+  rank: number;
+  user_id: string;
+  display_name: string;
+  username: string | null;
+  avatar_url: string | null;
+  level: string;
+  fan_token_balance: number;
+  fan_token_lifetime_earned: number;
+  is_official_member: boolean;
+};
+
 export type ChainOperation = {
   id: string;
   operation_type: string;

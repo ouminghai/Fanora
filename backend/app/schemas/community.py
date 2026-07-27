@@ -251,6 +251,18 @@ class FanTokenLedgerResponse(BaseModel):
     created_at: datetime
 
 
+class FanTokenLeaderboardUser(BaseModel):
+    rank: int
+    user_id: str
+    display_name: str
+    username: str | None
+    avatar_url: str | None
+    level: str
+    fan_token_balance: int
+    fan_token_lifetime_earned: int
+    is_official_member: bool
+
+
 class FanTokenAdjustmentCreate(BaseModel):
     user_id: str
     delta: int = Field(ge=-100_000, le=100_000)
