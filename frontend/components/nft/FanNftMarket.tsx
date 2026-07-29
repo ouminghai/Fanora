@@ -19,6 +19,7 @@ import { api } from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import type { FanNftAiDraft, FanNftCreateResponse, FanNftEngagement, FanNftListing, FanNftPurchaseResponse } from "@/lib/api/types";
 import { resetNftTilt, updateNftTilt } from "@/components/nft/nftMotion";
+import AiNftCreationWorkbench from "@/components/nft/AiNftCreationWorkbench";
 
 type MarketMode = "market" | "collection" | "item" | "create";
 type MarketVariant = "page" | "drawer";
@@ -757,7 +758,12 @@ type FanNftMarketProps = {
   onClose?: () => void;
 };
 
-export default function FanNftMarket({ mode, itemId, variant = "page", onClose }: FanNftMarketProps) {
+export default function FanNftMarket(props: FanNftMarketProps) {
+  if (props.mode === "create") return <AiNftCreationWorkbench />;
+  return <FanNftMarketContent {...props} />;
+}
+
+function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNftMarketProps) {
   const params = useParams<{ id?: string }>();
   const router = useRouter();
   const { user, refreshUser } = useAuth();

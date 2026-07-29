@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import AliasChoices, BaseModel, Field, field_validator
 
 from app.schemas.nft import PublicAttribute
 
@@ -14,9 +14,10 @@ class NftDraftRequest(BaseModel):
     preferred_name: str | None = Field(default=None, max_length=100)
     reference_notes: str | None = Field(default=None, max_length=500)
     reference_image_data_url: str | None = Field(default=None, max_length=7_000_000)
+    iteration_image_data_url: str | None = Field(default=None, max_length=7_000_000)
     generate_image: bool = True
 
-    @field_validator("reference_image_data_url")
+    @field_validator("reference_image_data_url", "iteration_image_data_url")
     @classmethod
     def validate_reference_image(cls, value: str | None) -> str | None:
         if value is None:
@@ -28,10 +29,21 @@ class NftDraftRequest(BaseModel):
 
 
 class NftMetadataNarrative(BaseModel):
-    name: str = Field(min_length=2, max_length=100)
-    description: str = Field(min_length=10, max_length=1000)
-    image_prompt: str = Field(min_length=10, max_length=1500)
-    suggested_attributes: list[PublicAttribute] = Field(default_factory=list, max_length=8)
+    name: str = Field(min_length=2, max_length=100, validation_alias=AliasChoices("name", "名称"))
+    description: str = Field(min_length=10, max_length=1000, validation_alias=AliasChoices("description", "描述"))
+    image_prompt: str = Field(min_length=10, max_length=1500, validation_alias=AliasChoices("image_prompt", "图片提示词"))
+    suggested_attributes: list[PublicAttribute] = Field(
+        default_factory=list,
+        max_length=8,
+        validation_alias=AliasChoices("suggested_attributes", "公开属性", "建议属性"),
+    )
+
+    @field_validator("suggested_attributes", mode="before")
+    @classmethod
+    def normalize_string_attributes(cls, value: object) -> object:
+        if isinstance(value, list) and all(isinstance(item, str) for item in value):
+            return [{"trait_type": "Attribute", "value": item[:120]} for item in value]
+        return value
 
 
 class NftDraftResponse(BaseModel):
@@ -42,7 +54,7 @@ class NftDraftResponse(BaseModel):
     suggested_attributes: list[PublicAttribute]
     image_data_url: str | None
     metadata_source: Literal["rules", "llm"]
-    image_source: Literal["openai", "not_requested", "unavailable"]
+    image_source: Literal["openai", "siliconflow", "not_requested", "unavailable"]
     degraded: bool
     image_error: str | None = None
     prompt_version: str = "fan-nft-draft-prompt-v1"

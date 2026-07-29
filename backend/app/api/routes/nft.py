@@ -7,7 +7,7 @@ from sqlmodel import col, func, select
 from app.adapters.monad import ChainConfigurationError, monad_contract_adapter
 from app.adapters.pinata import pinata_adapter
 from app.agents.nft_creation import nft_creation_agent
-from app.core.config import settings
+from app.core.config import Environment, settings
 from app.core.database import get_database_session
 from app.core.logging import logger
 from app.core.security import get_current_identity, get_optional_identity, require_official_member
@@ -619,6 +619,18 @@ async def create_fan_nft_ai_draft(
 ) -> NftDraftResponse:
     """Generate a creator-editable draft; this endpoint never publishes or mints."""
 
+    return await nft_creation_agent.create_draft(payload)
+
+
+@router.post("/creations/demo/ai-draft", response_model=NftDraftResponse)
+async def create_demo_fan_nft_ai_draft(payload: NftDraftRequest) -> NftDraftResponse:
+    """Local-only AI draft endpoint for the wallet-free product demo.
+
+    It never persists an NFT, charges FAN, or triggers an on-chain operation.
+    """
+
+    if settings.environment == Environment.PRODUCTION:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
     return await nft_creation_agent.create_draft(payload)
 
 

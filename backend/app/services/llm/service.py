@@ -1,6 +1,7 @@
 """LLM calls with structured output, retry, fallback, and timeout budgets."""
 
 import asyncio
+import json
 import time
 from typing import Any, TypeVar
 
@@ -54,9 +55,26 @@ class LLMService:
             for model_name in self.registry.model_names:
                 try:
                     model = self.registry.build(model_name)
-                    runnable = model.with_structured_output(response_model)
-                    result = await self._invoke(runnable, messages, model_name)
-                    return result
+                    # SiliconFlow documents JSON-object mode for compatible chat
+                    # models. Its Qwen endpoint can stall on OpenAI's stricter
+                    # json_schema/parse request used by LangChain's default.
+                    if "api.siliconflow.cn" in settings.openai_base_url.lower():
+                        raw_result = await self._invoke(model, messages, model_name)
+                        content = raw_result.content
+                        if isinstance(content, list):
+                            content = "".join(
+                                item.get("text", "") if isinstance(item, dict) else str(item) for item in content
+                            )
+                        if not isinstance(content, str):
+                            raise ValueError("SiliconFlow returned a non-text structured response")
+                        json_text = content.strip()
+                        if json_text.startswith("```json") and json_text.endswith("```"):
+                            json_text = json_text[7:-3].strip()
+                        return response_model.model_validate(json.loads(json_text))
+                    else:
+                        runnable = model.with_structured_output(response_model)
+                        result = await self._invoke(runnable, messages, model_name)
+                        return result
                 except OpenAIError as error:
                     last_error = error
                     logger.warning("llm_model_failed", model=model_name, error_type=type(error).__name__)

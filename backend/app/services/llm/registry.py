@@ -26,6 +26,11 @@ class LLMRegistry:
         }
         if self.settings.openai_base_url:
             kwargs["base_url"] = self.settings.openai_base_url
+        if "api.siliconflow.cn" in self.settings.openai_base_url.lower() and model_name.startswith("Qwen/Qwen3"):
+            # NFT Brief generation is a short, format-sensitive task. Disable
+            # Qwen3's default reasoning pass so it returns within the request
+            # budget and leaves room for the structured JSON response.
+            kwargs["extra_body"] = {"enable_thinking": False}
         kwargs.update(overrides)
         return ChatOpenAI(**kwargs)
 
