@@ -94,6 +94,17 @@ class Settings(BaseSettings):
     pinata_gateway_url: str = "https://gateway.pinata.cloud/ipfs"
     pinata_timeout_seconds: float = 30.0
     pinata_max_retries: int = 3
+    beeimg_base_url: str = "https://www.beeimg.cn"
+    beeimg_login_path: str = "/api/v2/login"
+    beeimg_upload_path: str = "/api/v2/upload"
+    beeimg_username: str = ""
+    beeimg_password: str = ""
+    beeimg_token: str = ""
+    beeimg_permission: int = 1
+    beeimg_storage_id: str = "1"
+    beeimg_strategy_id: str = ""
+    beeimg_album_id: str = ""
+    beeimg_timeout_seconds: float = 30.0
     nft_max_image_bytes: int = 5_000_000
     nft_min_image_dimension: int = 256
     nft_max_image_dimension: int = 4096
@@ -146,6 +157,14 @@ class Settings(BaseSettings):
         if value.startswith("postgresql://"):
             return value.replace("postgresql://", "postgresql+psycopg://", 1)
         return value
+
+    @field_validator("beeimg_base_url", mode="before")
+    @classmethod
+    def normalize_beeimg_base_url(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        cleaned = value.strip().lstrip(":：").strip().rstrip("/")
+        return cleaned or "https://www.beeimg.cn"
 
     @property
     def postgres_connect_args(self) -> dict[str, int]:

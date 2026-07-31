@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, func, select
 
+from app.adapters.beeimg import BeeImgConfigurationError, BeeImgUploadError, beeimg_adapter
 from app.api.routes.nft import _fan_nft_listing_response
 from app.core.database import get_database_session
 from app.core.security import get_current_identity, get_optional_identity, require_official_member
@@ -234,7 +235,14 @@ async def update_community(
     community = await get_official_community(session)
     community.name = payload.name
     community.description = payload.description
-    community.logo_url = payload.logo_url
+    try:
+        community.logo_url = await beeimg_adapter.ensure_remote_url(
+            payload.logo_url, filename="official-community-logo"
+        )
+    except BeeImgConfigurationError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+    except (BeeImgUploadError, OSError, ValueError) as error:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}") from error
     community.updated_at = utc_now()
     await session.commit()
     return await get_community(identity, session)
@@ -362,7 +370,9 @@ async def create_post(
         category=payload.category,
     )
     if moderation.decision == "rejected":
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="内容与社区主题不够相关，或像无意义/垃圾信息。")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="内容与社区主题不够相关，或像无意义/垃圾信息。"
+        )
     if payload.linked_nft_creation_id:
         linked_nft = await session.get(NftApplication, payload.linked_nft_creation_id)
         if (
@@ -375,10 +385,20 @@ async def create_post(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Linked NFT must be one of your published NFT items",
             )
+    try:
+        cover_url = await beeimg_adapter.ensure_remote_url(payload.cover_url, filename="community-post-cover")
+        image_urls = await beeimg_adapter.ensure_remote_urls(payload.image_urls, filename_prefix="community-post")
+    except BeeImgConfigurationError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+    except (BeeImgUploadError, OSError, ValueError) as error:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}") from error
+    values = payload.model_dump()
+    values["cover_url"] = cover_url
+    values["image_urls"] = image_urls
     post = CommunityPost(
         community_id=community.id,
         author_user_id=identity.user_id,
-        **payload.model_dump(),
+        **values,
     )
     session.add(post)
     await session.flush()
@@ -527,7 +547,9 @@ async def create_reply(
         category=post.category,
     )
     if moderation.decision == "rejected":
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="回复与社区主题不够相关，或像无意义/垃圾信息。")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="回复与社区主题不够相关，或像无意义/垃圾信息。"
+        )
 
     parent_reply_id = payload.parent_reply_id
     if parent_reply_id:
@@ -536,12 +558,18 @@ async def create_reply(
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Parent reply not found")
         if parent.parent_reply_id is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Comments support two levels only")
+    try:
+        image_urls = await beeimg_adapter.ensure_remote_urls(payload.image_urls, filename_prefix="community-reply")
+    except BeeImgConfigurationError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+    except (BeeImgUploadError, OSError, ValueError) as error:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}") from error
     reply = CommunityReply(
         post_id=post.id,
         author_user_id=identity.user_id,
         parent_reply_id=parent_reply_id,
         body=payload.body,
-        image_urls=payload.image_urls,
+        image_urls=image_urls,
     )
     session.add(reply)
     await session.flush()

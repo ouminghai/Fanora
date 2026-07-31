@@ -9,6 +9,15 @@ export const api = axios.create({
   headers: { "Content-Type": "application/json" },
 });
 
+export async function uploadImage(file: File): Promise<string> {
+  const form = new FormData();
+  form.append("file", file);
+  const response = await api.post<{ url: string }>("/media/images", form, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+  return response.data.url;
+}
+
 api.interceptors.request.use((config) => {
   if (typeof window !== "undefined") {
     const token = window.localStorage.getItem(SESSION_TOKEN_KEY);

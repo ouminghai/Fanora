@@ -181,7 +181,7 @@ class NftApplication(SQLModel, table=True):
     price_fan_tokens: int = Field(default=1, sa_column=Column(BigInteger, nullable=False))
     max_supply: int = Field(default=1, sa_column=Column(BigInteger, nullable=False))
     publish_fee_fan_tokens: int = Field(default=100, sa_column=Column(BigInteger, nullable=False))
-    image_data: str | None = Field(default=None, max_length=7_000_000)
+    image_data: str | None = Field(default=None, max_length=2048)
     image_mime_type: str = Field(max_length=100)
     image_size_bytes: int = Field(ge=0)
     image_width: int = Field(ge=0)

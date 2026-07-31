@@ -164,8 +164,13 @@ test("FEAR and DREAMS uses AI review and an ERC-1155 memorial ticket reward", ()
   assert.match(fearTicketSource, /celebrate: true/);
   assert.match(globalInfoModalSource, /nft-tilt-surface nft-flow-border/);
   assert.match(globalInfoModalSource, /startRealisticConfetti\(3000\)/);
-  assert.match(confettiSource, /startVelocity: 30, spread: 360, ticks: 60/);
-  assert.match(confettiSource, /window\.setInterval\(fire, 250\)/);
+  assert.match(confettiSource, /const count = 1000/);
+  assert.match(confettiSource, /angle: 30[\s\S]*origin: \{ x: 0\.04, y: 0\.72 \}/);
+  assert.match(confettiSource, /angle: 150[\s\S]*origin: \{ x: 0\.96, y: 0\.72 \}/);
+  assert.match(confettiSource, /Math\.floor\(\(count \* particleRatio\) \/ 2\)/);
+  assert.match(confettiSource, /fire\(0\.25, \{ spread: 26, startVelocity: 75 \}\)/);
+  assert.match(confettiSource, /fire\(0\.35, \{ spread: 100, startVelocity: 60, decay: 0\.91, scalar: 0\.8 \}\)/);
+  assert.match(confettiSource, /fire\(0\.1, \{ spread: 120, startVelocity: 50, decay: 0\.92, scalar: 1\.2 \}\)/);
 });
 
 test("post publishing and replies use a blocking AI review modal and shared errors", () => {

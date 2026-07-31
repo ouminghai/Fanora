@@ -2,7 +2,9 @@
 
 import argparse
 import asyncio
+import hashlib
 import os
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -10,11 +12,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlmodel import select
 
+from app.adapters.beeimg import beeimg_adapter, parse_data_url
 from app.core.config import settings
 from app.models.community import CommunityPost, FanTask
 from app.models.user import AuthIdentity, Community, User, UserProfile, UserRole, UserSession, Wallet
 from app.services.product_seed import OFFICIAL_COMMUNITY_ID
-
 
 # Fill these values directly when you want to run the script without passing
 # SOURCE_DATABASE_URL / TARGET_DATABASE_URL in the shell.
@@ -27,6 +29,7 @@ TARGET_PROXY_ENABLED = True
 TARGET_PROXY_HOST = "127.0.0.1"
 TARGET_PROXY_PORT = 7892
 TARGET_PROXY_TYPE = "socks5"
+DATA_IMAGE_PATTERN = re.compile(r"data:image/[a-zA-Z0-9.+-]+;base64,[a-zA-Z0-9+/=]+")
 
 
 @dataclass(frozen=True, slots=True)
@@ -40,6 +43,53 @@ class CommunitySnapshot:
     community: dict[str, Any]
     posts: list[dict[str, Any]]
     tasks: list[dict[str, Any]]
+
+
+class SnapshotImageHoster:
+    def __init__(self) -> None:
+        self.upload_cache: dict[str, str] = {}
+        self.upload_count = 0
+
+    async def _host_data_url(self, value: str, *, label: str) -> str:
+        content, mime_type = parse_data_url(value)
+        cache_key = f"{mime_type}:{hashlib.sha256(content).hexdigest()}"
+        if cache_key not in self.upload_cache:
+            uploaded = await beeimg_adapter.upload_bytes(content=content, mime_type=mime_type, filename=label)
+            self.upload_cache[cache_key] = uploaded.url
+            self.upload_count += 1
+        return self.upload_cache[cache_key]
+
+    async def replace(self, value: Any, *, label: str) -> Any:
+        if isinstance(value, str):
+            matches = list(DATA_IMAGE_PATTERN.finditer(value))
+            if not matches:
+                return value
+            parts: list[str] = []
+            cursor = 0
+            for index, match in enumerate(matches, start=1):
+                parts.append(value[cursor : match.start()])
+                parts.append(await self._host_data_url(match.group(0), label=f"{label}-{index}"))
+                cursor = match.end()
+            parts.append(value[cursor:])
+            return "".join(parts)
+        if isinstance(value, list):
+            return [await self.replace(item, label=f"{label}-{index}") for index, item in enumerate(value, start=1)]
+        if isinstance(value, dict):
+            return {key: await self.replace(item, label=f"{label}-{key}") for key, item in value.items()}
+        return value
+
+    async def host_snapshot(self, snapshot: CommunitySnapshot) -> CommunitySnapshot:
+        return CommunitySnapshot(
+            users=snapshot.users,
+            user_profiles=await self.replace(snapshot.user_profiles, label="user-profile"),
+            user_roles=snapshot.user_roles,
+            user_sessions=snapshot.user_sessions,
+            wallets=snapshot.wallets,
+            auth_identities=snapshot.auth_identities,
+            community=await self.replace(snapshot.community, label="community"),
+            posts=await self.replace(snapshot.posts, label="community-post"),
+            tasks=await self.replace(snapshot.tasks, label="fan-task"),
+        )
 
 
 def async_database_url(url: str) -> str:
@@ -122,15 +172,13 @@ def validate_snapshot(
             "Source tasks reference posts outside the selected community: " + ", ".join(missing_target_post_ids)
         )
 
-    posts_without_base64 = [
-        post.id for post in posts if not post.cover_url or not post.cover_url.startswith("data:image/")
-    ]
-    if posts_without_base64:
-        print("Warning: source posts do not contain Base64 cover images: " + ", ".join(posts_without_base64))
+    posts_without_images = [post.id for post in posts if not post.cover_url and not post.image_urls]
+    if posts_without_images:
+        print("Warning: source posts do not contain images: " + ", ".join(posts_without_images))
 
-    tasks_without_base64 = [task.id for task in tasks if not image_url_from_task(task).startswith("data:image/")]
-    if tasks_without_base64:
-        print("Warning: source tasks do not contain Base64 presentation images: " + ", ".join(tasks_without_base64))
+    tasks_without_images = [task.id for task in tasks if not image_url_from_task(task)]
+    if tasks_without_images:
+        print("Warning: source tasks do not contain presentation images: " + ", ".join(tasks_without_images))
 
 
 async def load_snapshot(source_engine: AsyncEngine, community_id: str) -> CommunitySnapshot:
@@ -364,6 +412,12 @@ async def synchronize(
             return
         if not normalized_target:
             raise RuntimeError("Target database URL is required unless --dry-run is used")
+        if not beeimg_adapter.configured:
+            raise RuntimeError("BeeImg must be configured before synchronizing images")
+
+        image_hoster = SnapshotImageHoster()
+        snapshot = await image_hoster.host_snapshot(snapshot)
+        print(f"BeeImg image hosting completed: uploaded {image_hoster.upload_count} unique images")
 
         if target_proxy_enabled:
             enable_target_proxy(

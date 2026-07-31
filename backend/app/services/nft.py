@@ -18,6 +18,7 @@ from qrcode.constants import ERROR_CORRECT_Q
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
+from app.adapters.beeimg import beeimg_adapter
 from app.adapters.monad import ChainConfigurationError, monad_contract_adapter
 from app.adapters.pinata import pinata_adapter
 from app.core.config import settings
@@ -97,6 +98,27 @@ class NftService:
         if width < minimum or height < minimum or width > maximum or height > maximum:
             raise NftValidationError(f"Image dimensions must be between {minimum} and {maximum} pixels")
         return content, mime_type, width, height
+
+    async def _image_bytes_from_source(self, source: str) -> tuple[bytes, str, int, int]:
+        if source.startswith("data:image/"):
+            return self._parse_image(source)
+        if source.startswith(("http://", "https://")):
+            async with httpx.AsyncClient(timeout=settings.beeimg_timeout_seconds) as client:
+                response = await client.get(source)
+                response.raise_for_status()
+                content = response.content
+                mime_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
+            if mime_type not in ALLOWED_IMAGE_TYPES:
+                raise NftValidationError("Remote image must be JPEG, PNG, WebP, or GIF")
+            try:
+                with Image.open(io.BytesIO(content)) as image:
+                    image.verify()
+                with Image.open(io.BytesIO(content)) as image:
+                    width, height = image.size
+            except (UnidentifiedImageError, OSError) as error:
+                raise NftValidationError("Remote image is not a valid image") from error
+            return content, mime_type, width, height
+        raise NftValidationError("Image source is unavailable")
 
     async def _membership_level_image_bytes(self, level: MembershipLevel) -> tuple[bytes, str]:
         source = level.badge_image_url.strip()
@@ -427,18 +449,22 @@ class NftService:
         self, session: AsyncSession, identity: AuthenticatedIdentity, payload: NftApplicationCreate
     ) -> NftApplication:
         content, mime_type, width, height = self._parse_image(payload.image_data_url)
+        hosted_image_url = await beeimg_adapter.upload_data_url(payload.image_data_url, filename="fan-nft")
+        story_image_urls = await beeimg_adapter.ensure_remote_urls(
+            payload.story_image_urls, filename_prefix="fan-nft-story"
+        )
         application = NftApplication(
             user_id=identity.user_id,
             name=payload.name.strip(),
             description=payload.description.strip(),
-            story_image_urls=[],
+            story_image_urls=story_image_urls,
             theme=payload.theme.strip(),
             price_fan_tokens=payload.price_fan_tokens,
             max_supply=payload.max_supply,
             publish_fee_fan_tokens=settings.nft_publish_fee_fan_tokens,
             public_attributes=[item.model_dump() for item in payload.public_attributes],
             copyright_declaration=payload.copyright_declaration.strip(),
-            image_data=payload.image_data_url,
+            image_data=hosted_image_url,
             image_mime_type=mime_type,
             image_size_bytes=len(content),
             image_width=width,
@@ -492,7 +518,6 @@ class NftService:
             content, mime_type, _, _ = self._parse_image(payload.image_data_url)
             image = await pinata_adapter.pin_image(f"fan-nft-{application.id}", content, mime_type)
             finish_stage("image_pin")
-            application.story_image_urls = payload.story_image_urls
             metadata_payload = {
                 "name": f"{creator_name} · {application.name}",
                 "description": application.description,
@@ -635,7 +660,6 @@ class NftService:
             creator_ownership.minted_at = utc_now()
             token_type.minted_supply = 1
             application.status = "MINTED"
-            application.image_data = None
             finish_stage("creator_mint_transaction")
             current_stage = "fan_token_and_commit"
             await fan_token_service.award(
@@ -1604,7 +1628,7 @@ class NftService:
             raise ChainConfigurationError("Pinata and collectible operator configuration are required")
         if not application.image_data:
             raise NftValidationError("Application image is unavailable")
-        content, mime_type, _, _ = self._parse_image(application.image_data)
+        content, mime_type, _, _ = await self._image_bytes_from_source(application.image_data)
         application.status = "PINNING"
         await session.commit()
         try:
@@ -1749,7 +1773,6 @@ class NftService:
             ownership.minted_at = utc_now()
             token_type.minted_supply = 1
             application.status = "MINTED"
-            application.image_data = None
             await session.commit()
             return application
         except Exception:

@@ -668,6 +668,10 @@ export default function CollectionDashboard() {
       return;
     }
     if (status !== "authenticated" || !user) return;
+    if (!user.is_official_member) {
+      router.replace("/membership/join");
+      return;
+    }
     if (initializedUserRef.current === user.id) return;
     initializedUserRef.current = user.id;
     void load();

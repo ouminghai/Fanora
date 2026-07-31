@@ -74,6 +74,15 @@ test("collection keeps identity synchronization and on-chain links", () => {
   assert.match(source, /累计获得 FAN 确认会员等级/);
 });
 
+test("collection redirects inactive members to the membership join page before loading assets", () => {
+  const routeGuard = source.slice(
+    source.indexOf('if (status === "anonymous"'),
+    source.indexOf("const identity = collection?.identity"),
+  );
+  assert.match(routeGuard, /if \(!user\.is_official_member\) \{\s*router\.replace\("\/membership\/join"\);\s*return;/);
+  assert.ok(routeGuard.indexOf('router.replace("/membership/join")') < routeGuard.indexOf("void load()"));
+});
+
 test("collection automatically creates, refreshes, reveals, and downloads a free membership card", () => {
   assert.match(source, /\/nft\/identity\/card\/refresh/);
   assert.match(source, /\/nft\/identity\/card/);
@@ -262,6 +271,8 @@ test("chain transactions connect nodes and resolve into NFT or identity artifact
   const progressSource = readFileSync(new URL("../components/nft/ChainTransactionProgress.tsx", import.meta.url), "utf8");
 
   assert.match(progressSource, /提交发布.*写入 IPFS.*合约铸造.*链上确认/);
+  assert.match(progressSource, /const STEP_INTERVAL_MS = 1_000/);
+  assert.match(progressSource, /}, STEP_INTERVAL_MS\);/);
   assert.match(progressSource, /chain-transaction-link/);
   assert.match(progressSource, /chain-transaction-artifact/);
   assert.match(marketSource, /progressKind: "publish"/);

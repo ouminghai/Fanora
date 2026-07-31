@@ -119,13 +119,7 @@ async def activate_free_membership(
     identity: AuthenticatedIdentity = Depends(get_current_identity),
     session: AsyncSession = Depends(get_database_session),
 ) -> OfficialMembershipStatusResponse:
-    try:
-        fee_wei = await membership_fee_service.get_live_fee()
-    except Exception as error:
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Unable to verify the current membership fee",
-        ) from error
+    fee_wei = settings.membership_fee_wei
     if fee_wei != 0:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Official membership is not free right now")
     payment = await official_membership_payment_service.activate_free_membership(session, identity)

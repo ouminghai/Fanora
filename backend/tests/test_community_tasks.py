@@ -214,7 +214,7 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
     )
     assert story_post.status_code == 201
     assert story_post.json()["body"].startswith("#粉丝故事图文征集")
-    assert story_post.json()["cover_url"].startswith("data:image/png;base64,")
+    assert story_post.json()["cover_url"].startswith("https://www.beeimg.cn/")
     assert len(story_post.json()["image_urls"]) == 2
     async with database_service.session() as session:
         post_publish_entries = list(

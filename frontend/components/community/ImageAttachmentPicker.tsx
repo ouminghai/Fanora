@@ -3,6 +3,8 @@
 import Image from "next/image";
 import { useId, type ChangeEvent } from "react";
 
+import { uploadImage } from "@/lib/api/client";
+
 type ImageAttachmentPickerProps = {
   value: string[];
   onChange: (value: string[]) => void;
@@ -29,15 +31,10 @@ export default function ImageAttachmentPicker({ value, onChange, onError, maxIma
       return;
     }
     try {
-      const dataUrls = await Promise.all(files.map((file) => new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(String(reader.result));
-        reader.onerror = () => reject(new Error("图片读取失败"));
-        reader.readAsDataURL(file);
-      })));
-      onChange([...value, ...dataUrls]);
+      const imageUrls = await Promise.all(files.map((file) => uploadImage(file)));
+      onChange([...value, ...imageUrls]);
     } catch {
-      onError?.("图片读取失败，请重新选择。 ");
+      onError?.("图片上传失败，请重新选择。 ");
     }
   };
 

@@ -5,7 +5,9 @@ import {
   useConnectModal,
 } from "@rainbow-me/rainbowkit";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAccount, useSignMessage } from "wagmi";
+import { createWalletClient, custom, type EIP1193Provider } from "viem";
+import { useAccount } from "wagmi";
+import { monadTestnet } from "wagmi/chains";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { supportedChains } from "@/lib/web3/config";
 
@@ -13,14 +15,20 @@ type RainbowWalletLoginButtonProps = {
   variant?: "icon" | "full";
 };
 
+function providerErrorCode(error: unknown): number | undefined {
+  if (!error || typeof error !== "object") return undefined;
+  if ("code" in error && typeof error.code === "number") return error.code;
+  if ("cause" in error) return providerErrorCode(error.cause);
+  return undefined;
+}
+
 export default function RainbowWalletLoginButton({
   variant = "icon",
 }: RainbowWalletLoginButtonProps) {
   const { user, status, loginWithWallet, clearError } = useAuth();
-  const { address, chain, isConnected } = useAccount();
+  const { address, chain, connector, isConnected } = useAccount();
   const { openConnectModal } = useConnectModal();
   const { openChainModal } = useChainModal();
-  const { signMessageAsync } = useSignMessage();
   const [mounted, setMounted] = useState(false);
   const awaitingConnectionRef = useRef(false);
   const signingRef = useRef(false);
@@ -42,16 +50,47 @@ export default function RainbowWalletLoginButton({
 
   const signIn = useCallback(async (walletAddress: `0x${string}`) => {
     if (signingRef.current) return;
+    if (!connector) throw new Error("钱包连接尚未准备好，请重新连接后再试。");
     signingRef.current = true;
     awaitingConnectionRef.current = false;
     try {
-      await loginWithWallet(walletAddress, (message) =>
-        signMessageAsync({ account: walletAddress, message }),
-      );
+      const provider = await connector.getProvider() as EIP1193Provider;
+      try {
+        await provider.request({
+          method: "wallet_switchEthereumChain",
+          params: [{ chainId: `0x${monadTestnet.id.toString(16)}` }],
+        });
+      } catch (switchError) {
+        if (providerErrorCode(switchError) !== 4902) throw switchError;
+        await provider.request({
+          method: "wallet_addEthereumChain",
+          params: [{
+            chainId: `0x${monadTestnet.id.toString(16)}`,
+            chainName: monadTestnet.name,
+            nativeCurrency: monadTestnet.nativeCurrency,
+            rpcUrls: [
+              process.env.NEXT_PUBLIC_MONAD_TESTNET_RPC_URL
+                || monadTestnet.rpcUrls.default.http[0],
+            ],
+            blockExplorerUrls: monadTestnet.blockExplorers
+              ? [monadTestnet.blockExplorers.default.url]
+              : undefined,
+          }],
+        });
+      }
+      const walletClient = createWalletClient({
+        account: walletAddress,
+        chain: monadTestnet,
+        transport: custom(provider),
+      });
+      await loginWithWallet(walletAddress, (message) => walletClient.signMessage({
+        account: walletAddress,
+        message,
+      }));
     } finally {
       signingRef.current = false;
     }
-  }, [loginWithWallet, signMessageAsync]);
+  }, [connector, loginWithWallet]);
 
   useEffect(() => {
     if (
