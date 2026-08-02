@@ -5,7 +5,7 @@
 [在线 Demo](https://fanora-orpin.vercel.app/) · [完整项目说明](docs/produce/README.md) · [系统架构](docs/produce/ARCHITECTURE.md) · [AI Agent 设计](docs/produce/AI_AGENT_DESIGN.md)
 
 ![Fanora 项目首页](docs/image.png)
-
+![ai agent NFT creation](docs/image2.png)
 ## 为什么是 Fanora
 
 粉丝在社区里的签到、创作和互动通常无法沉淀为长期资产；传统 NFT 工具又常常只生成一张缺少故事的图片。Fanora 将两条路径连接成一个闭环：
