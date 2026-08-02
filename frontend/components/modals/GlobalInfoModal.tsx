@@ -16,6 +16,7 @@ export type GlobalInfoModalProps = {
   imageUrl?: string | null;
   imageAlt?: string;
   celebrate?: boolean;
+  celebrationDurationMs?: number;
   actionLabel?: string;
   actionUrl?: string | null;
   confirmLabel?: string;
@@ -37,7 +38,7 @@ function ToneIcon({ tone }: { tone: NonNullable<GlobalInfoModalProps["tone"]> })
 }
 
 export default NiceModal.create<GlobalInfoModalProps>(
-  ({ title, message, tone = "info", eyebrow, imageUrl, imageAlt = "获得的 NFT", celebrate = false, actionLabel, actionUrl, confirmLabel = "知道了", dismissible = true }) => {
+  ({ title, message, tone = "info", eyebrow, imageUrl, imageAlt = "获得的 NFT", celebrate = false, celebrationDurationMs = 3000, actionLabel, actionUrl, confirmLabel = "知道了", dismissible = true }) => {
     const modal = useModal();
     const classes = toneClasses[tone];
     useBodyScrollLock(modal.visible);
@@ -61,7 +62,7 @@ export default NiceModal.create<GlobalInfoModalProps>(
       if (!modal.visible || !celebrate) return;
       let disposed = false;
       let stop: (() => void) | undefined;
-      void startRealisticConfetti(3000).then((cleanup) => {
+      void startRealisticConfetti(celebrationDurationMs).then((cleanup) => {
         if (disposed) cleanup();
         else stop = cleanup;
       });
@@ -69,7 +70,7 @@ export default NiceModal.create<GlobalInfoModalProps>(
         disposed = true;
         stop?.();
       };
-    }, [celebrate, modal.visible]);
+    }, [celebrate, celebrationDurationMs, modal.visible]);
 
     return (
       <div

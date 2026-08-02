@@ -1,6 +1,7 @@
 """Monad payment verification for becoming an official Fanora member."""
 
 import asyncio
+import time
 from dataclasses import dataclass
 
 from fastapi import HTTPException, status
@@ -206,63 +207,98 @@ class OfficialMembershipPaymentService:
         session: AsyncSession,
         identity: AuthenticatedIdentity,
     ) -> OfficialMembershipPayment:
-        profile = await session.get(UserProfile, identity.user_id)
-        if profile is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found")
+        operation_started_at = time.perf_counter()
+        step_started_at = operation_started_at
 
-        existing_payment = (
-            await session.execute(
-                select(OfficialMembershipPayment).where(OfficialMembershipPayment.user_id == identity.user_id)
+        def print_timing(step: str) -> None:
+            nonlocal step_started_at
+            finished_at = time.perf_counter()
+            print(
+                f"[membership.activate-free] user_id={identity.user_id} "
+                f"step={step} elapsed_ms={(finished_at - step_started_at) * 1000:.2f} "
+                f"total_ms={(finished_at - operation_started_at) * 1000:.2f}",
+                flush=True,
             )
-        ).scalar_one_or_none()
-        if profile.is_official_member and existing_payment is not None:
-            return existing_payment
+            step_started_at = finished_at
 
-        if not monad_contract_adapter.membership_gateway_configured:
-            raise HTTPException(
-                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-                detail="Free membership relayer is not configured",
-            )
         try:
-            receipt = await monad_contract_adapter.activate_free_membership(
-                identity.primary_wallet,
-                self.payment_id_for_user(identity.user_id),
-            )
-        except Exception as error:
-            raise HTTPException(
-                status_code=status.HTTP_502_BAD_GATEWAY,
-                detail="Free membership activation failed onchain",
-            ) from error
+            profile = await session.get(UserProfile, identity.user_id)
+            print_timing("profile_load")
+            if profile is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User profile not found")
 
-        now = utc_now()
-        treasury_address = receipt.event_args.get("treasury")
-        record = OfficialMembershipPayment(
-            user_id=identity.user_id,
-            wallet_address=Web3.to_checksum_address(identity.primary_wallet),
-            treasury_address=Web3.to_checksum_address(
-                treasury_address or settings.membership_treasury_address or identity.primary_wallet
-            ),
-            transaction_hash=receipt.transaction_hash.lower(),
-            chain_id=settings.monad_chain_id,
-            amount_wei=0,
-            block_number=receipt.block_number,
-            confirmed_at=now,
-        )
-        session.add(record)
-        await fan_token_service.sync_level(session, profile)
-        profile.is_official_member = True
-        profile.official_member_since = now
-        profile.updated_at = now
-        try:
-            await session.commit()
-        except IntegrityError as error:
-            await session.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail="Membership was activated by another request",
-            ) from error
-        await session.refresh(record)
-        return record
+            existing_payment = (
+                await session.execute(
+                    select(OfficialMembershipPayment).where(OfficialMembershipPayment.user_id == identity.user_id)
+                )
+            ).scalar_one_or_none()
+            print_timing("existing_payment_lookup")
+            if profile.is_official_member and existing_payment is not None:
+                print_timing("idempotent_return")
+                return existing_payment
+
+            if not monad_contract_adapter.membership_gateway_configured:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Free membership relayer is not configured",
+                )
+            print_timing("relayer_config_check")
+            try:
+                receipt = await monad_contract_adapter.activate_free_membership(
+                    identity.primary_wallet,
+                    self.payment_id_for_user(identity.user_id),
+                )
+            except Exception as error:
+                print_timing("onchain_activation_failed")
+                raise HTTPException(
+                    status_code=status.HTTP_502_BAD_GATEWAY,
+                    detail="Free membership activation failed onchain",
+                ) from error
+            print_timing("onchain_activation")
+
+            now = utc_now()
+            treasury_address = receipt.event_args.get("treasury")
+            record = OfficialMembershipPayment(
+                user_id=identity.user_id,
+                wallet_address=Web3.to_checksum_address(identity.primary_wallet),
+                treasury_address=Web3.to_checksum_address(
+                    treasury_address or settings.membership_treasury_address or identity.primary_wallet
+                ),
+                transaction_hash=receipt.transaction_hash.lower(),
+                chain_id=settings.monad_chain_id,
+                amount_wei=0,
+                block_number=receipt.block_number,
+                confirmed_at=now,
+            )
+            session.add(record)
+            print_timing("record_prepare")
+
+            await fan_token_service.sync_level(session, profile)
+            print_timing("fan_level_sync")
+            profile.is_official_member = True
+            profile.official_member_since = now
+            profile.updated_at = now
+            try:
+                await session.commit()
+            except IntegrityError as error:
+                await session.rollback()
+                print_timing("db_commit_failed")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail="Membership was activated by another request",
+                ) from error
+            print_timing("db_commit")
+            await session.refresh(record)
+            print_timing("record_refresh")
+            return record
+        finally:
+            finished_at = time.perf_counter()
+            print(
+                f"[membership.activate-free] user_id={identity.user_id} step=total "
+                f"elapsed_ms={(finished_at - operation_started_at) * 1000:.2f} "
+                f"total_ms={(finished_at - operation_started_at) * 1000:.2f}",
+                flush=True,
+            )
 
 
 official_membership_payment_service = OfficialMembershipPaymentService()

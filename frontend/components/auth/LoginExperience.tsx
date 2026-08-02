@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import RainbowWalletLoginButton from "@/components/web3/RainbowWalletLoginButton";
 import { useAuth } from "@/components/providers/AuthProvider";
@@ -23,44 +24,74 @@ export default function LoginExperience() {
   }, [router, status, user]);
 
   return (
-    <main className={`${styles.stage} flex min-h-screen items-center bg-[#F8F7FF] px-6 pb-16 pt-32 dark:bg-jacarta-900`}>
+    <main className={`${styles.stage} flex min-h-screen items-center px-6 pb-16 pt-32`}>
+      <Image
+        fill
+        priority
+        src="/img/fanora/login/login-bg.jpg"
+        alt=""
+        aria-hidden="true"
+        sizes="100vw"
+        className={`${styles.backdrop} pointer-events-none object-cover object-center`}
+      />
+      <div className={styles.backdropVeil} aria-hidden="true" />
       <div className="mx-auto grid w-full max-w-6xl items-center gap-12 lg:grid-cols-[1.05fr_.95fr]">
         <section className={styles.card}>
-          <span className="inline-flex rounded-full border border-accent/20 bg-accent/10 px-4 py-2 text-xs font-bold uppercase tracking-[0.2em] text-accent">
+          <span className={styles.protocolLabel}>
             One identity · one wallet
           </span>
-          <h1 className="mt-6 max-w-2xl font-display text-5xl font-semibold leading-[1.05] text-jacarta-700 dark:text-white md:text-7xl">
-           Fanora — Every Interaction Builds Your Identity.
+          <h1 className={`${styles.heroTitle} mt-6 max-w-2xl font-display text-5xl font-semibold leading-[1.05] md:text-7xl`}>
+            <span className={`${styles.typewriterLine} ${styles.typewriterBrand}`}>Fanora</span>
           </h1>
-          <p className="mt-6 max-w-xl text-lg leading-8 text-jacarta-500 dark:text-jacarta-200">
+          <h1 className={`${styles.heroTitle} mt-6 max-w-2xl font-display text-5xl font-semibold leading-[1.05] md:text-7xl`}>
+            <span className={`${styles.typewriterLine} ${styles.typewriterFandom}`}>Your fandom.</span>
+            <br />
+            <span className={`${styles.typewriterLine} ${styles.typewriterForever}`}>On-chain. Forever.</span>
+          </h1>
+          <p className={`${styles.heroCopy} mt-6 max-w-xl text-lg leading-8`}>
             Fanora 使用 RainbowKit 连接你熟悉的钱包。完成一次无 Gas 的消息签名后，即可获得可验证的粉丝身份。
           </p>
-          <div className="mt-10 grid gap-4 sm:grid-cols-3">
-            {steps.map(([number, title, text], index) => (
+          <div className={`${styles.stepFlow} mt-10 grid gap-4 sm:grid-cols-3`}>
+            {steps.map(([number, title, text]) => (
               <div
                 key={number}
-                className="rounded-2xl border border-white/70 bg-white/70 p-5 shadow-sm backdrop-blur dark:border-white/10 dark:bg-white/[.05]"
-                style={{ animationDelay: `${index * 100}ms` }}
+                className={`${styles.stepCard} p-5`}
               >
-                <span className="font-display text-sm text-accent">{number}</span>
-                <h2 className="mt-3 font-display text-base font-semibold text-jacarta-700 dark:text-white">{title}</h2>
-                <p className="mt-2 text-sm leading-6 text-jacarta-500 dark:text-jacarta-300">{text}</p>
+                <span className={`${styles.stepNumber} font-display text-sm`}>{number}</span>
+                <h2 className="mt-3 font-display text-base font-semibold text-white">{title}</h2>
+                <p className={`${styles.stepCopy} mt-2 text-sm leading-6`}>{text}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <section className={`${styles.card} relative mx-auto w-full max-w-md rounded-[2rem] border border-white/60 bg-white/85 p-8 shadow-[0_30px_90px_rgba(62,38,140,.22)] backdrop-blur-xl dark:border-white/10 dark:bg-jacarta-800/90 md:p-10`}>
+        <section className={`${styles.card} ${styles.loginCard} relative mx-auto w-full max-w-md`}>
+          <span className={`${styles.corner} ${styles.cornerTopLeft}`} aria-hidden="true" />
+          <span className={`${styles.corner} ${styles.cornerTopRight}`} aria-hidden="true" />
+          <span className={`${styles.corner} ${styles.cornerBottomLeft}`} aria-hidden="true" />
+          <span className={`${styles.corner} ${styles.cornerBottomRight}`} aria-hidden="true" />
+          <span className={styles.photon} aria-hidden="true"><i /></span>
+          <span className={`${styles.photon} ${styles.photonSecondary}`} aria-hidden="true"><i /></span>
+          <div className={styles.loginSystemBar}>
+            <span><i aria-hidden="true" /> WALLET AUTH NODE</span>
+            <span>MONAD // READY</span>
+          </div>
+          <div className={styles.loginCardBody}>
           <div className="relative mx-auto mb-8 flex h-28 w-28 items-center justify-center">
             <div className={`${styles.orbit} absolute inset-0 rounded-full border border-dashed border-accent/45`} />
-            <div className={`${styles.pulse} flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-accent to-[#46C7FF] text-3xl text-white shadow-accent-volume`}>
-              ✦
-            </div>
+            <Image
+              src="/img/avatars/login-icon.jpg"
+              alt="Fanora 粉丝身份"
+              width={80}
+              height={80}
+              priority
+              className={`${styles.pulse} h-20 w-20 rounded-lg object-cover shadow-accent-volume`}
+            />
             <span className="absolute -right-1 top-2 h-4 w-4 rounded-full bg-green shadow-[0_0_18px_rgba(16,185,129,.8)]" />
           </div>
           <div className="text-center">
-            <h2 className="font-display text-2xl font-semibold text-jacarta-700 dark:text-white">开始建立粉丝身份</h2>
-            <p className="mt-3 text-sm leading-6 text-jacarta-500 dark:text-jacarta-300">首次登录会自动注册 Fanora 账户并绑定唯一主钱包。</p>
+            <h2 className="font-display text-2xl font-semibold text-white">欢迎加入 Fanora！</h2>
+            <p className={`${styles.loginCopy} mt-3 text-sm leading-6`}>完成确认后，即可开启签到、粉丝任务和会员专属权益。</p>
           </div>
           <div className="mt-8">
             <RainbowWalletLoginButton variant="full" />
@@ -74,10 +105,11 @@ export default function LoginExperience() {
               {error}
             </button>
           )}
-          <div className="mt-6 flex items-center justify-center gap-5 text-xs text-jacarta-400">
+          <div className={`${styles.securityNotes} mt-6 flex items-center justify-center gap-5 text-xs`}>
             <span>✓ 不保存私钥</span>
             <span>✓ 钱包强绑定</span>
             <span>✓ 随时退出</span>
+          </div>
           </div>
         </section>
       </div>

@@ -1,5 +1,4 @@
-import Header3 from "@/components/headers/Header3";
-import ProfileDashboard from "@/components/profile/ProfileDashboard";
+import { redirect } from "next/navigation";
 
 export const metadata = {
   title: "我的身份 | Fanora",
@@ -7,10 +6,5 @@ export const metadata = {
 };
 
 export default function ProfilePage() {
-  return (
-    <>
-      <Header3 />
-      <ProfileDashboard />
-    </>
-  );
+  redirect("/collection?tab=profile");
 }

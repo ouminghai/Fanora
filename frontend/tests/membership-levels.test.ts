@@ -47,6 +47,10 @@ test("membership levels use the database-backed animated autoplay slider", () =>
   assert.match(source, /isReady \? "opacity-100" : "opacity-0"/);
   assert.match(source, /animate-gradient--no-text-fill/);
   assert.match(source, /badge-level-card-reveal/);
+  assert.match(source, /IDENTITY GROWTH NETWORK/);
+  assert.match(source, /networkStyles\.universe/);
+  assert.match(source, /networkStyles\.stars/);
+  assert.match(source, /networkStyles\.nebulaOne/);
   assert.doesNotMatch(source, /badgeLevels/);
   assert.doesNotMatch(source, /\[\.\.\.levels, \.\.\.levels\]/);
 });

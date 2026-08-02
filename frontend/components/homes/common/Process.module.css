@@ -1,0 +1,149 @@
+.networkSection {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: 112px 0;
+  color: #f8f5ff;
+  background: #030108;
+}
+
+.universe,
+.stars,
+.nebulaOne,
+.nebulaTwo {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.universe { z-index: -1; overflow: hidden; }
+.stars {
+  opacity: 0.58;
+  background-image:
+    radial-gradient(circle, rgba(255, 255, 255, 0.72) 0 1px, transparent 1.4px),
+    radial-gradient(circle, rgba(199, 161, 255, 0.58) 0 1px, transparent 1.3px);
+  background-position: 0 0, 29px 17px;
+  background-size: 78px 78px, 113px 113px;
+  mask-image: linear-gradient(to bottom, transparent, black 18%, black 86%, transparent);
+  animation: starDrift 26s linear infinite;
+}
+
+.nebulaOne,
+.nebulaTwo { filter: blur(40px); opacity: 0.75; animation: nebulaFloat 13s ease-in-out infinite alternate; }
+.nebulaOne { background: radial-gradient(ellipse at 22% 45%, rgba(119, 49, 210, 0.24), transparent 34%); }
+.nebulaTwo { background: radial-gradient(ellipse at 80% 52%, rgba(39, 145, 209, 0.16), transparent 32%); animation-delay: -6s; }
+.networkContainer { position: relative; z-index: 2; }
+
+.networkHeader { max-width: 760px; margin: 0 auto 70px; text-align: center; }
+.networkHeader > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #b78bff;
+  font: 700 11px monospace;
+  letter-spacing: 0.12em;
+}
+.networkHeader > span svg { width: 15px; }
+.networkHeader h2 { margin-top: 15px; font-size: clamp(28px, 4vw, 42px); font-weight: 700; line-height: 1.25; }
+.networkHeader p { margin-top: 14px; color: rgba(226, 215, 239, 0.58); font-size: 16px; line-height: 1.8; }
+
+.chainMap { display: flex; align-items: flex-start; justify-content: center; }
+.chainSegment { display: flex; min-width: 0; flex: 1; align-items: flex-start; }
+.chainNode { position: relative; width: min(100%, 250px); flex: 0 0 auto; text-align: center; }
+.nodeIndex { color: rgba(190, 153, 226, 0.5); font: 700 9px monospace; letter-spacing: 0.12em; }
+.nodeOrbit {
+  position: relative;
+  display: grid;
+  width: 104px;
+  height: 104px;
+  margin: 12px auto 22px;
+  place-items: center;
+  border: 1px solid rgba(190, 138, 255, 0.23);
+  border-radius: 50%;
+  box-shadow: inset 0 0 28px rgba(168, 85, 247, 0.08), 0 0 32px rgba(107, 52, 168, 0.1);
+}
+.nodeOrbit::before,
+.nodeOrbit::after { content: ""; position: absolute; border: 1px dashed rgba(208, 171, 255, 0.18); border-radius: 50%; }
+.nodeOrbit::before { inset: 8px; animation: orbitSpin 12s linear infinite; }
+.nodeOrbit::after { inset: -8px; border-style: solid; border-color: transparent rgba(105, 187, 255, 0.18); animation: orbitSpin 8s linear infinite reverse; }
+.nodeCore {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border: 1px solid rgba(227, 202, 255, 0.38);
+  border-radius: 9px;
+  color: #f1dcff;
+  background: linear-gradient(145deg, rgba(149, 76, 230, 0.36), rgba(35, 18, 64, 0.82));
+  box-shadow: inset 0 0 22px rgba(220, 180, 255, 0.08), 0 0 30px rgba(168, 85, 247, 0.2);
+  animation: corePulse 3.2s ease-in-out infinite;
+}
+.nodeCore svg { width: 24px; }
+.orbitPhoton {
+  position: absolute;
+  z-index: 3;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #ead3ff;
+  box-shadow: 0 0 9px 3px #a855f7;
+  offset-path: circle(51px at 52px 52px);
+  animation: photonOrbit 4.8s linear infinite;
+}
+.chainNode h3 { color: white; font-size: 18px; font-weight: 700; }
+.chainNode p { min-height: 96px; margin-top: 12px; color: rgba(221, 209, 233, 0.54); font-size: 14px; line-height: 1.7; }
+.chainNode small { display: inline-flex; align-items: center; gap: 6px; color: rgba(190, 158, 218, 0.45); font: 700 8px monospace; }
+.chainNode small i,
+.networkFooter span i { width: 6px; height: 6px; border-radius: 50%; background: #ad68ff; box-shadow: 0 0 9px #a855f7; animation: statusPulse 2s ease-in-out infinite; }
+
+.chainLink { position: relative; min-width: 28px; flex: 1; height: 106px; margin: 58px 10px 0; border-top: 1px solid rgba(170, 114, 236, 0.3); }
+.chainLink::before { content: ""; position: absolute; top: -3px; right: 0; left: 0; height: 5px; background: linear-gradient(90deg, transparent, rgba(183, 128, 255, 0.16), transparent); }
+.dataPulse { position: absolute; top: -2px; left: -20%; width: 22%; height: 3px; background: #dcb7ff; box-shadow: 0 0 9px #a855f7; animation: dataTravel 3.4s linear infinite; }
+.chainLink i { position: absolute; top: -7px; width: 13px; height: 13px; transform: rotate(45deg); border: 1px solid rgba(204, 165, 255, 0.48); background: #10061f; box-shadow: 0 0 12px rgba(168, 85, 247, 0.12); animation: blockGenerate 3.6s ease-in-out infinite; }
+.blockOne { left: 22%; }
+.blockTwo { left: 50%; animation-delay: -1.2s !important; }
+.blockThree { left: 78%; animation-delay: -2.4s !important; }
+
+.networkFooter {
+  display: grid;
+  grid-template-columns: auto minmax(0, 760px) auto;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  margin-top: 64px;
+  padding: 18px 22px;
+  border-top: 1px solid rgba(189, 142, 244, 0.14);
+  border-bottom: 1px solid rgba(189, 142, 244, 0.14);
+  background: rgba(22, 8, 39, 0.42);
+  backdrop-filter: blur(16px);
+}
+.networkFooter p { color: rgba(229, 218, 239, 0.62); text-align: center; font-size: 14px; line-height: 1.75; }
+.networkFooter span { display: flex; align-items: center; gap: 7px; color: rgba(199, 164, 230, 0.58); white-space: nowrap; font: 700 9px monospace; }
+
+@keyframes starDrift { to { background-position: 78px 78px, 142px 130px; } }
+@keyframes nebulaFloat { to { transform: translate3d(2%, -2%, 0) scale(1.08); } }
+@keyframes orbitSpin { to { transform: rotate(360deg); } }
+@keyframes photonOrbit { to { offset-distance: 100%; } }
+@keyframes corePulse { 50% { transform: translateY(-4px); box-shadow: inset 0 0 22px rgba(220, 180, 255, 0.13), 0 0 42px rgba(168, 85, 247, 0.34); } }
+@keyframes statusPulse { 50% { opacity: 0.38; transform: scale(0.7); } }
+@keyframes dataTravel { to { left: 110%; } }
+@keyframes blockGenerate { 0%, 26%, 100% { opacity: 0.2; transform: rotate(45deg) scale(0.7); } 13% { opacity: 1; transform: rotate(45deg) scale(1); border-color: #e0c0ff; } }
+
+@media (max-width: 1024px) {
+  .chainMap { display: grid; grid-template-columns: 1fr 1fr; gap: 48px 28px; }
+  .chainSegment { justify-content: center; }
+  .chainLink { display: none; }
+  .networkFooter { grid-template-columns: 1fr; }
+  .networkFooter span { justify-content: center; }
+}
+
+@media (max-width: 620px) {
+  .networkSection { padding: 88px 0; }
+  .networkHeader { margin-bottom: 50px; }
+  .chainMap { grid-template-columns: 1fr; }
+  .chainNode p { min-height: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stars, .nebulaOne, .nebulaTwo, .nodeOrbit::before, .nodeOrbit::after, .nodeCore, .orbitPhoton, .dataPulse, .chainLink i, .chainNode small i, .networkFooter span i { animation: none !important; }
+}

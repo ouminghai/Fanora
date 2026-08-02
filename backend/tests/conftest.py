@@ -16,6 +16,7 @@ os.environ["MEMBERSHIP_PAYMENT_CONTRACT_ADDRESS"] = ""
 os.environ["MEMBERSHIP_IDENTITY_CONTRACT_ADDRESS"] = ""
 os.environ["PINATA_JWT"] = ""
 
+from app.adapters.beeimg import BeeImgUpload, beeimg_adapter  # noqa: E402
 from app.core.database import database_service  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.community import CommunityPost, FanTask  # noqa: E402
@@ -35,25 +36,25 @@ async def seed_test_community_content() -> None:
 
     async with database_service.session() as session:
         posts = [
-                CommunityPost(
-                    id=WELCOME_POST_ID,
-                    community_id=OFFICIAL_COMMUNITY_ID,
-                    author_user_id=SYSTEM_USER_ID,
-                    title="你与喜欢的音乐，第一次相遇在什么时候？",
-                    body=POST_MARKDOWN_BODIES[WELCOME_POST_ID],
-                    cover_url="/img/fanora/activity-community.jpg",
-                    category="story",
-                ),
-                CommunityPost(
-                    id=MUSIC_POST_ID,
-                    community_id=OFFICIAL_COMMUNITY_ID,
-                    author_user_id=SYSTEM_USER_ID,
-                    title="本周循环：安利一首你舍不得切掉的歌",
-                    body=POST_MARKDOWN_BODIES[MUSIC_POST_ID],
-                    cover_url="/img/fanora/activity-music.jpg",
-                    category="music",
-                ),
-            ]
+            CommunityPost(
+                id=WELCOME_POST_ID,
+                community_id=OFFICIAL_COMMUNITY_ID,
+                author_user_id=SYSTEM_USER_ID,
+                title="你与喜欢的音乐，第一次相遇在什么时候？",
+                body=POST_MARKDOWN_BODIES[WELCOME_POST_ID],
+                cover_url="/img/fanora/activity-community.jpg",
+                category="story",
+            ),
+            CommunityPost(
+                id=MUSIC_POST_ID,
+                community_id=OFFICIAL_COMMUNITY_ID,
+                author_user_id=SYSTEM_USER_ID,
+                title="本周循环：安利一首你舍不得切掉的歌",
+                body=POST_MARKDOWN_BODIES[MUSIC_POST_ID],
+                cover_url="/img/fanora/activity-music.jpg",
+                category="music",
+            ),
+        ]
         for post_id, title, _body, cover_url, category in CREATION_SEEDS:
             posts.append(
                 CommunityPost(
@@ -80,6 +81,33 @@ async def seed_test_community_content() -> None:
                     )
                 )
         await session.commit()
+
+
+@pytest.fixture(autouse=True)
+def stub_beeimg_uploads(monkeypatch):
+    async def upload_bytes(*, content: bytes, mime_type: str, filename: str = "fanora-image") -> BeeImgUpload:
+        del content, mime_type
+        return BeeImgUpload(url=f"https://www.beeimg.cn/{filename}.png", raw={"data": {"public_url": filename}})
+
+    async def upload_data_url(value: str, *, filename: str = "fanora-image") -> str:
+        del value
+        return f"https://www.beeimg.cn/{filename}.png"
+
+    async def ensure_remote_url(value: str | None, *, filename: str = "fanora-image") -> str | None:
+        if value and value.startswith("data:image/"):
+            return f"https://www.beeimg.cn/{filename}.png"
+        return value
+
+    async def ensure_remote_urls(values: list[str], *, filename_prefix: str = "fanora-image") -> list[str]:
+        return [
+            f"https://www.beeimg.cn/{filename_prefix}-{index + 1}.png" if value.startswith("data:image/") else value
+            for index, value in enumerate(values)
+        ]
+
+    monkeypatch.setattr(beeimg_adapter, "upload_bytes", upload_bytes)
+    monkeypatch.setattr(beeimg_adapter, "upload_data_url", upload_data_url)
+    monkeypatch.setattr(beeimg_adapter, "ensure_remote_url", ensure_remote_url)
+    monkeypatch.setattr(beeimg_adapter, "ensure_remote_urls", ensure_remote_urls)
 
 
 @pytest.fixture(scope="session")

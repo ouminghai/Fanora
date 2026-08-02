@@ -1,12 +1,15 @@
 """LLM calls with structured output, retry, fallback, and timeout budgets."""
 
 import asyncio
+import json
 import time
+from collections.abc import Sequence
 from typing import Any, TypeVar
 
-from langchain_core.messages import BaseMessage
+from langchain_core.messages import AIMessage, BaseMessage
+from langchain_core.tools import BaseTool
 from openai import APIError, APITimeoutError, OpenAIError, RateLimitError
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential
 
 from app.core.config import settings
@@ -54,10 +57,27 @@ class LLMService:
             for model_name in self.registry.model_names:
                 try:
                     model = self.registry.build(model_name)
-                    runnable = model.with_structured_output(response_model)
-                    result = await self._invoke(runnable, messages, model_name)
-                    return result
-                except OpenAIError as error:
+                    # SiliconFlow documents JSON-object mode for compatible chat
+                    # models. Its Qwen endpoint can stall on OpenAI's stricter
+                    # json_schema/parse request used by LangChain's default.
+                    if "api.siliconflow.cn" in settings.openai_base_url.lower():
+                        raw_result = await self._invoke(model, messages, model_name)
+                        content = raw_result.content
+                        if isinstance(content, list):
+                            content = "".join(
+                                item.get("text", "") if isinstance(item, dict) else str(item) for item in content
+                            )
+                        if not isinstance(content, str):
+                            raise ValueError("SiliconFlow returned a non-text structured response")
+                        json_text = content.strip()
+                        if json_text.startswith("```json") and json_text.endswith("```"):
+                            json_text = json_text[7:-3].strip()
+                        return response_model.model_validate(json.loads(json_text))
+                    else:
+                        runnable = model.with_structured_output(response_model)
+                        result = await self._invoke(runnable, messages, model_name)
+                        return result
+                except (OpenAIError, ValidationError, TypeError, ValueError) as error:
                     last_error = error
                     logger.warning("llm_model_failed", model=model_name, error_type=type(error).__name__)
             raise LLMUnavailable(f"All configured models failed: {last_error}")
@@ -66,6 +86,31 @@ class LLMService:
             return await asyncio.wait_for(call_with_fallback(), timeout=settings.llm_total_timeout_seconds)
         except TimeoutError as error:
             raise LLMUnavailable("LLM total timeout budget exceeded") from error
+
+    async def call_with_tools(self, messages: list[BaseMessage], tools: Sequence[BaseTool]) -> AIMessage:
+        """Let a configured chat model choose from a bounded set of tools."""
+
+        if not self.available:
+            raise LLMUnavailable("No OpenAI-compatible model is configured")
+
+        async def call_with_fallback() -> AIMessage:
+            last_error: Exception | None = None
+            for model_name in self.registry.model_names:
+                try:
+                    runnable = self.registry.build(model_name).bind_tools(list(tools))
+                    result = await self._invoke(runnable, messages, model_name)
+                    if not isinstance(result, AIMessage):
+                        raise TypeError("Tool-enabled model returned a non-AI message")
+                    return result
+                except (OpenAIError, TypeError, ValueError) as error:
+                    last_error = error
+                    logger.warning("llm_tool_model_failed", model=model_name, error_type=type(error).__name__)
+            raise LLMUnavailable(f"All configured tool models failed: {last_error}")
+
+        try:
+            return await asyncio.wait_for(call_with_fallback(), timeout=settings.llm_total_timeout_seconds)
+        except TimeoutError as error:
+            raise LLMUnavailable("LLM tool-call timeout budget exceeded") from error
 
 
 llm_service = LLMService()

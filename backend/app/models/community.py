@@ -17,7 +17,7 @@ class CommunityPost(SQLModel, table=True):
     author_user_id: str = Field(foreign_key="users.id", index=True)
     title: str = Field(max_length=120, index=True)
     body: str = Field(max_length=10_000)
-    cover_url: str | None = Field(default=None, max_length=1_500_000)
+    cover_url: str | None = Field(default=None, max_length=2048)
     image_urls: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
     linked_nft_creation_id: str | None = Field(default=None, foreign_key="nft_applications.id", index=True)
     category: str = Field(default="discussion", max_length=30, index=True)

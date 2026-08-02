@@ -7,6 +7,9 @@ from sqlmodel import col, func, select
 from app.adapters.monad import ChainConfigurationError, monad_contract_adapter
 from app.adapters.pinata import pinata_adapter
 from app.agents.nft_creation import nft_creation_agent
+from app.agents.nft_studio import nft_studio_agent
+from app.agents.nft_upload_analysis import nft_upload_analysis_agent
+from app.agents.nft_visual_templates import STYLE_PROMPTS, VISUAL_STYLE_OPTIONS
 from app.core.config import settings
 from app.core.database import get_database_session
 from app.core.logging import logger
@@ -40,9 +43,30 @@ from app.schemas.nft import (
     PublicCollectionResponse,
     PublicCollectionUserResponse,
 )
-from app.schemas.nft_agent import NftDraftRequest, NftDraftResponse
+from app.schemas.nft_agent import (
+    NftAgentChatRequest,
+    NftAgentChatResponse,
+    NftDraftRequest,
+    NftDraftResponse,
+    NftUploadedImageAnalysisResponse,
+    NftUploadedImageAnalyzeRequest,
+    NftVisualStyle,
+    NftVisualTemplate,
+    NftVisualTemplateCreate,
+)
+from app.schemas.nft_forge import (
+    NftForgeAnalyzeRequest,
+    NftForgeSelectVersionRequest,
+    NftForgeSessionResponse,
+    NftForgeStartRequest,
+    NftForgeStrategyRequest,
+    NftFragmentBalanceResponse,
+    NftFragmentRedeemRequest,
+)
 from app.services.identity import AuthenticatedIdentity
 from app.services.nft import NftValidationError, nft_service
+from app.services.nft_forge import ForgeValidationError, nft_forge_service
+from app.services.nft_visual_templates import nft_visual_template_service
 
 router = APIRouter(prefix="/nft")
 
@@ -50,6 +74,7 @@ router = APIRouter(prefix="/nft")
 def _application_response(application: NftApplication) -> NftApplicationResponse:
     return NftApplicationResponse(
         id=application.id,
+        forge_session_id=application.forge_session_id,
         name=application.name,
         description=application.description,
         story_image_urls=application.story_image_urls,
@@ -69,6 +94,114 @@ def _application_response(application: NftApplication) -> NftApplicationResponse
         created_at=application.created_at,
         updated_at=application.updated_at,
     )
+
+
+@router.post("/forge/analyze", response_model=NftForgeSessionResponse, status_code=status.HTTP_201_CREATED)
+async def analyze_nft_forge(
+    payload: NftForgeAnalyzeRequest,
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftForgeSessionResponse:
+    try:
+        return await nft_forge_service.analyze(session, identity.user_id, payload)
+    except ForgeValidationError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+
+
+@router.patch("/forge/{session_id}/strategy", response_model=NftForgeSessionResponse)
+async def update_nft_forge_strategy(
+    session_id: str,
+    payload: NftForgeStrategyRequest,
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftForgeSessionResponse:
+    try:
+        return await nft_forge_service.update_strategy(session, identity.user_id, session_id, payload)
+    except ForgeValidationError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+
+
+@router.post("/forge/{session_id}/start", response_model=NftForgeSessionResponse)
+async def start_nft_forge(
+    session_id: str,
+    payload: NftForgeStartRequest,
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftForgeSessionResponse:
+    try:
+        return await nft_forge_service.start(
+            session,
+            identity.user_id,
+            session_id,
+            payload.idempotency_key,
+            use_fragment_credit=payload.use_fragment_credit,
+        )
+    except ForgeValidationError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+
+
+@router.post("/forge/{session_id}/retry", response_model=NftForgeSessionResponse)
+async def retry_nft_forge(
+    session_id: str,
+    payload: NftForgeStartRequest,
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftForgeSessionResponse:
+    try:
+        return await nft_forge_service.start(
+            session,
+            identity.user_id,
+            session_id,
+            payload.idempotency_key,
+            use_fragment_credit=payload.use_fragment_credit,
+        )
+    except ForgeValidationError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+
+
+@router.get("/forge/{session_id}", response_model=NftForgeSessionResponse)
+async def get_nft_forge(
+    session_id: str,
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftForgeSessionResponse:
+    try:
+        return await nft_forge_service.get(session, identity.user_id, session_id)
+    except ForgeValidationError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(error)) from error
+
+
+@router.post("/forge/{session_id}/select-version", response_model=NftForgeSessionResponse)
+async def select_nft_forge_version(
+    session_id: str,
+    payload: NftForgeSelectVersionRequest,
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftForgeSessionResponse:
+    try:
+        return await nft_forge_service.select_version(session, identity.user_id, session_id, payload.version_id)
+    except ForgeValidationError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+
+
+@router.get("/fragments/me", response_model=NftFragmentBalanceResponse)
+async def get_my_nft_fragments(
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftFragmentBalanceResponse:
+    return await nft_forge_service.fragments(session, identity.user_id)
+
+
+@router.post("/fragments/redeem", response_model=NftFragmentBalanceResponse)
+async def redeem_nft_fragments(
+    payload: NftFragmentRedeemRequest,
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftFragmentBalanceResponse:
+    try:
+        return await nft_forge_service.redeem(session, identity.user_id, payload)
+    except ForgeValidationError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
 
 
 async def _creator_response(session: AsyncSession, user_id: str) -> NftCreatorResponse:
@@ -256,7 +389,12 @@ async def _identity_response_for_user(session: AsyncSession, user_id: str) -> tu
     if identity_nft.is_member_card and user is not None and profile is not None:
         level = await nft_service._identity_level_for_profile(session, profile)
         if level is not None:
-            card_needs_refresh = identity_nft.card_level_code != level.code or identity_nft.level_id != level.rank
+            card_needs_refresh = nft_service.membership_card_needs_refresh(
+                user=user,
+                profile=profile,
+                level=level,
+                record=identity_nft,
+            )
     return (
         MembershipIdentityResponse(
             token_id=identity_nft.token_id,
@@ -619,7 +757,77 @@ async def create_fan_nft_ai_draft(
 ) -> NftDraftResponse:
     """Generate a creator-editable draft; this endpoint never publishes or mints."""
 
-    return await nft_creation_agent.create_draft(payload)
+    return await nft_creation_agent.create_draft(payload.model_copy(update={"generate_image": False}))
+
+
+@router.get("/creations/agent/templates", response_model=list[NftVisualTemplate])
+async def get_fan_nft_visual_templates(
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> list[NftVisualTemplate]:
+    """Return system templates and templates owned by the current creator."""
+
+    return await nft_visual_template_service.list_for_user(session, identity.user_id)
+
+
+@router.get("/creations/agent/styles", response_model=list[NftVisualStyle])
+async def get_fan_nft_visual_styles(
+    _: AuthenticatedIdentity = Depends(require_official_member),
+) -> list[NftVisualStyle]:
+    return [NftVisualStyle.model_validate(item) for item in VISUAL_STYLE_OPTIONS]
+
+
+@router.post("/creations/agent/analyze-upload", response_model=NftUploadedImageAnalysisResponse)
+async def analyze_uploaded_fan_nft_image(
+    payload: NftUploadedImageAnalyzeRequest,
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftUploadedImageAnalysisResponse:
+    template = await nft_visual_template_service.get_for_user(session, identity.user_id, payload.template_id)
+    if template is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Visual template not found")
+    style = next((item for item in VISUAL_STYLE_OPTIONS if item["id"] == payload.visual_style), None)
+    if style is None:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Visual style not found")
+    return await nft_upload_analysis_agent.analyze(
+        image_url=payload.image_url,
+        template=template,
+        style_name=str(style["name"]),
+        style_prompt=STYLE_PROMPTS[payload.visual_style],
+    )
+
+
+@router.post("/creations/agent/templates", response_model=NftVisualTemplate, status_code=status.HTTP_201_CREATED)
+async def create_fan_nft_visual_template(
+    payload: NftVisualTemplateCreate,
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftVisualTemplate:
+    try:
+        return await nft_visual_template_service.create(session, identity.user_id, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+
+
+@router.post("/creations/agent/chat", response_model=NftAgentChatResponse)
+async def chat_with_fan_nft_agent(
+    payload: NftAgentChatRequest,
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftAgentChatResponse:
+    """Advance one checkpointed story-development turn without publishing."""
+
+    available_templates = await nft_visual_template_service.list_for_user(session, identity.user_id)
+    template = next((item for item in available_templates if item.id == payload.template_id), None)
+    if template is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Visual template not found")
+    template = await nft_visual_template_service.get_for_user(session, identity.user_id, template.id)
+    if template is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Visual template not found")
+    clean_payload = payload.model_copy(
+        update={"reference_image_urls": [url for url in payload.reference_image_urls if not url.startswith("/img/")]}
+    )
+    return await nft_studio_agent.chat(identity.user_id, clean_payload, template, available_templates)
 
 
 @router.post("/creations/{creation_id}/buy", response_model=FanNftPurchaseResponse)

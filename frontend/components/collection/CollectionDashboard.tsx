@@ -2,11 +2,11 @@
 
 import NiceModal from "@ebay/nice-modal-react";
 import axios from "axios";
-import { Download, ExternalLink, RefreshCw, ShieldCheck, Sparkles, UserRound } from "lucide-react";
+import { Box, Copy, Download, ExternalLink, Fingerprint, RefreshCw, ShieldCheck, Sparkles, UserRound } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import type { Abi } from "viem";
 import { useReadContract } from "wagmi";
 import FanTokenAmount from "@/components/common/FanTokenAmount";
@@ -14,14 +14,15 @@ import GlobalInfoModal from "@/components/modals/GlobalInfoModal";
 import GlobalProcessModal, { hideGlobalProcessModal } from "@/components/modals/GlobalProcessModal";
 import type { TransactionPhase } from "@/components/nft/ChainTransactionProgress";
 import { resetNftTilt, updateNftTilt } from "@/components/nft/nftMotion";
-import FanProfileSummary from "@/components/profile/FanProfileSummary";
 import UserAvatar from "@/components/profile/UserAvatar";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { api } from "@/lib/api/client";
-import type { CollectibleAvatarResponse, CollectibleNft, FanProfileAnalysis, MembershipCardAction, MembershipIdentityNft, MyCollection } from "@/lib/api/types";
+import type { CollectibleAvatarResponse, CollectibleNft, MembershipCardAction, MembershipIdentityNft, MembershipLevel, MyCollection } from "@/lib/api/types";
 import membershipIdentityArtifact from "../../../shared/contracts/FanoraMembershipIdentity.json";
+import CollectionProfilePanel from "./CollectionProfilePanel";
+import styles from "./CollectionDashboard.module.css";
 
-type CollectionTab = "identity" | "collectibles";
+type CollectionTab = "identity" | "collectibles" | "profile";
 
 const statusLabels: Record<string, string> = {
   NOT_CONFIGURED: "等待链上配置",
@@ -44,21 +45,15 @@ const statusLabels: Record<string, string> = {
 const tabs: Array<{ id: CollectionTab; label: string }> = [
   { id: "identity", label: "链上身份" },
   { id: "collectibles", label: "我的收藏" },
+  { id: "profile", label: "身份资料" },
 ];
+
+const MEMBER_CARD_CELEBRATION_MS = 4_000;
 
 function errorText(error: unknown) {
   if (axios.isAxiosError(error)) return error.response?.data?.detail || "请求暂时没有完成。";
   if (error instanceof Error) return error.message;
   return "请求暂时没有完成。";
-}
-
-function formatDate(value: string | null) {
-  if (!value) return "尚未正式入会";
-  return new Intl.DateTimeFormat("zh-CN", {
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  }).format(new Date(value));
 }
 
 function formatChainDate(value: string | null | undefined) {
@@ -74,6 +69,18 @@ function formatChainDate(value: string | null | undefined) {
 
 function shortAddress(address: string) {
   return `${address.slice(0, 8)}...${address.slice(-6)}`;
+}
+
+function membershipNftExplorerUrl(
+  identity: MembershipIdentityNft | null | undefined,
+  chainTokenId: bigint | null,
+) {
+  const visibleTokenId = chainTokenId && chainTokenId > 0n
+    ? chainTokenId.toString()
+    : identity?.token_id?.toString();
+  return identity?.contract_address && visibleTokenId
+    ? `https://testnet.monadvision.com/nft/${identity.contract_address}/${visibleTokenId}?tab=Overview`
+    : null;
 }
 
 function Status({ value }: { value: string }) {
@@ -124,12 +131,7 @@ function IdentityPanel({
   onCardAction: () => void;
   onDownload: () => void;
 }) {
-  const visibleTokenId = chainTokenId && chainTokenId > 0n
-    ? chainTokenId.toString()
-    : identity?.token_id?.toString();
-  const nftExplorerUrl = identity?.contract_address && visibleTokenId
-    ? `https://testnet.monadvision.com/nft/${identity.contract_address}/${visibleTokenId}?tab=Overview`
-    : null;
+  const nftExplorerUrl = membershipNftExplorerUrl(identity, chainTokenId);
 
   return (
     <div className="grid gap-8 lg:grid-cols-[minmax(0,420px)_1fr] lg:items-start">
@@ -477,17 +479,17 @@ export default function CollectionDashboard() {
   const [downloadingCard, setDownloadingCard] = useState(false);
   const [avatarBusyTokenId, setAvatarBusyTokenId] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [fanProfile, setFanProfile] = useState<FanProfileAnalysis | null>(null);
+  const [levels, setLevels] = useState<MembershipLevel[]>([]);
   const [copied, setCopied] = useState(false);
   const initializedUserRef = useRef<string | null>(null);
   const autoCardSyncKeyRef = useRef<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    setFanProfile(null);
-    void api.get<FanProfileAnalysis>("/profile/me")
-      .then((response) => setFanProfile(response.data))
-      .catch(() => setFanProfile(null));
+  const load = useCallback(async (showLoading = true) => {
+    if (showLoading) setLoading(true);
+    void api.get<MembershipLevel[]>("/membership-levels")
+      .then((response) => setLevels(response.data))
+      .catch(() => setLevels([]));
     try {
       const response = await api.get<MyCollection>("/nft/me");
       setCollection(response.data);
@@ -496,7 +498,7 @@ export default function CollectionDashboard() {
       setNotice(errorText(error));
       return null;
     } finally {
-      setLoading(false);
+      if (showLoading) setLoading(false);
     }
   }, []);
 
@@ -605,6 +607,7 @@ export default function CollectionDashboard() {
         imageUrl: completedIdentity?.image_url,
         imageAlt: `${user?.level || "Fanora"} 会员证 NFT`,
         celebrate: response.data.changed,
+        celebrationDurationMs: MEMBER_CARD_CELEBRATION_MS,
         actionLabel: "查看链上 NFT",
         actionUrl: completedIdentity?.explorer_url,
       });
@@ -663,11 +666,23 @@ export default function CollectionDashboard() {
   }, [avatarBusyTokenId, refreshUser]);
 
   useEffect(() => {
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    if (requestedTab === "identity" || requestedTab === "collectibles" || requestedTab === "profile") {
+      setActiveTab(requestedTab);
+    }
+  }, []);
+
+  useEffect(() => {
     if (status === "anonymous" || status === "error") {
       router.replace("/login");
       return;
     }
     if (status !== "authenticated" || !user) return;
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    if (!user.is_official_member && requestedTab !== "profile") {
+      router.replace("/membership/join");
+      return;
+    }
     if (initializedUserRef.current === user.id) return;
     initializedUserRef.current = user.id;
     void load();
@@ -682,6 +697,8 @@ export default function CollectionDashboard() {
     const syncKey = [
       user.id,
       user.level,
+      user.display_name || "",
+      user.username || "",
       identity?.token_id || "new",
     ].join(":");
     if (autoCardSyncKeyRef.current === syncKey) return;
@@ -729,19 +746,159 @@ export default function CollectionDashboard() {
       (!identity?.token_id || chainTokenId === BigInt(identity.token_id)),
   );
   const chainChecking = chainTokenLoading || Boolean(chainTokenId && chainTokenId > 0n && chainOwnerLoading);
+  const identityExplorerUrl = membershipNftExplorerUrl(identity, chainTokenId);
+  const refreshCollectionAfterProfileSave = useCallback(async () => {
+    await load(false);
+  }, [load]);
+  const backgroundLayers = (
+    <>
+      <video ref={videoRef} className={styles.videoBackground} autoPlay muted loop playsInline preload="auto" aria-hidden="true" onCanPlay={() => void videoRef.current?.play()} onEnded={() => { if (videoRef.current) { videoRef.current.currentTime = 0; void videoRef.current.play(); } }}><source src="/video/bg.mp4" type="video/mp4" /></video>
+      <div className={styles.videoOverlay} aria-hidden="true" />
+      <div className={styles.videoGrid} aria-hidden="true" />
+      <div className={styles.videoScanlines} aria-hidden="true" />
+    </>
+  );
 
   if (!user || loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#f7f7fb] pt-24 dark:bg-jacarta-900 dark:text-white">
-        <span className="mr-3 h-5 w-5 animate-spin rounded-full border-2 border-accent/25 border-t-accent" />
+      <main className={`${styles.page} ${styles.loadingScreen} flex min-h-screen items-center justify-center pt-24 text-white`}>
+        {backgroundLayers}
+        <span className="mr-3 h-5 w-5 animate-spin rounded-full border-2 border-white/20 border-t-[#d8b4fe]" />
         正在读取链上收藏...
       </main>
     );
   }
 
+  const tokenLevels = levels
+    .filter((level) => !level.is_management && level.min_token_balance !== null)
+    .sort((left, right) => left.rank - right.rank);
+  const currentLevel = tokenLevels.find((level) => level.name === user.level)
+    || [...tokenLevels].reverse().find((level) => (level.min_token_balance || 0) <= user.fan_token_lifetime_earned)
+    || tokenLevels[0];
+  const nextLevel = currentLevel
+    ? tokenLevels.find((level) => level.rank > currentLevel.rank)
+    : tokenLevels.find((level) => (level.min_token_balance || 0) > user.fan_token_lifetime_earned);
+  const currentFloor = currentLevel?.min_token_balance || 0;
+  const nextTarget = nextLevel?.min_token_balance ?? currentLevel?.max_token_balance ?? user.fan_token_lifetime_earned;
+  const neededFan = nextLevel ? Math.max(0, (nextLevel.min_token_balance || 0) - user.fan_token_lifetime_earned) : 0;
+  const levelProgress = nextLevel
+    ? Math.max(4, Math.min(100, ((user.fan_token_lifetime_earned - currentFloor) / Math.max(1, nextTarget - currentFloor)) * 100))
+    : 100;
+  const levelProgressLabel = nextLevel
+    ? `距离 ${nextLevel.name} 还需 ${neededFan.toLocaleString("en-US")} FAN`
+    : "已抵达当前最高 FanToken 等级";
+
   return (
-    <main className="min-h-screen bg-[#f7f7fb] pb-24 pt-[88px] dark:bg-jacarta-900">
-      <div className="community-reveal relative h-[220px] overflow-hidden sm:h-[300px]">
+    <main className={`${styles.page} min-h-screen pb-24 pt-[88px]`}>
+      {backgroundLayers}
+
+      <section className={`${styles.hero} community-reveal`}>
+        <header className={styles.hudHeader}>
+          <span className={styles.hudIcon}><Fingerprint /></span>
+          <div>
+            <p>CYBER IDENTITY // FANORA PROTOCOL</p>
+            <h1> Fanora Identity Awakening</h1>
+          </div>
+          <div className={styles.hudStatus}>
+            <span><i /> MONAD NODE ONLINE</span>
+            <strong>#{identity?.token_id ?? "PENDING"}</strong>
+          </div>
+        </header>
+
+        <div className={styles.identityGrid}>
+          <aside className={styles.chainRail} aria-label="身份区块生成状态">
+            <p>IDENTITY BLOCK STREAM</p>
+            {["WALLET SIGNATURE", "FANORA SOUL", "MONAD VERIFY", "NFT PASSPORT"].map((label, index) => (
+              <div key={label} className={styles.chainStep}>
+                <span><Box /></span>
+                <div><small>BLOCK 0{index + 1}</small><strong>{label}</strong></div>
+                {index < 3 ? <i><b /><b /><b /></i> : null}
+              </div>
+            ))}
+          </aside>
+
+          <article className={styles.passport}>
+            <span className={styles.passportScan} aria-hidden="true" />
+            <header>
+              <span>ON-CHAIN PASSPORT</span>
+              <strong>FANORA / {identity?.chain_id || 10143}</strong>
+            </header>
+            <div className={styles.passportBody}>
+              <div className={styles.avatarSystem}>
+                <div className={styles.dnaHelix} aria-hidden="true">
+                  {Array.from({ length: 12 }, (_, index) => <i key={index} style={{ animationDelay: `${index * -0.22}s` }} />)}
+                </div>
+                <div className={styles.avatarOrbit}>
+                  <UserAvatar
+                    avatarUrl={user.avatar_url}
+                    seed={user.id}
+                    displayName={user.display_name}
+                    className={styles.identityAvatar}
+                  />
+                  <i className={styles.avatarPhoton} />
+                </div>
+              </div>
+              <div className={styles.identityCopy}>
+                <small>DIGITAL SOUL HOLDER</small>
+                <h2>{user.display_name || user.username || "Fanora Member"}</h2>
+                <button type="button" onClick={() => void copyWallet()} className={styles.walletLine} title="复制钱包地址">
+                  <span>{user.primary_wallet.address}</span>
+                  {copied ? <ShieldCheck /> : <Copy />}
+                </button>
+                <p>{user.bio || "每一次参与，都在 Monad 留下不可替代的 Proof of Fandom。"}</p>
+                <div className={styles.identityStats}>
+                  <span><small>CURRENT LEVEL</small><strong>{user.level}</strong></span>
+                  <span><small>AVAILABLE</small><FanTokenAmount amount={user.fan_token_balance} showSymbol /></span>
+                  <span><small>LIFETIME</small><FanTokenAmount amount={user.fan_token_lifetime_earned} showSymbol /></span>
+                </div>
+              </div>
+            </div>
+            <footer>
+              <div className={styles.progressRing} style={{ "--identity-progress": `${levelProgress * 3.6}deg` } as CSSProperties}>
+                <span>{Math.round(levelProgress)}%</span>
+              </div>
+              <div className={styles.progressCopy}>
+                <small>IDENTITY GROWTH</small>
+                <strong>{levelProgressLabel}</strong>
+                <i><b style={{ width: `${levelProgress}%` }} /></i>
+              </div>
+              {chainVerified && identityExplorerUrl ? (
+                <a
+                  href={identityExplorerUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className={styles.verifiedState}
+                  title="在 MonadVision 查看身份 NFT"
+                >
+                  <i />身份已在 Monad 验证<ExternalLink />
+                </a>
+              ) : (
+                <span className={styles.verifiedState}><i />{chainChecking ? "正在验证链上身份" : "等待链上确认"}</span>
+              )}
+            </footer>
+          </article>
+
+          <aside className={styles.badgeProjection}>
+            <p>NFT BADGE HOLOGRAM</p>
+            <div className={styles.hologramStage}>
+              <span className={styles.holoRings} />
+              <Image
+                width={180}
+                height={180}
+                unoptimized
+                src={nextLevel?.badge_image_url || currentLevel?.badge_image_url || "/img/fanora/badge-core.svg"}
+                alt={`${nextLevel?.name || user.level} NFT Badge`}
+              />
+              <i className={styles.projectorBeam} />
+            </div>
+            <small>NEXT IDENTITY</small>
+            <h3>{nextLevel?.name || "MAX LEVEL"}</h3>
+            <strong>{nextLevel ? `${neededFan.toLocaleString("en-US")} FAN TO ACTIVATE` : "FULLY ACTIVATED"}</strong>
+          </aside>
+        </div>
+      </section>
+
+      <div className={`${styles.legacyBanner} community-reveal relative h-[220px] overflow-hidden sm:h-[300px]`}>
         <Image
           fill
           priority
@@ -753,7 +910,7 @@ export default function CollectionDashboard() {
         <div className="absolute inset-0 bg-gradient-to-t from-[#140d2d]/65 via-transparent to-black/10" />
       </div>
 
-      <section className="community-reveal relative bg-white pb-10 pt-24 [animation-delay:80ms] dark:bg-jacarta-800 sm:pt-28">
+      <section className={`${styles.legacyProfile} community-reveal relative pb-10 pt-24 [animation-delay:80ms] sm:pt-28`}>
         <div className="absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2">
           <div className="relative">
             <UserAvatar
@@ -809,31 +966,28 @@ export default function CollectionDashboard() {
         </div>
       </section>
 
-      {fanProfile ? (
-        <div className="community-reveal mx-auto max-w-6xl px-5 py-9 [animation-delay:120ms]">
-          <FanProfileSummary profile={fanProfile} ownerLabel="我的个人画像" />
-        </div>
-      ) : null}
-
-      <div className="community-reveal border-b border-jacarta-100 bg-white [animation-delay:140ms] dark:border-white/10 dark:bg-jacarta-800">
+      <div className={`${styles.tabBar} community-reveal [animation-delay:140ms]`}>
         <nav className="mx-auto flex max-w-6xl gap-8 overflow-x-auto px-5" aria-label="收藏分类">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
-              className={`relative shrink-0 py-5 text-sm font-semibold transition-colors ${activeTab === tab.id ? "text-accent" : "text-jacarta-500 hover:text-jacarta-700 dark:text-jacarta-300 dark:hover:text-white"}`}
+              onClick={() => {
+                setActiveTab(tab.id);
+                window.history.replaceState(null, "", `/collection?tab=${tab.id}`);
+              }}
+              className={`${styles.tabButton} ${activeTab === tab.id ? styles.tabActive : ""} relative shrink-0 py-5 text-sm font-semibold transition-colors`}
             >
               {tab.label}
-              {activeTab === tab.id ? <span className="absolute inset-x-0 bottom-0 h-0.5 bg-accent" /> : null}
+              {activeTab === tab.id ? <span className={styles.tabBeam} /> : null}
             </button>
           ))}
         </nav>
       </div>
 
-      <div key={activeTab} className="community-reveal mx-auto max-w-6xl px-5 pt-10 [animation-delay:180ms]">
+      <div key={activeTab} className={`${styles.content} community-reveal mx-auto max-w-6xl px-5 pt-10 [animation-delay:180ms]`}>
         {notice ? (
-          <div className="mb-7 border-l-4 border-accent bg-white px-5 py-4 text-sm text-jacarta-700 shadow-sm dark:bg-jacarta-800 dark:text-white">
+          <div className={styles.notice}>
             {notice}
           </div>
         ) : null}
@@ -905,6 +1059,10 @@ export default function CollectionDashboard() {
               </div>
             )}
           </section>
+        ) : null}
+
+        {activeTab === "profile" ? (
+          <CollectionProfilePanel onSaved={refreshCollectionAfterProfileSave} />
         ) : null}
 
       </div>

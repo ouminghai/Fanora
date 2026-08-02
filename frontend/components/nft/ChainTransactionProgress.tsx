@@ -6,6 +6,8 @@ import { useEffect, useMemo, useState } from "react";
 export type TransactionPhase = "idle" | "processing" | "complete";
 export type TransactionKind = "publish" | "mint" | "identity" | "member-card" | "quest-reward";
 
+const STEP_INTERVAL_MS = 1_000;
+
 const stepLabels: Record<TransactionKind, string[]> = {
   publish: ["提交发布", "写入 IPFS", "合约铸造", "链上确认"],
   mint: ["提交购买", "扣除 FAN", "铸造 NFT", "钱包确认"],
@@ -44,7 +46,7 @@ export default function ChainTransactionProgress({
     setActiveStep(0);
     const timer = window.setInterval(() => {
       setActiveStep((current) => Math.min(steps.length - 1, current + 1));
-    }, 720);
+    }, STEP_INTERVAL_MS);
     return () => window.clearInterval(timer);
   }, [phase, steps.length]);
 

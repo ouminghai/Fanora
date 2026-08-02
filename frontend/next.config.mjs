@@ -31,6 +31,28 @@ const nextConfig = {
         hostname: "ipfs.io",
         pathname: "/ipfs/**",
       },
+      {
+        protocol: "https",
+        hostname: "www.beeimg.cn",
+      },
+      {
+        protocol: "https",
+        hostname: "beeimg.cn",
+      },
+      {
+        protocol: "https",
+        hostname: "**.beeimg.cn",
+      },
+      {
+        protocol: "https",
+        hostname: "**.imglnk.cn",
+        pathname: "/v/**",
+      },
+      {
+        protocol: "https",
+        hostname: "s3.siliconflow.cn",
+        pathname: "/temporary/outputs/**",
+      },
     ],
   },
 };
