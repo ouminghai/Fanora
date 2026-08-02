@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
+  AlertTriangle,
   Bot,
   Check,
   ChevronRight,
@@ -29,7 +30,7 @@ import PublishConfirmModal from "@/components/nft/PublishConfirmModal";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { api, uploadImage } from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
-import { buildForgeAnalyzePayload } from "@/lib/nft/forge-request";
+import { buildForgeAnalyzePayload, forgeStrategyTooltipText } from "@/lib/nft/forge-request";
 import type {
   FanNftAiDraft,
   FanNftCreateResponse,
@@ -92,6 +93,7 @@ export default function NftStudioWorkbench() {
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const versionSelectionRequestRef = useRef(0);
+  const strategyTooltipTimerRef = useRef<number | null>(null);
   const [templates, setTemplates] = useState<NftVisualTemplate[]>([]);
   const [visualStyles, setVisualStyles] = useState<NftVisualStyle[]>([]);
   const [templateId, setTemplateId] = useState("");
@@ -122,6 +124,26 @@ export default function NftStudioWorkbench() {
   const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
   const [busy, setBusy] = useState<"chat" | "reference" | "upload" | "strategy" | "publish" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [strategyTooltip, setStrategyTooltip] = useState<string | null>(null);
+
+  const dismissStrategyTooltip = useCallback(() => {
+    if (strategyTooltipTimerRef.current) window.clearTimeout(strategyTooltipTimerRef.current);
+    strategyTooltipTimerRef.current = null;
+    setStrategyTooltip(null);
+  }, []);
+
+  const showStrategyTooltip = useCallback((message: string) => {
+    if (strategyTooltipTimerRef.current) window.clearTimeout(strategyTooltipTimerRef.current);
+    setStrategyTooltip(message);
+    strategyTooltipTimerRef.current = window.setTimeout(() => {
+      setStrategyTooltip(null);
+      strategyTooltipTimerRef.current = null;
+    }, 6_000);
+  }, []);
+
+  useEffect(() => () => {
+    if (strategyTooltipTimerRef.current) window.clearTimeout(strategyTooltipTimerRef.current);
+  }, []);
 
   const selectedTemplate = useMemo(
     () => templates.find((item) => item.id === templateId) ?? templates[0],
@@ -354,13 +376,13 @@ export default function NftStudioWorkbench() {
         });
         applyForge(response.data);
       } catch (error) {
-        setNotice(getMessage(error));
+        showStrategyTooltip(forgeStrategyTooltipText(apiErrorMessage(error, "发行参数更新失败，请检查发行数量和价格。")));
       } finally {
         setBusy(null);
       }
     }, 450);
     return () => window.clearTimeout(timer);
-  }, [applyForge, busy, forgeSession, price, supply]);
+  }, [applyForge, busy, forgeSession, price, showStrategyTooltip, supply]);
 
   const uploadReferences = async (files: FileList | null) => {
     const selected = Array.from(files || []);
@@ -512,13 +534,20 @@ export default function NftStudioWorkbench() {
     try {
       let preparedForge = forgeSession;
       if (preparedForge.supply !== supply || preparedForge.price_fan_tokens !== price) {
-        const strategy = await api.patch<NftForgeSession>(`/nft/forge/${preparedForge.id}/strategy`, {
-          supply,
-          price_fan_tokens: price,
-          forge_mode: preparedForge.forge_mode,
-        });
-        preparedForge = strategy.data;
-        applyForge(preparedForge);
+        try {
+          const strategy = await api.patch<NftForgeSession>(`/nft/forge/${preparedForge.id}/strategy`, {
+            supply,
+            price_fan_tokens: price,
+            forge_mode: preparedForge.forge_mode,
+          });
+          preparedForge = strategy.data;
+          applyForge(preparedForge);
+        } catch (error) {
+          await hideGlobalProcessModal().catch(() => undefined);
+          setBusy(null);
+          showStrategyTooltip(forgeStrategyTooltipText(apiErrorMessage(error, "发行参数更新失败，请检查发行数量和价格。")));
+          return;
+        }
       }
       const endpoint = preparedForge.latest_attempt ? "retry" : "start";
       const forgeResponse = await api.post<NftForgeSession>(`/nft/forge/${preparedForge.id}/${endpoint}`, {
@@ -655,7 +684,11 @@ export default function NftStudioWorkbench() {
           <div className={styles.metadataForm}>
             <label>NFT 名称<input value={name} onChange={(event) => setName(event.target.value)} placeholder="每轮由 Agent 优化，可继续编辑" /></label>
             <label className={styles.descriptionEditor}>作品描述<MarkdownEditor value={description} onChange={setDescription} maxLength={1000} imageUrls={descriptionImages} onImageUrlsChange={setDescriptionImages} onImageError={setNotice} compact /></label>
-            <div><label>发行数量<input type="number" min={1} max={1000} value={supply} onChange={(event) => setSupply(Number(event.target.value))} /></label><label>价格 FAN<input type="number" min={1} value={price} onChange={(event) => setPrice(Number(event.target.value))} /></label></div>
+            <div className={styles.strategyFields}>
+              {strategyTooltip ? <div role="alert" className={styles.strategyTooltip}><AlertTriangle /><span>{strategyTooltip}</span><button type="button" onClick={dismissStrategyTooltip} aria-label="关闭发行参数错误提示"><X /></button><i aria-hidden="true" /></div> : null}
+              <label>发行数量<input type="number" min={1} max={1000} value={supply} onChange={(event) => { dismissStrategyTooltip(); setSupply(Number(event.target.value)); }} /></label>
+              <label>价格 FAN<input type="number" min={1} max={1000000} value={price} onChange={(event) => { dismissStrategyTooltip(); setPrice(Number(event.target.value)); }} /></label>
+            </div>
           </div>
           {forgeSession ? <div className={styles.memoryForgeSummary}>
             <div><span>MEMORY FORGE</span><strong>AI 五维分析</strong></div>

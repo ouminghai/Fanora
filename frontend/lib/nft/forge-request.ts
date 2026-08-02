@@ -69,3 +69,20 @@ export function buildForgeAnalyzePayload(input: ForgeAnalyzeInput) {
     copyright_confirmed: false,
   };
 }
+
+export function forgeStrategyTooltipText(message: string) {
+  const normalized = message.toLowerCase();
+  if (normalized.includes("supply") && normalized.includes("less than or equal to 1000")) {
+    return "发行数量不能超过 1000，请修改后重试。";
+  }
+  if (normalized.includes("supply") && normalized.includes("greater than or equal to 1")) {
+    return "发行数量不能低于 1，请修改后重试。";
+  }
+  if (normalized.includes("price_fan_tokens") && normalized.includes("less than or equal to 1000000")) {
+    return "价格不能超过 1,000,000 FAN，请修改后重试。";
+  }
+  if (normalized.includes("price_fan_tokens") && normalized.includes("greater than or equal to 1")) {
+    return "价格不能低于 1 FAN，请修改后重试。";
+  }
+  return message.trim() || "发行参数更新失败，请检查发行数量和价格。";
+}

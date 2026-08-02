@@ -175,6 +175,10 @@ test("Gallery routes NFT creation to the stateful Agent studio", () => {
     "utf8",
   );
   const studioSource = readFileSync(new URL("../components/nft/NftStudioWorkbench.tsx", import.meta.url), "utf8");
+  const studioStyleSource = readFileSync(
+    new URL("../components/nft/NftStudioWorkbench.module.css", import.meta.url),
+    "utf8",
+  );
   const templateModalSource = readFileSync(
     new URL("../components/nft/NftVisualTemplateModal.tsx", import.meta.url),
     "utf8",
@@ -268,6 +272,11 @@ test("Gallery routes NFT creation to the stateful Agent studio", () => {
   assert.match(studioSource, /result\.image_generated && result\.draft\.image_data_url/);
   assert.match(studioSource, /MEMORY FORGE/);
   assert.match(studioSource, /发行成功率/);
+  assert.match(studioSource, /strategyTooltip/);
+  assert.match(studioSource, /role="alert"/);
+  assert.match(studioSource, /关闭发行参数错误提示/);
+  assert.match(studioSource, /forgeStrategyTooltipText\(apiErrorMessage\(error/);
+  assert.match(studioStyleSource, /\.strategyTooltip\s*\{/);
   assert.doesNotMatch(studioSource, /Perfect/);
   const selectTemplateBlock = studioSource.slice(
     studioSource.indexOf("const selectTemplate"),

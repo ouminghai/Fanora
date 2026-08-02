@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildForgeAnalyzePayload } from "../lib/nft/forge-request";
+import { buildForgeAnalyzePayload, forgeStrategyTooltipText } from "../lib/nft/forge-request";
 
 test("forge analysis payload is normalized to the backend schema before version analysis", () => {
   const payload = buildForgeAnalyzePayload({
@@ -59,4 +59,15 @@ test("forge analysis rejects an unhosted oversized image before sending a 422 re
     supply: 10,
     priceFanTokens: 10,
   }), /托管/);
+});
+
+test("forge strategy validation errors become actionable Chinese tooltip text", () => {
+  assert.equal(
+    forgeStrategyTooltipText("supply：Input should be less than or equal to 1000"),
+    "发行数量不能超过 1000，请修改后重试。",
+  );
+  assert.equal(
+    forgeStrategyTooltipText("price_fan_tokens：Input should be greater than or equal to 1"),
+    "价格不能低于 1 FAN，请修改后重试。",
+  );
 });
