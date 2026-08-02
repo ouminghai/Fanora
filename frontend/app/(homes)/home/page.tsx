@@ -4,14 +4,13 @@ import Header3 from "@/components/headers/Header3";
 import Auction from "@/components/homes/common/Auction";
 import Collections from "@/components/homes/common/Collections";
 import Process from "@/components/homes/common/Process";
-import Featured from "@/components/homes/common/Featured";
 import CoverFlowSlider from "@/components/homes/home/CoverFlowSlider";
 import Hero from "@/components/homes/home/Hero";
 
 import Partners from "@/components/common/Partners";
 
 export const metadata = {
-  title: "Fanora Protocol | Proof of Fandom",
+  title: "Fanora | 链上粉丝社区与 AI NFT 创作",
 };
 export default function HomePage() {
   return (
@@ -26,8 +25,7 @@ export default function HomePage() {
           <Auction />
           <Process />
         </div>
-        <Featured />
-        <Partners />
+        {/* <Partners /> */}
       </main>
       <Footer1 />
     </>

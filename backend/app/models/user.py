@@ -48,7 +48,7 @@ class UserProfile(SQLModel, table=True):
     user_id: str = Field(foreign_key="users.id", primary_key=True)
     username: str | None = Field(default=None, max_length=40, unique=True, index=True)
     email: str | None = Field(default=None, max_length=320)
-    avatar_url: str | None = Field(default=None, max_length=1_500_000)
+    avatar_url: str | None = Field(default=None, max_length=2048)
     bio: str | None = Field(default=None, max_length=280)
     locale: str = Field(default="zh-CN", max_length=20)
     level: str = Field(default="新生儿", max_length=30)

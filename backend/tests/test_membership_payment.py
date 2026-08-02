@@ -6,6 +6,7 @@ from eth_account import Account
 from fastapi import HTTPException
 
 from app.adapters.monad import monad_contract_adapter
+from app.api.routes.membership_payment import activate_free_membership
 from app.core.config import settings
 from app.core.database import database_service
 from app.models.base import utc_now
@@ -13,6 +14,7 @@ from app.models.membership import MembershipLevel
 from app.models.user import OfficialMembershipPayment, User, UserProfile, UserSession, Wallet
 from app.services.auth import hash_session_token
 from app.services.identity import AuthenticatedIdentity
+from app.services.membership_fee import membership_fee_service
 from app.services.membership_payment import ConfirmedChainPayment, official_membership_payment_service
 
 
@@ -212,7 +214,7 @@ async def test_membership_status_does_not_offer_payment_without_gateway(client, 
     assert response.json()["payment_contract_address"] is None
 
 
-async def test_zero_fee_membership_activates_without_chain_payment(client, monkeypatch):
+async def test_zero_fee_membership_activates_without_chain_payment(client, monkeypatch, capsys):
     account = Account.create()
     raw_token = "free-membership-session-token"
 
@@ -239,6 +241,7 @@ async def test_zero_fee_membership_activates_without_chain_payment(client, monke
     monkeypatch.setattr(settings, "chain_writes_enabled", True)
     monkeypatch.setattr(settings, "membership_identity_contract_address", "")
     monkeypatch.setattr(settings, "pinata_jwt", "")
+
     async def current_fee() -> int:
         return 0
 
@@ -261,13 +264,43 @@ async def test_zero_fee_membership_activates_without_chain_payment(client, monke
     assert status_response.json()["fee_wei"] == "0"
     assert status_response.json()["payment_id"] is not None
 
+    async def fail_live_fee_lookup() -> int:
+        raise AssertionError("activate-free must not query the membership fee from the chain")
+
+    monkeypatch.setattr(membership_fee_service, "get_live_fee", fail_live_fee_lookup)
+
     activation_response = client.post("/api/v1/membership/activate-free", headers=headers)
     assert activation_response.status_code == 200
     assert activation_response.json()["is_official_member"] is True
     assert activation_response.json()["transaction_hash"] == "0x" + "ef" * 32
     assert relayed_users == [account.address]
+    timing_output = capsys.readouterr().out
+    assert "step=profile_load" in timing_output
+    assert "step=onchain_activation" in timing_output
+    assert "step=db_commit" in timing_output
+    assert "step=total" in timing_output
 
     repeated_response = client.post("/api/v1/membership/activate-free", headers=headers)
     assert repeated_response.status_code == 200
     assert repeated_response.json()["transaction_hash"] == activation_response.json()["transaction_hash"]
     assert relayed_users == [account.address]
+
+
+async def test_free_activation_rejects_nonzero_local_fee_without_chain_lookup(monkeypatch):
+    monkeypatch.setattr(settings, "membership_fee_wei", 10**18)
+
+    async def fail_live_fee_lookup() -> int:
+        raise AssertionError("activate-free must not query the membership fee from the chain")
+
+    monkeypatch.setattr(membership_fee_service, "get_live_fee", fail_live_fee_lookup)
+    identity = AuthenticatedIdentity(
+        user_id="non-free-member",
+        primary_wallet=Account.create().address,
+        wallet_type="external",
+        provider="rainbowkit",
+    )
+
+    with pytest.raises(HTTPException, match="Official membership is not free right now") as error:
+        await activate_free_membership(identity, None)  # type: ignore[arg-type]
+
+    assert error.value.status_code == 409

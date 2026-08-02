@@ -13,6 +13,7 @@ from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
 from app.agents.fan_profile import fan_profile_agent
+from app.agents.nft_studio import nft_studio_agent
 from app.api.router import api_router
 from app.api.routes.health import get_health_status
 from app.core.cache import cache_service
@@ -30,6 +31,7 @@ async def lifespan(_: FastAPI):
     await database_service.initialize()
     await cache_service.initialize()
     await fan_profile_agent.initialize()
+    await nft_studio_agent.initialize()
     yield
     await checkpoint_manager.close()
     await cache_service.close()

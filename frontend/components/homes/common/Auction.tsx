@@ -1,6 +1,7 @@
 "use client";
 
 import axios from "axios";
+import { Orbit } from "lucide-react";
 import Image from "next/image";
 import { useCallback, useEffect, useState, type CSSProperties } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
@@ -10,6 +11,7 @@ import { useAuth } from "@/components/providers/AuthProvider";
 import { api } from "@/lib/api/client";
 import type { MembershipLevel } from "@/lib/api/types";
 import { formatMembershipTokenRange, getMembershipProgress } from "@/lib/membership";
+import networkStyles from "./Process.module.css";
 
 export default function Auction() {
   const { user } = useAuth();
@@ -38,17 +40,19 @@ export default function Auction() {
   }, [loadLevels]);
 
   return (
-    <section id="badges" className="relative isolate overflow-hidden py-24">
-      <div className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+    <section id="badges" className={networkStyles.networkSection}>
+      <div className={networkStyles.universe} aria-hidden="true">
+        <div className={networkStyles.stars} />
+        <div className={networkStyles.nebulaOne} />
+        <div className={networkStyles.nebulaTwo} />
+      </div>
 
-      <div className="container relative">
-        <h2 className="mb-3 text-center font-display text-3xl text-white">
-          <span className="mr-1 inline-block animate-heartBeat text-xl">🏅</span>
-          粉丝等级与 Badge 成长
-        </h2>
-        <p className="mx-auto mb-10 max-w-2xl text-center text-sm leading-6 text-white/70">
-          等级按历史累计获得的 FAN 成长且只升不降，消费可用余额不会影响已获得的会员身份。
-        </p>
+      <div className={`${networkStyles.networkContainer} container`}>
+        <header className={networkStyles.networkHeader}>
+          <span><Orbit /> IDENTITY GROWTH NETWORK</span>
+          <h2>粉丝等级与 Badge 成长</h2>
+          <p>等级按历史累计获得的 FAN 成长且只升不降，消费可用余额不会影响已获得的会员身份。</p>
+        </header>
 
         {levels === null && !error && (
           <div className="flex min-h-72 items-center justify-center rounded-3xl border border-white/10 bg-black/10 text-white/75 backdrop-blur-sm">

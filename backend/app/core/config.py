@@ -94,6 +94,17 @@ class Settings(BaseSettings):
     pinata_gateway_url: str = "https://gateway.pinata.cloud/ipfs"
     pinata_timeout_seconds: float = 30.0
     pinata_max_retries: int = 3
+    beeimg_base_url: str = "https://www.beeimg.cn"
+    beeimg_login_path: str = "/api/v2/login"
+    beeimg_upload_path: str = "/api/v2/upload"
+    beeimg_username: str = ""
+    beeimg_password: str = ""
+    beeimg_token: str = ""
+    beeimg_permission: int = 1
+    beeimg_storage_id: str = "1"
+    beeimg_strategy_id: str = ""
+    beeimg_album_id: str = ""
+    beeimg_timeout_seconds: float = 30.0
     nft_max_image_bytes: int = 5_000_000
     nft_min_image_dimension: int = 256
     nft_max_image_dimension: int = 4096
@@ -103,6 +114,17 @@ class Settings(BaseSettings):
     nft_max_price_fan_tokens: int = 1_000_000
     nft_min_supply: int = 1
     nft_max_supply: int = 1_000
+    nft_forge_rules_version: str = "forge-v1"
+    nft_forge_stable_cost: int = 10
+    nft_forge_focused_cost: int = 20
+    nft_forge_legendary_cost: int = 40
+    nft_forge_daily_limit: int = 5
+    nft_forge_success_rate_min: float = 20.0
+    nft_forge_success_rate_max: float = 95.0
+    nft_forge_perfect_rate_min: float = 5.0
+    nft_forge_perfect_rate_max: float = 20.0
+    nft_forge_stable_fragment_cost: int = 5
+    nft_forge_focused_fragment_cost: int = 10
     fanora_issuer_name: str = "Fanora Protocol"
 
     log_level: str = "INFO"
@@ -146,6 +168,14 @@ class Settings(BaseSettings):
         if value.startswith("postgresql://"):
             return value.replace("postgresql://", "postgresql+psycopg://", 1)
         return value
+
+    @field_validator("beeimg_base_url", mode="before")
+    @classmethod
+    def normalize_beeimg_base_url(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        cleaned = value.strip().lstrip(":：").strip().rstrip("/")
+        return cleaned or "https://www.beeimg.cn"
 
     @property
     def postgres_connect_args(self) -> dict[str, int]:

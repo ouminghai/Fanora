@@ -209,7 +209,7 @@ async def test_membership_card_renders_downloadable_png_with_qr_panel() -> None:
         assert lightest > 240
 
 
-def test_membership_card_refresh_fingerprint_only_tracks_membership_level() -> None:
+def test_membership_card_refresh_fingerprint_tracks_identity_copy_and_level() -> None:
     service = NftService()
     level = MembershipLevel(
         code="newborn",
@@ -233,9 +233,20 @@ def test_membership_card_refresh_fingerprint_only_tracks_membership_level() -> N
         metadata_cid="metadata-cid",
     )
     before = service.membership_card_content_hash(user=user, profile=profile, level=level, record=record)
+    record.is_member_card = True
+    record.card_level_code = level.code
+    record.card_content_hash = before
+    assert service.membership_card_needs_refresh(user=user, profile=profile, level=level, record=record) is False
     profile.fan_token_lifetime_earned = 500
-    after = service.membership_card_content_hash(user=user, profile=profile, level=level, record=record)
-    assert before == after
+    balance_only = service.membership_card_content_hash(user=user, profile=profile, level=level, record=record)
+    assert before == balance_only
+    user.display_name = "Renamed Member"
+    renamed = service.membership_card_content_hash(user=user, profile=profile, level=level, record=record)
+    assert before != renamed
+    assert service.membership_card_needs_refresh(user=user, profile=profile, level=level, record=record) is True
+    profile.username = "renamed_member"
+    username_changed = service.membership_card_content_hash(user=user, profile=profile, level=level, record=record)
+    assert renamed != username_changed
     upgraded = MembershipLevel(
         code="mild-neuro",
         name="轻度神经",
@@ -246,7 +257,7 @@ def test_membership_card_refresh_fingerprint_only_tracks_membership_level() -> N
         badge_image_url="/img/badges/mild.png",
     )
     upgraded_hash = service.membership_card_content_hash(user=user, profile=profile, level=upgraded, record=record)
-    assert before != upgraded_hash
+    assert username_changed != upgraded_hash
 
 
 @pytest.mark.asyncio

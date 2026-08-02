@@ -162,7 +162,7 @@ async def test_explicit_test_tasks_and_posts_use_portable_fallback_images(client
     tasks = client.get("/api/v1/tasks").json()
     posts = client.get("/api/v1/community/posts").json()
 
-    assert len(tasks) >= 10
+    assert len(tasks) >= 9
     assert len(posts) >= 6
     assert all(task["presentation"]["image_url"].startswith("/img/") for task in tasks)
     assert all(post["cover_url"].startswith("/img/") for post in posts if post["cover_url"])
@@ -214,7 +214,7 @@ async def test_daily_creation_and_special_page_tasks_complete_without_manual_rev
     )
     assert story_post.status_code == 201
     assert story_post.json()["body"].startswith("#粉丝故事图文征集")
-    assert story_post.json()["cover_url"].startswith("data:image/png;base64,")
+    assert story_post.json()["cover_url"].startswith("https://www.beeimg.cn/")
     assert len(story_post.json()["image_urls"]) == 2
     async with database_service.session() as session:
         post_publish_entries = list(

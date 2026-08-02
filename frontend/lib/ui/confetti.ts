@@ -1,41 +1,44 @@
+import type { Options } from "canvas-confetti";
+
 export async function startRealisticConfetti(durationMs = 3000): Promise<() => void> {
   if (typeof window === "undefined" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
     return () => undefined;
   }
 
   const { default: confetti } = await import("canvas-confetti");
-  const animationEnd = Date.now() + durationMs;
-  const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 1700 };
-  let stopped = false;
+  const count = 1000;
+  const defaults: Options = {
+    zIndex: 1700,
+  };
 
-  const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-  const fire = () => {
-    if (stopped) return;
-    const timeLeft = animationEnd - Date.now();
-    if (timeLeft <= 0) return;
-    const particleCount = Math.max(8, 50 * (timeLeft / durationMs));
+  const fire = (particleRatio: number, options: Options) => {
+    const particleCount = Math.floor((count * particleRatio) / 2);
     void confetti({
       ...defaults,
+      ...options,
       particleCount,
-      origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 },
+      angle: 30,
+      origin: { x: 0.04, y: 0.72 },
     });
     void confetti({
       ...defaults,
+      ...options,
       particleCount,
-      origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
+      angle: 150,
+      origin: { x: 0.96, y: 0.72 },
     });
   };
 
-  fire();
-  const interval = window.setInterval(fire, 250);
-  const timeout = window.setTimeout(() => {
-    stopped = true;
-    window.clearInterval(interval);
-  }, durationMs);
+  fire(0.25, { spread: 26, startVelocity: 75 });
+  fire(0.2, { spread: 60, startVelocity: 65 });
+  fire(0.35, { spread: 100, startVelocity: 60, decay: 0.91, scalar: 0.8 });
+  fire(0.1, { spread: 120, startVelocity: 50, decay: 0.92, scalar: 1.2 });
+  fire(0.1, { spread: 120, startVelocity: 70 });
+
+  const timeout = window.setTimeout(() => confetti.reset(), durationMs);
 
   return () => {
-    stopped = true;
-    window.clearInterval(interval);
     window.clearTimeout(timeout);
+    confetti.reset();
   };
 }

@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, func, select
 
+from app.adapters.beeimg import BeeImgConfigurationError, BeeImgUploadError, beeimg_adapter
 from app.api.routes.community import get_official_community, require_creator
 from app.core.database import get_database_session
 from app.core.security import get_current_identity, get_optional_identity, require_official_member
@@ -333,9 +334,17 @@ async def complete_page_task(
     if participation is None:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Claim the task before completing it")
     if participation.status == "claimed":
+        try:
+            image_urls = await beeimg_adapter.ensure_remote_urls(payload.image_urls, filename_prefix="task-submission")
+        except BeeImgConfigurationError as error:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+        except (BeeImgUploadError, OSError, ValueError) as error:
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}"
+            ) from error
         participation.submission = {
             "body": payload.interaction_note,
-            "image_urls": payload.image_urls,
+            "image_urls": image_urls,
         }
         completed = await complete_claimed_tasks(
             session,
@@ -383,6 +392,16 @@ async def create_task(
         post = await session.get(CommunityPost, payload.target_post_id)
         if post is None or post.community_id != community.id:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Target post not found")
+    presentation = payload.presentation.model_copy(deep=True)
+    try:
+        presentation.image_url = await beeimg_adapter.ensure_remote_url(
+            presentation.image_url,
+            filename="task-presentation",
+        )
+    except BeeImgConfigurationError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+    except (BeeImgUploadError, OSError, ValueError) as error:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}") from error
     values = payload.model_dump(exclude={"minimum_reply_length", "content_categories", "presentation"})
     task = FanTask(
         community_id=community.id,
@@ -390,7 +409,7 @@ async def create_task(
         validation_rule={
             "minimum_reply_length": payload.minimum_reply_length,
             "content_categories": payload.content_categories,
-            "presentation": payload.presentation.model_dump(),
+            "presentation": presentation.model_dump(),
         },
         **values,
     )
@@ -419,6 +438,16 @@ async def update_task(
         post = await session.get(CommunityPost, payload.target_post_id)
         if post is None or post.community_id != task.community_id:
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Target post not found")
+    presentation = payload.presentation.model_copy(deep=True)
+    try:
+        presentation.image_url = await beeimg_adapter.ensure_remote_url(
+            presentation.image_url,
+            filename="task-presentation",
+        )
+    except BeeImgConfigurationError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+    except (BeeImgUploadError, OSError, ValueError) as error:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}") from error
     for field, value in payload.model_dump(
         exclude={"minimum_reply_length", "content_categories", "presentation"}
     ).items():
@@ -426,7 +455,7 @@ async def update_task(
     task.validation_rule = {
         "minimum_reply_length": payload.minimum_reply_length,
         "content_categories": payload.content_categories,
-        "presentation": payload.presentation.model_dump(),
+        "presentation": presentation.model_dump(),
     }
     task.updated_at = utc_now()
     await session.commit()

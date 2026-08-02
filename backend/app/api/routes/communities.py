@@ -5,6 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
+from app.adapters.beeimg import BeeImgConfigurationError, BeeImgUploadError, beeimg_adapter
 from app.core.database import get_database_session
 from app.core.security import get_current_identity
 from app.models.base import utc_now
@@ -74,7 +75,14 @@ async def update_community(
     if community is None or community.slug != "fanora-official":
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Community not found")
     await require_creator(session, identity.user_id)
-    for field, value in payload.model_dump().items():
+    values = payload.model_dump()
+    try:
+        values["logo_url"] = await beeimg_adapter.ensure_remote_url(values["logo_url"], filename="community-logo")
+    except BeeImgConfigurationError as error:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
+    except (BeeImgUploadError, OSError, ValueError) as error:
+        raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}") from error
+    for field, value in values.items():
         setattr(community, field, value)
     community.updated_at = utc_now()
     await session.commit()
