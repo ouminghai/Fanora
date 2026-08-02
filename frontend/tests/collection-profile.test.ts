@@ -65,6 +65,10 @@ test("collection uses the Cyber Identity passport and asset tabs without loading
   assert.match(source, /CYBER IDENTITY \/\/ FANORA PROTOCOL/);
   assert.match(source, /Fanora Identity Awakening/);
   assert.match(source, /ON-CHAIN PASSPORT/);
+  const passportBlock = source.slice(source.indexOf("ON-CHAIN PASSPORT"), source.indexOf("NFT BADGE HOLOGRAM"));
+  assert.match(passportBlock, /<span>\{shortAddress\(user\.primary_wallet\.address\)\}<\/span>/);
+  assert.match(source, /navigator\.clipboard\.writeText\(user\.primary_wallet\.address\)/);
+  assert.doesNotMatch(passportBlock, /<span>\{user\.primary_wallet\.address\}<\/span>/);
   assert.match(source, /NFT BADGE HOLOGRAM/);
   assert.match(source, /IDENTITY BLOCK STREAM/);
   assert.match(source, /api\.get<MembershipLevel\[]>\("\/membership-levels"\)/);

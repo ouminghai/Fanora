@@ -842,7 +842,7 @@ export default function CollectionDashboard() {
                 <small>DIGITAL SOUL HOLDER</small>
                 <h2>{user.display_name || user.username || "Fanora Member"}</h2>
                 <button type="button" onClick={() => void copyWallet()} className={styles.walletLine} title="复制钱包地址">
-                  <span>{user.primary_wallet.address}</span>
+                  <span>{shortAddress(user.primary_wallet.address)}</span>
                   {copied ? <ShieldCheck /> : <Copy />}
                 </button>
                 <p>{user.bio || "每一次参与，都在 Monad 留下不可替代的 Proof of Fandom。"}</p>
