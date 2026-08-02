@@ -3,7 +3,16 @@ from pathlib import Path
 from sqlalchemy import text
 
 from scripts.export_demo_data_sql import create_engine, export_sql
-from scripts.import_demo_data_sql import import_sql
+from scripts.import_demo_data_sql import import_sql, prepare_driver_statement
+
+
+def test_postgres_driver_statement_escapes_literal_url_percent_sequences():
+    statement = "INSERT INTO images (url) VALUES ('https://example.test/file?key=a%2Fb&progress=100%');"
+
+    assert prepare_driver_statement(statement, dialect_name="postgresql") == (
+        "INSERT INTO images (url) VALUES ('https://example.test/file?key=a%%2Fb&progress=100%%');"
+    )
+    assert prepare_driver_statement(statement, dialect_name="sqlite") == statement
 
 
 async def test_export_and_import_all_tables_except_alembic_version(tmp_path: Path):

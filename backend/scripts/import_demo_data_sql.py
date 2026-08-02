@@ -85,6 +85,14 @@ def statement_table_name(statement: str) -> str | None:
     return match.group(1) if match else None
 
 
+def prepare_driver_statement(statement: str, *, dialect_name: str) -> str:
+    # psycopg uses percent-style placeholders even when no parameters are supplied.
+    # Doubling percent signs preserves URL escapes such as %2F as literal data.
+    if dialect_name == "postgresql":
+        return statement.replace("%", "%%")
+    return statement
+
+
 async def clear_business_tables(connection: AsyncConnection, tables: list[Table]) -> None:
     if not tables:
         return
@@ -141,12 +149,13 @@ async def import_sql(
             for statement in statements:
                 if statement_table_name(statement) is None:
                     continue
+                driver_statement = prepare_driver_statement(statement, dialect_name=connection.dialect.name)
                 try:
                     if continue_on_error:
                         async with connection.begin_nested():
-                            await connection.exec_driver_sql(statement)
+                            await connection.exec_driver_sql(driver_statement)
                     else:
-                        await connection.exec_driver_sql(statement)
+                        await connection.exec_driver_sql(driver_statement)
                     written += 1
                 except SQLAlchemyError as error:
                     if not continue_on_error:
