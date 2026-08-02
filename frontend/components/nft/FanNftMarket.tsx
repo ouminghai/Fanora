@@ -1,6 +1,7 @@
 "use client";
 
 import NiceModal from "@ebay/nice-modal-react";
+import { Activity, AlertTriangle, Boxes, RadioTower, Sparkles, X } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -19,9 +20,9 @@ import { api } from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import type { FanNftAiDraft, FanNftCreateResponse, FanNftEngagement, FanNftListing, FanNftPurchaseResponse } from "@/lib/api/types";
 import { resetNftTilt, updateNftTilt } from "@/components/nft/nftMotion";
-import AiNftCreationWorkbench from "@/components/nft/AiNftCreationWorkbench";
+import styles from "./FanNftMarket.module.css";
 
-type MarketMode = "market" | "collection" | "item" | "create";
+type MarketMode = "market" | "collection" | "item";
 type MarketVariant = "page" | "drawer";
 
 type PublishDraft = {
@@ -62,6 +63,14 @@ const itemImageGalleryOptions: PhotoSwipeOptions = {
 
 function errorText(error: unknown) {
   return apiErrorMessage(error, "请求暂时没有完成。");
+}
+
+function purchaseErrorText(error: unknown) {
+  const message = errorText(error);
+  if (message === "You already own the creator side of this NFT") {
+    return "你是这件 NFT 的创作者，已经拥有创作者侧资产，无需重复购买。";
+  }
+  return message;
 }
 
 function formatDate(value: string) {
@@ -171,9 +180,11 @@ function NftCard({
       onPointerLeave={resetNftTilt}
       onPointerCancel={resetNftTilt}
       onMouseLeave={resetNftTilt}
-      className={`nft-tilt-surface group community-reveal overflow-hidden rounded-lg border border-jacarta-100 bg-white shadow-sm dark:border-white/10 dark:bg-jacarta-700 ${selected ? "nft-flow-border" : ""}`}
+      className={`${styles.exhibitCard} nft-tilt-surface group community-reveal overflow-hidden rounded-lg border border-jacarta-100 bg-white shadow-sm dark:border-white/10 dark:bg-jacarta-700 ${selected ? "nft-flow-border" : ""}`}
       style={{ animationDelay: `${Math.min(index, 12) * 55}ms` }}
     >
+      <span className={styles.cardScan} aria-hidden="true" />
+      <span className={styles.cardCorners} aria-hidden="true" />
       <Link href={`/item/${item.id}`} onClick={(event) => { event.preventDefault(); event.currentTarget.blur(); onOpen(item); }} className="block">
         <div className="relative aspect-square overflow-hidden bg-jacarta-100 dark:bg-white/5">
           {item.image_url ? (
@@ -194,15 +205,13 @@ function NftCard({
         </div>
       </Link>
       <div className="p-5">
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <UserIdentityLink
-              author={item.creator}
-              avatarClassName="h-9 w-9 rounded-full"
-              nameClassName="text-sm font-semibold text-jacarta-700 dark:text-white"
-            />
-            <p className="ml-11 text-xs text-jacarta-400">{item.creator.level}</p>
-          </div>
+        <div className={styles.authorLine}>
+          <UserIdentityLink
+            author={item.creator}
+            avatarClassName="h-9 w-9 rounded-full"
+            nameClassName="text-sm font-semibold text-jacarta-700 dark:text-white"
+          />
+          <span className={styles.authorLevel}>{item.creator.level}</span>
         </div>
         <Link href={`/item/${item.id}`} onClick={(event) => { event.preventDefault(); event.currentTarget.blur(); onOpen(item); }} className="mt-4 block">
           <h3 className="truncate font-display text-lg font-semibold text-jacarta-700 group-hover:text-accent dark:text-white">
@@ -237,7 +246,7 @@ function NftCard({
   );
 }
 
-function PublishModal({
+export function LegacyPublishModal({
   open,
   onClose,
   onPublished,
@@ -421,6 +430,7 @@ function PublishModal({
         imageUrl: response.data.listing.image_url,
         imageAlt: response.data.listing.name,
         celebrate: true,
+        celebrationDurationMs: 4_000,
         actionLabel: "查看链上 NFT",
         actionUrl: response.data.listing.explorer_url,
         confirmLabel: "知道了",
@@ -759,7 +769,6 @@ type FanNftMarketProps = {
 };
 
 export default function FanNftMarket(props: FanNftMarketProps) {
-  if (props.mode === "create") return <AiNftCreationWorkbench />;
   return <FanNftMarketContent {...props} />;
 }
 
@@ -774,10 +783,11 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
   const [notice, setNotice] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<ItemTab>("details");
   const [activeCategory, setActiveCategory] = useState<NftCategory>("recommended");
-  const [publishOpen, setPublishOpen] = useState(mode === "create");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [drawerClosing, setDrawerClosing] = useState(false);
+  const [purchaseTooltip, setPurchaseTooltip] = useState<string | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const purchaseTooltipTimer = useRef<number | null>(null);
   const nextOffset = useRef(0);
   const loadingItems = useRef(false);
   const loadMoreSentinel = useRef<HTMLDivElement | null>(null);
@@ -842,10 +852,6 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
   }, [load]);
 
   useEffect(() => {
-    if (mode === "create") setPublishOpen(true);
-  }, [mode]);
-
-  useEffect(() => {
     if (mode === "item") return;
     const handlePopState = () => {
       const match = window.location.pathname.match(/^\/item\/([^/]+)$/);
@@ -870,6 +876,16 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
 
   useEffect(() => () => {
     if (closeTimer.current) clearTimeout(closeTimer.current);
+    if (purchaseTooltipTimer.current) clearTimeout(purchaseTooltipTimer.current);
+  }, []);
+
+  const showPurchaseTooltip = useCallback((message: string) => {
+    if (purchaseTooltipTimer.current) clearTimeout(purchaseTooltipTimer.current);
+    setPurchaseTooltip(message);
+    purchaseTooltipTimer.current = window.setTimeout(() => {
+      setPurchaseTooltip(null);
+      purchaseTooltipTimer.current = null;
+    }, 6_000);
   }, []);
 
   const visibleItems = useMemo(() => {
@@ -898,6 +914,8 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
     }
     setBusy("buy");
     setNotice(null);
+    setPurchaseTooltip(null);
+    if (purchaseTooltipTimer.current) clearTimeout(purchaseTooltipTimer.current);
     void NiceModal.show(GlobalProcessModal, {
       title: "正在购买并铸造",
       message: "交易已提交，正在扣除 FAN、连接 Monad 验证节点并把 NFT 铸造到你的钱包。",
@@ -934,6 +952,7 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
         imageUrl: response.data.collectible.image_url || response.data.listing.image_url,
         imageAlt: response.data.collectible.name,
         celebrate: true,
+        celebrationDurationMs: 4_000,
         actionLabel: "查看链上 NFT",
         actionUrl: response.data.collectible.explorer_url || response.data.listing.explorer_url,
         confirmLabel: "知道了",
@@ -941,13 +960,7 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
     } catch (error) {
       setBusy(null);
       await hideGlobalProcessModal().catch(() => undefined);
-      void NiceModal.show(GlobalInfoModal, {
-        title: "NFT 购买没有完成",
-        message: errorText(error),
-        tone: "error",
-        eyebrow: "MINT ERROR",
-        confirmLabel: "返回重试",
-      });
+      showPurchaseTooltip(purchaseErrorText(error));
     } finally {
       setBusy(null);
     }
@@ -1041,32 +1054,29 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
     router.push("/collections");
   };
 
-  const handlePublished = useCallback((created: FanNftListing) => {
-    setPublishOpen(false);
-    setItems((current) => [created, ...current.filter((entry) => entry.id !== created.id)]);
-    if (mode === "create") {
-      router.replace("/collections");
-      return;
-    }
-    void loadItemPage(true);
-  }, [loadItemPage, mode, router]);
-
   const Root = mode === "item" && variant === "drawer" ? "div" : "main";
   return (
-    <Root ref={(node) => { drawerScrollRef.current = node; }} className={mode === "item" ? variant === "drawer" ? "community-letter-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#f7f7fb] dark:bg-jacarta-900" : "min-h-screen bg-[#f7f7fb] pb-24 pt-[88px] dark:bg-jacarta-900" : "web3-page-shell min-h-screen pb-24 pt-28 md:pt-32"}>
-      <div className={mode === "item" ? variant === "drawer" ? "mx-auto max-w-7xl px-5 pt-16 md:px-8 md:pt-14" : "mx-auto max-w-7xl px-5 pt-12" : "container"}>
-        <PublishModal
-          open={publishOpen}
-          onClose={() => {
-            setPublishOpen(false);
-            if (mode === "create") router.push("/collections");
-          }}
-          onPublished={handlePublished}
-        />
-
+    <Root ref={(node) => { drawerScrollRef.current = node; }} className={mode === "item" ? variant === "drawer" ? "community-letter-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain bg-[#f7f7fb] dark:bg-jacarta-900" : "min-h-screen bg-[#f7f7fb] pb-24 pt-[88px] dark:bg-jacarta-900" : `${styles.galleryRoot} web3-page-shell min-h-screen pb-24 pt-28 md:pt-32`}>
+      {mode !== "item" ? (
+        <div className={styles.ambientLayer} aria-hidden="true">
+          <div className={styles.grid} />
+          <div className={styles.scanlines} />
+          <div className={styles.nebula} />
+          <div className={styles.nodeField}>
+            <span className={styles.nodeA} />
+            <span className={styles.nodeB} />
+            <span className={styles.nodeC} />
+            <span className={styles.nodeD} />
+            <i className={styles.linkA} />
+            <i className={styles.linkB} />
+            <i className={styles.linkC} />
+          </div>
+        </div>
+      ) : null}
+      <div className={mode === "item" ? variant === "drawer" ? "mx-auto max-w-7xl px-5 pt-16 md:px-8 md:pt-14" : "mx-auto max-w-7xl px-5 pt-12" : `${styles.galleryContainer} container`}>
         {notice ? <div className="community-reveal mb-7 rounded-2xl border border-accent/20 bg-accent/10 px-5 py-4 text-sm font-semibold text-accent-lighter">{notice}</div> : null}
 
-        {loading && mode !== "create" ? (
+        {loading ? (
           <div className="flex min-h-[42vh] items-center justify-center">
             <span aria-label="正在读取 NFT" className="h-8 w-8 animate-spin rounded-full border-2 border-accent/20 border-t-accent" />
           </div>
@@ -1175,9 +1185,19 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
                     <span className="mt-3 block text-sm text-jacarta-400 dark:text-jacarta-300">{item.minted_supply} minted · {item.remaining_supply} remaining</span>
                   </div>
                 </div>
-                <button type="button" disabled={Boolean(busy) || item.remaining_supply <= 0} onClick={() => void buy()} className="inline-block w-full rounded-full bg-accent px-8 py-3 text-center font-semibold text-white shadow-accent-volume transition-all hover:bg-accent-dark disabled:opacity-50">
-                  {busy === "buy" ? "正在购买..." : item.remaining_supply <= 0 ? "已售罄" : "购买并铸造"}
-                </button>
+                <div className="relative">
+                  {purchaseTooltip ? (
+                    <div role="alert" className="absolute bottom-[calc(100%+12px)] left-1/2 z-20 flex w-[min(420px,calc(100vw-48px))] -translate-x-1/2 items-start gap-3 rounded-xl border border-red/30 bg-[#241020] px-4 py-3 text-left text-sm leading-6 text-red shadow-[0_18px_55px_rgba(0,0,0,.45)]">
+                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                      <span className="min-w-0 flex-1">{purchaseTooltip}</span>
+                      <button type="button" onClick={() => setPurchaseTooltip(null)} aria-label="关闭购买错误提示" className="shrink-0 text-red/70 transition-colors hover:text-red"><X className="h-4 w-4" /></button>
+                      <span className="absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-1/2 rotate-45 border-b border-r border-red/30 bg-[#241020]" aria-hidden="true" />
+                    </div>
+                  ) : null}
+                  <button type="button" disabled={Boolean(busy) || item.remaining_supply <= 0} onClick={() => void buy()} className="inline-block w-full rounded-full bg-accent px-8 py-3 text-center font-semibold text-white shadow-accent-volume transition-all hover:bg-accent-dark disabled:opacity-50">
+                    {busy === "buy" ? "正在购买..." : item.remaining_supply <= 0 ? "已售罄" : "购买并铸造"}
+                  </button>
+                </div>
               </div>
             </div>
           </section>
@@ -1187,8 +1207,29 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
 
         {mode !== "item" && !loading ? (
           <>
-          <div className="community-reveal sticky top-20 z-10 mb-8 flex items-center gap-4 py-2 [animation-delay:100ms]">
-            <nav className="flex min-w-0 flex-1 items-center gap-6 overflow-x-auto" aria-label="NFT 分类">
+          <header className={styles.galleryHud}>
+            <div className={styles.hudIcon} aria-hidden="true"><Boxes /></div>
+            <div className={styles.hudCopy}>
+              <p>FANORA // ON-CHAIN EXHIBITION HALL</p>
+              <h1 className={styles.typewriter}>{mode === "collection" ? "沿着链路，查看这位创作者的收藏宇宙。" : "把热爱铸造成记忆，让每份珍藏在链上拥有自己的空间。"}</h1>
+            </div>
+            <div className={styles.hudStatus}>
+              <span><i /> MONAD ONLINE</span>
+              <span><Activity /> {visibleItems.length} ARTIFACTS</span>
+              <span><RadioTower /> LIVE INDEX</span>
+            </div>
+          </header>
+
+          <section className={styles.signalRail} aria-label="Gallery 链路状态">
+            <div><span>01</span><strong>发现作品</strong><small>DISCOVER</small></div>
+            <i />
+            <div><span>02</span><strong>连接创作者</strong><small>CONNECT</small></div>
+            <i />
+            <div><span>03</span><strong>写入收藏</strong><small>COLLECT</small></div>
+          </section>
+
+          <div className={`${styles.galleryToolbar} community-reveal sticky top-20 z-10 mb-8 flex items-center gap-4 py-2 [animation-delay:100ms]`}>
+            <nav className={`${styles.categoryNav} flex min-w-0 flex-1 items-center gap-6 overflow-x-auto`} aria-label="NFT 分类">
               {nftCategories.map((category) => (
                 <button
                   key={category.id}
@@ -1204,16 +1245,24 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
                 </button>
               ))}
             </nav>
-            <button
-              type="button"
-              onClick={() => setPublishOpen(true)}
-              className="web3-action-button shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold text-white"
+            <Link
+              href="/collections/create"
+              className={`${styles.createButton} web3-action-button shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold text-white`}
             >
-              发布 NFT
-            </button>
+              <Sparkles aria-hidden="true" />
+              创造 NFT
+              <span className={styles.photon} aria-hidden="true" />
+              <span className={`${styles.photon} ${styles.photonSecond}`} aria-hidden="true" />
+            </Link>
           </div>
           {visibleItems.length ? (
-            <section className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className={styles.cabinetHeader}>
+              <div><span>COLLECTION CABINET</span><strong>{nftCategories.find((category) => category.id === activeCategory)?.label}</strong></div>
+              <p><i /> LIGHT SCAN ACTIVE</p>
+            </div>
+          ) : null}
+          {visibleItems.length ? (
+            <section className={`${styles.cardWall} grid gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4`}>
               {visibleItems.map((entry, index) => (
                 <NftCard
                   key={entry.id}
@@ -1227,7 +1276,7 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
               ))}
             </section>
           ) : (
-            <div className="community-reveal py-20 text-center text-white/40">还没有粉丝 NFT。</div>
+            <div className={`${styles.emptyCabinet} community-reveal py-20 text-center text-white/40`}><Boxes />还没有粉丝 NFT。</div>
           )}
           <div ref={loadMoreSentinel} aria-hidden="true" className="flex min-h-24 items-center justify-center">
             {loadingMoreItems ? (

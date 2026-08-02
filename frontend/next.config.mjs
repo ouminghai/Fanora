@@ -48,6 +48,11 @@ const nextConfig = {
         hostname: "**.imglnk.cn",
         pathname: "/v/**",
       },
+      {
+        protocol: "https",
+        hostname: "s3.siliconflow.cn",
+        pathname: "/temporary/outputs/**",
+      },
     ],
   },
 };

@@ -167,11 +167,153 @@ class NftCreationReaction(SQLModel, table=True):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
-class NftApplication(SQLModel, table=True):
-    __tablename__ = "nft_applications"  # pyright: ignore[reportAssignmentType]
+class NftVisualTemplate(SQLModel, table=True):
+    __tablename__ = "nft_visual_templates"  # pyright: ignore[reportAssignmentType]
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    owner_user_id: str | None = Field(default=None, foreign_key="users.id", index=True)
+    source_post_id: str | None = Field(default=None, foreign_key="community_posts.id", index=True)
+    name: str = Field(max_length=80, index=True)
+    category: str = Field(max_length=40, index=True)
+    description: str = Field(max_length=500)
+    prompt: str = Field(max_length=2000)
+    preview_image_url: str = Field(max_length=2048)
+    reference_image_urls: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    palette: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    elements: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    forbidden: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    is_system: bool = Field(default=False, index=True)
+    created_at: datetime = Field(default_factory=utc_now, index=True)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class NftForgeSession(SQLModel, table=True):
+    __tablename__ = "nft_forge_sessions"  # pyright: ignore[reportAssignmentType]
 
     id: str = Field(default_factory=new_id, primary_key=True)
     user_id: str = Field(foreign_key="users.id", index=True)
+    conversation_id: str | None = Field(default=None, max_length=80, index=True)
+    template_id: str | None = Field(default=None, max_length=64)
+    visual_style: str = Field(default="cinematic", max_length=80)
+    title: str = Field(max_length=100)
+    story_summary: str = Field(max_length=1500)
+    image_prompt: str = Field(max_length=2500)
+    reference_image_urls: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    suggested_attributes: list[dict[str, str]] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    supply: int = Field(default=50, sa_column=Column(BigInteger, nullable=False))
+    price_fan_tokens: int = Field(default=20, sa_column=Column(BigInteger, nullable=False))
+    forge_mode: str = Field(default="FOCUSED", max_length=20, index=True)
+    status: str = Field(default="ANALYZED", max_length=30, index=True)
+    rules_version: str = Field(default="forge-v1", max_length=30)
+    generated_versions: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    selected_version_id: str | None = Field(default=None, max_length=64)
+    published_at: datetime | None = Field(default=None)
+    created_at: datetime = Field(default_factory=utc_now, index=True)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class NftAiAnalysis(SQLModel, table=True):
+    __tablename__ = "nft_ai_analyses"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("forge_session_id", name="uq_nft_ai_analysis_session"),)
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    forge_session_id: str = Field(foreign_key="nft_forge_sessions.id", index=True)
+    rare_score: int = Field(ge=0, le=100)
+    rarity_level: str = Field(max_length=20)
+    originality: int = Field(ge=0, le=100)
+    visual_quality: int = Field(ge=0, le=100)
+    fan_emotion: int = Field(ge=0, le=100)
+    scarcity: int = Field(ge=0, le=100)
+    community_potential: int = Field(ge=0, le=100)
+    recommend_supply_min: int = Field(ge=1)
+    recommend_supply_max: int = Field(ge=1)
+    recommend_supply_default: int = Field(ge=1)
+    recommend_price_min: int = Field(ge=1)
+    recommend_price_max: int = Field(ge=1)
+    recommend_price_default: int = Field(ge=1)
+    suggestions: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    model_name: str = Field(default="rules", max_length=100)
+    prompt_version: str = Field(default="nft-forge-analysis-v1", max_length=50)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class NftForgeAttempt(SQLModel, table=True):
+    __tablename__ = "nft_forge_attempts"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_nft_forge_attempt_idempotency"),)
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    forge_session_id: str = Field(foreign_key="nft_forge_sessions.id", index=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    idempotency_key: str = Field(max_length=160, index=True)
+    forge_mode: str = Field(max_length=20, index=True)
+    payment_source: str = Field(default="FAN", max_length=20)
+    fan_cost: int = Field(default=0, ge=0)
+    success_rate: float = Field(ge=0, le=100)
+    perfect_rate: float = Field(ge=0, le=100)
+    random_roll: float = Field(ge=0, le=100)
+    perfect_roll: float | None = Field(default=None, ge=0, le=100)
+    server_seed_hash: str = Field(max_length=64)
+    server_seed_reveal: str | None = Field(default=None, max_length=128)
+    result: str = Field(default="PENDING", max_length=20, index=True)
+    refund_status: str = Field(default="NOT_REQUIRED", max_length=20)
+    error_message: str | None = Field(default=None, max_length=500)
+    rules_version: str = Field(default="forge-v1", max_length=30)
+    created_at: datetime = Field(default_factory=utc_now, index=True)
+    completed_at: datetime | None = Field(default=None)
+
+
+class UserFragmentBalance(SQLModel, table=True):
+    __tablename__ = "user_fragment_balances"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("user_id", name="uq_user_fragment_balance_user"),)
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    balance: int = Field(default=0, ge=0)
+    stable_credits: int = Field(default=0, ge=0)
+    focused_credits: int = Field(default=0, ge=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class FragmentLedger(SQLModel, table=True):
+    __tablename__ = "fragment_ledgers"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_fragment_ledger_idempotency"),)
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    forge_attempt_id: str | None = Field(default=None, foreign_key="nft_forge_attempts.id", index=True)
+    delta: int
+    balance_after: int = Field(ge=0)
+    source_type: str = Field(max_length=30, index=True)
+    idempotency_key: str = Field(max_length=160, index=True)
+    description: str = Field(max_length=300)
+    created_at: datetime = Field(default_factory=utc_now, index=True)
+
+
+class NftGenerationJob(SQLModel, table=True):
+    __tablename__ = "nft_generation_jobs"  # pyright: ignore[reportAssignmentType]
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    forge_attempt_id: str = Field(foreign_key="nft_forge_attempts.id", index=True)
+    forge_session_id: str = Field(foreign_key="nft_forge_sessions.id", index=True)
+    status: str = Field(default="PENDING", max_length=20, index=True)
+    model_name: str = Field(max_length=100)
+    image_prompt: str = Field(max_length=2500)
+    output_versions: list[dict[str, Any]] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))
+    error_message: str | None = Field(default=None, max_length=500)
+    duration_ms: int | None = Field(default=None, ge=0)
+    created_at: datetime = Field(default_factory=utc_now)
+    completed_at: datetime | None = Field(default=None)
+
+
+class NftApplication(SQLModel, table=True):
+    __tablename__ = "nft_applications"  # pyright: ignore[reportAssignmentType]
+    __table_args__ = (UniqueConstraint("forge_session_id", name="uq_nft_application_forge_session"),)
+
+    id: str = Field(default_factory=new_id, primary_key=True)
+    user_id: str = Field(foreign_key="users.id", index=True)
+    forge_session_id: str | None = Field(default=None, foreign_key="nft_forge_sessions.id", index=True)
     name: str = Field(max_length=100)
     description: str = Field(max_length=1000)
     story_image_urls: list[str] = Field(default_factory=list, sa_column=Column(JSON, nullable=False))

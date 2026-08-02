@@ -55,8 +55,9 @@ const GlobalProcessModal = NiceModal.create<GlobalProcessModalProps>(
 );
 
 export async function hideGlobalProcessModal() {
-  await NiceModal.hide(GlobalProcessModal);
-  window.setTimeout(() => NiceModal.remove(GlobalProcessModal), 320);
+  void NiceModal.hide(GlobalProcessModal);
+  await new Promise((resolve) => window.setTimeout(resolve, 320));
+  NiceModal.remove(GlobalProcessModal);
 }
 
 export default GlobalProcessModal;

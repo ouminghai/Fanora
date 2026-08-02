@@ -21,6 +21,8 @@ const markdownEditorSource = readFileSync(new URL("../components/community/Markd
 const markdownContentSource = readFileSync(new URL("../components/community/MarkdownContent.tsx", import.meta.url), "utf8");
 const coverFlowSource = readFileSync(new URL("../components/homes/home/CoverFlowSlider.tsx", import.meta.url), "utf8");
 const collectionsSource = readFileSync(new URL("../components/homes/common/Collections.tsx", import.meta.url), "utf8");
+const homeSource = readFileSync(new URL("../app/(homes)/home/page.tsx", import.meta.url), "utf8");
+const footerSource = readFileSync(new URL("../components/footer/Footer1.tsx", import.meta.url), "utf8");
 const identityLinkSource = readFileSync(new URL("../components/profile/UserIdentityLink.tsx", import.meta.url), "utf8");
 const publicProfileSource = readFileSync(new URL("../components/profile/PublicCollectionDashboard.tsx", import.meta.url), "utf8");
 const nftMarketSource = readFileSync(new URL("../components/nft/FanNftMarket.tsx", import.meta.url), "utf8");
@@ -137,6 +139,23 @@ test("home hot content and popular missions use live community APIs", () => {
   assert.match(collectionsSource, /api\.get<FanTask\[]>\("\/tasks"\)/);
   assert.match(collectionsSource, /task\.presentation\.action_url/);
   assert.match(collectionsSource, /participant_count/);
+  assert.match(collectionsSource, /FANORA NFT CREATION AGENT/);
+  assert.match(collectionsSource, /CYBER IDENTITY/);
+  assert.match(collectionsSource, /ON-CHAIN PASSPORT/);
+  assert.match(collectionsSource, /href="\/collections\/create"/);
+  assert.match(collectionsSource, /walletAddress/);
+  assert.match(collectionsSource, /progressRing/);
+  assert.doesNotMatch(homeSource, /<Featured/);
+});
+
+test("footer exposes the current community, NFT Agent, membership, and identity routes", () => {
+  assert.match(footerSource, /"\/community"/);
+  assert.match(footerSource, /"\/collections\/create"/);
+  assert.match(footerSource, /"\/collection"/);
+  assert.match(footerSource, /"\/membership\/join"/);
+  assert.match(footerSource, /"\/profile"/);
+  assert.match(footerSource, /LANGGRAPH AGENT/);
+  assert.doesNotMatch(footerSource, /href="#"/);
 });
 
 test("FEAR and DREAMS uses AI review and an ERC-1155 memorial ticket reward", () => {
@@ -163,7 +182,8 @@ test("FEAR and DREAMS uses AI review and an ERC-1155 memorial ticket reward", ()
   assert.match(fearTicketSource, /获得 FEAR and DREAMS 纪念票/);
   assert.match(fearTicketSource, /celebrate: true/);
   assert.match(globalInfoModalSource, /nft-tilt-surface nft-flow-border/);
-  assert.match(globalInfoModalSource, /startRealisticConfetti\(3000\)/);
+  assert.match(globalInfoModalSource, /startRealisticConfetti\(celebrationDurationMs\)/);
+  assert.match(globalInfoModalSource, /celebrationDurationMs = 3000/);
   assert.match(confettiSource, /const count = 1000/);
   assert.match(confettiSource, /angle: 30[\s\S]*origin: \{ x: 0\.04, y: 0\.72 \}/);
   assert.match(confettiSource, /angle: 150[\s\S]*origin: \{ x: 0\.96, y: 0\.72 \}/);

@@ -156,6 +156,13 @@ class BeeImgAdapter:
             return None
         if value.startswith("data:image/"):
             return await self.upload_data_url(value, filename=filename)
+        if value.startswith("/"):
+            public_file = Path(__file__).resolve().parents[2] / "public" / value.lstrip("/")
+            if not public_file.is_file():
+                raise ValueError(f"Local image does not exist: {value}")
+            mime_type = mimetypes.guess_type(public_file.name)[0] or "application/octet-stream"
+            uploaded = await self.upload_bytes(content=public_file.read_bytes(), mime_type=mime_type, filename=filename)
+            return uploaded.url
         return value
 
     async def ensure_remote_urls(self, values: list[str], *, filename_prefix: str = "fanora-image") -> list[str]:

@@ -114,6 +114,17 @@ class Settings(BaseSettings):
     nft_max_price_fan_tokens: int = 1_000_000
     nft_min_supply: int = 1
     nft_max_supply: int = 1_000
+    nft_forge_rules_version: str = "forge-v1"
+    nft_forge_stable_cost: int = 10
+    nft_forge_focused_cost: int = 20
+    nft_forge_legendary_cost: int = 40
+    nft_forge_daily_limit: int = 5
+    nft_forge_success_rate_min: float = 20.0
+    nft_forge_success_rate_max: float = 95.0
+    nft_forge_perfect_rate_min: float = 5.0
+    nft_forge_perfect_rate_max: float = 20.0
+    nft_forge_stable_fragment_cost: int = 5
+    nft_forge_focused_fragment_cost: int = 10
     fanora_issuer_name: str = "Fanora Protocol"
 
     log_level: str = "INFO"

@@ -162,7 +162,7 @@ async def test_explicit_test_tasks_and_posts_use_portable_fallback_images(client
     tasks = client.get("/api/v1/tasks").json()
     posts = client.get("/api/v1/community/posts").json()
 
-    assert len(tasks) >= 10
+    assert len(tasks) >= 9
     assert len(posts) >= 6
     assert all(task["presentation"]["image_url"].startswith("/img/") for task in tasks)
     assert all(post["cover_url"].startswith("/img/") for post in posts if post["cover_url"])

@@ -12,6 +12,7 @@ class PublicAttribute(BaseModel):
 
 
 class NftApplicationCreate(BaseModel):
+    forge_session_id: str = Field(min_length=8, max_length=64)
     name: str = Field(min_length=2, max_length=100)
     description: str = Field(min_length=2, max_length=1000)
     theme: str = Field(min_length=2, max_length=120)
@@ -25,8 +26,10 @@ class NftApplicationCreate(BaseModel):
     @field_validator("image_data_url")
     @classmethod
     def validate_image_data_url(cls, value: str) -> str:
+        if value.startswith(("http://", "https://")):
+            return value
         if not value.startswith("data:image/") or ";base64," not in value[:100]:
-            raise ValueError("image_data_url must be a base64 image data URL")
+            raise ValueError("image_data_url must be a hosted image URL or base64 image data URL")
         return value
 
     @field_validator("story_image_urls")
@@ -50,6 +53,7 @@ class NftApplicationResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    forge_session_id: str | None = None
     name: str
     description: str
     story_image_urls: list[str] = Field(default_factory=list)

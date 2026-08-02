@@ -51,6 +51,10 @@ test("homepage journey describes direct wallet ownership and deterministic FAN r
   assert.match(fanoraData, /Agent 只分析画像和解释结果/);
   assert.match(processSection, /登录签名不消耗 Gas/);
   assert.match(processSection, /Fanora 不读取或保存私钥与助记词/);
+  assert.match(processSection, /BLOCKCHAIN NETWORK/);
+  assert.match(processSection, /styles\.chainMap/);
+  assert.match(processSection, /styles\.blockOne/);
+  assert.match(processSection, /MONAD TESTNET/);
   assert.doesNotMatch(fanoraData, /使用邮箱或社交账号快速加入/);
   assert.doesNotMatch(processSection, /注册流程中完成钱包创建/);
   assert.doesNotMatch(fanoraData, /Agent .*更新 Fan Token/);

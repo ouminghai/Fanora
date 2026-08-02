@@ -1,51 +1,56 @@
-import Image from "next/image";
+import { BadgeCheck, Coins, RadioTower, Sparkles, Users, WalletCards } from "lucide-react";
 import { fanJourney } from "@/data/fanora";
+import styles from "./Process.module.css";
+
+const journeyIcons = [WalletCards, Users, Coins, BadgeCheck];
 
 export default function Process() {
   return (
-    <section id="fan-journey" className="relative py-24 text-white">
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-      <div className="container">
-        <h2 className="mb-16 text-center font-display text-3xl text-white">
-          从加入社区到拥有链上粉丝身份
-        </h2>
-        <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-4">
-          {fanJourney.map((step) => (
-            <div key={step.id} className="text-center">
-              <div
-                className="mb-6 inline-flex rounded-full p-3"
-                style={{ backgroundColor: step.ringColor }}
-              >
-                <div
-                  className={`inline-flex h-12 w-12 items-center justify-center rounded-full ${step.bgClass}`}
-                >
-                  <Image
-                    width={24}
-                    height={24}
-                    src={step.iconSrc}
-                    alt={step.title}
-                  />
-                </div>
+    <section id="fan-journey" className={styles.networkSection}>
+      <div className={styles.universe} aria-hidden="true">
+        <div className={styles.stars} />
+        <div className={styles.nebulaOne} />
+        <div className={styles.nebulaTwo} />
+      </div>
+      <div className={`${styles.networkContainer} container`}>
+        <header className={styles.networkHeader}>
+          <span><RadioTower /> BLOCKCHAIN NETWORK</span>
+          <h2>从加入社区到拥有链上粉丝身份</h2>
+          <p>每一次真实参与，都会沿着 Monad 链路沉淀为可验证的身份资产。</p>
+        </header>
+
+        <div className={styles.chainMap}>
+          {fanJourney.map((step, index) => {
+            const Icon = journeyIcons[index] ?? Sparkles;
+            return (
+              <div className={styles.chainSegment} key={step.id}>
+                <article className={styles.chainNode}>
+                  <span className={styles.nodeIndex}>NODE 0{step.id}</span>
+                  <div className={styles.nodeOrbit}>
+                    <span className={styles.orbitPhoton} />
+                    <div className={styles.nodeCore}><Icon /></div>
+                  </div>
+                  <h3>{step.title.replace(/^\d+\.\s*/, "")}</h3>
+                  <p>{step.description}</p>
+                  <small><i /> VERIFIED PATH</small>
+                </article>
+                {index < fanJourney.length - 1 ? (
+                  <div className={styles.chainLink} aria-hidden="true">
+                    <span className={styles.dataPulse} />
+                    <i className={styles.blockOne} />
+                    <i className={styles.blockTwo} />
+                    <i className={styles.blockThree} />
+                  </div>
+                ) : null}
               </div>
-              <h3 className="mb-4 font-display text-lg text-white">
-                {step.title}
-              </h3>
-              <p className="text-white/55">{step.description}</p>
-            </div>
-          ))}
+            );
+          })}
         </div>
 
-        <p className="mx-auto mt-20 max-w-2xl text-center text-lg text-white/75">
-          你始终使用自己的钱包管理链上账户。登录签名不消耗 Gas，也不会授权 Fanora 转移资产；Fanora 不读取或保存私钥与助记词。
-        </p>
-
-        <div className="mx-auto mt-7 max-w-md text-center">
-          <a
-            href="#proof-of-fandom"
-            className="inline-block w-full rounded-full bg-accent py-3 px-6 font-display text-sm text-white shadow-accent-volume transition-all hover:bg-accent-dark"
-          >
-            了解 Proof of Fandom
-          </a>
+        <div className={styles.networkFooter}>
+          <span><i /> WALLET SELF-CUSTODY</span>
+          <p>你始终使用自己的钱包管理链上账户。登录签名不消耗 Gas，也不会授权 Fanora 转移资产；Fanora 不读取或保存私钥与助记词。</p>
+          <span><i /> MONAD TESTNET</span>
         </div>
       </div>
     </section>

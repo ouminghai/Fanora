@@ -11,11 +11,12 @@ type ImageAttachmentPickerProps = {
   onError?: (message: string) => void;
   maxImages?: number;
   compact?: boolean;
+  dense?: boolean;
 };
 
 const acceptedTypes = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 
-export default function ImageAttachmentPicker({ value, onChange, onError, maxImages = 6, compact = false }: ImageAttachmentPickerProps) {
+export default function ImageAttachmentPicker({ value, onChange, onError, maxImages = 6, compact = false, dense = false }: ImageAttachmentPickerProps) {
   const inputId = useId();
 
   const selectImages = async (event: ChangeEvent<HTMLInputElement>) => {
@@ -39,20 +40,20 @@ export default function ImageAttachmentPicker({ value, onChange, onError, maxIma
   };
 
   return (
-    <div className={compact ? "mt-3" : "mt-4"}>
+    <div className={dense ? "mt-1.5" : compact ? "mt-3" : "mt-4"}>
       <div className="flex items-center justify-between gap-3">
         <label htmlFor={inputId} className="cursor-pointer text-xs font-semibold text-accent-lighter transition-colors hover:text-white">图片</label>
         <span className="text-[11px] text-white/30">{value.length}/{maxImages} · 单张最大 1 MB</span>
       </div>
       <input id={inputId} type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple onChange={selectImages} className="sr-only" />
-      <div className="mt-2 flex flex-wrap gap-2">
+      <div className={`${dense ? "mt-1 gap-1.5" : "mt-2 gap-2"} flex flex-wrap`}>
         {value.map((imageUrl, index) => (
-          <div key={imageUrl} className="group relative h-16 w-16 overflow-hidden rounded-lg border border-white/10 bg-white/5">
+          <div key={imageUrl} className={`group relative overflow-hidden rounded-lg border border-white/10 bg-white/5 ${dense ? "h-11 w-11" : "h-16 w-16"}`}>
             <Image src={imageUrl} alt={`待发布图片 ${index + 1}`} fill sizes="64px" className="object-cover" />
             <button type="button" aria-label={`移除图片 ${index + 1}`} onClick={() => onChange(value.filter((_, itemIndex) => itemIndex !== index))} className="absolute inset-0 bg-black/55 text-lg text-white opacity-0 transition-opacity group-hover:opacity-100">×</button>
           </div>
         ))}
-        {value.length < maxImages && <label htmlFor={inputId} className="flex h-16 w-16 cursor-pointer items-center justify-center rounded-lg border border-dashed border-white/20 bg-white/[.035] text-xl text-white/45 transition-colors hover:border-accent/50 hover:text-accent-lighter">+</label>}
+        {value.length < maxImages && <label htmlFor={inputId} className={`flex cursor-pointer items-center justify-center rounded-lg border border-dashed border-white/20 bg-white/[.035] text-white/45 transition-colors hover:border-accent/50 hover:text-accent-lighter ${dense ? "h-11 w-11 text-base" : "h-16 w-16 text-xl"}`}>+</label>}
       </div>
     </div>
   );

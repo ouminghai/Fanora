@@ -359,6 +359,102 @@ export type FanNftCreateResponse = {
   fan_token_balance: number;
 };
 
+export type NftForgeMode = "STABLE" | "FOCUSED" | "LEGENDARY";
+
+export type NftForgeAnalysis = {
+  rare_score: number;
+  rarity_level: string;
+  dimensions: Record<"originality" | "visual_quality" | "fan_emotion" | "scarcity" | "community_potential", number>;
+  recommend_supply: { min: number; max: number; default: number };
+  recommend_price: { min: number; max: number; default: number };
+  suggestions: string[];
+  model_name: string;
+  prompt_version: string;
+};
+
+export type NftForgeProbability = {
+  quality_factor: number;
+  strategy_fit: number;
+  price_fit: number;
+  level_bonus: number;
+  mode_modifier: number;
+  success_rate: number;
+  perfect_rate: number;
+  fan_cost: number;
+  possible_results: string[];
+};
+
+export type NftForgeAttempt = {
+  id: string;
+  forge_mode: NftForgeMode;
+  payment_source: "FAN" | "FRAGMENT";
+  fan_cost: number;
+  success_rate: number;
+  perfect_rate: number;
+  random_roll: number;
+  perfect_roll: number | null;
+  server_seed_hash: string;
+  server_seed_reveal: string | null;
+  result: "PENDING" | "SUCCESS" | "PERFECT" | "FAILED" | "ERROR";
+  refund_status: string;
+  error_message: string | null;
+  rules_version: string;
+  created_at: string;
+  completed_at: string | null;
+};
+
+export type NftForgeVersion = {
+  id: string;
+  url: string;
+  label: string;
+  name: string;
+  description: string;
+  image_prompt: string;
+  attributes: Array<{ trait_type: string; value: string }>;
+};
+
+export type NftForgeSession = {
+  id: string;
+  conversation_id: string | null;
+  status: "ANALYZED" | "FORGING" | "SUCCESS" | "PERFECT" | "FAILED" | "ERROR" | "PUBLISHED";
+  title: string;
+  story_summary: string;
+  image_prompt: string;
+  reference_image_urls: string[];
+  suggested_attributes: Array<{ trait_type: string; value: string }>;
+  supply: number;
+  price_fan_tokens: number;
+  forge_mode: NftForgeMode;
+  rules_version: string;
+  generated_versions: NftForgeVersion[];
+  selected_version_id: string | null;
+  analysis: NftForgeAnalysis;
+  probability: NftForgeProbability;
+  latest_attempt: NftForgeAttempt | null;
+  fragment_balance: number;
+  stable_credits: number;
+  focused_credits: number;
+  fan_token_balance: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type NftFragmentBalance = {
+  balance: number;
+  stable_credits: number;
+  focused_credits: number;
+  stable_redeem_cost: number;
+  focused_redeem_cost: number;
+  ledger: Array<{
+    id: string;
+    delta: number;
+    balance_after: number;
+    source_type: string;
+    description: string;
+    created_at: string;
+  }>;
+};
+
 export type FanNftAiDraft = {
   name: string;
   description: string;
@@ -367,10 +463,67 @@ export type FanNftAiDraft = {
   suggested_attributes: Array<{ trait_type: string; value: string }>;
   image_data_url: string | null;
   metadata_source: "rules" | "llm";
-  image_source: "openai" | "not_requested" | "unavailable";
+  image_source: "openai" | "siliconflow" | "not_requested" | "unavailable";
   degraded: boolean;
   image_error: string | null;
   prompt_version: string;
+};
+
+export type NftVisualTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  prompt: string;
+  palette: string[];
+  elements: string[];
+  forbidden: string[];
+  preview_image_url: string;
+  reference_image_urls: string[];
+  owner_user_id: string | null;
+  source_post_id: string | null;
+  is_system: boolean;
+};
+
+export type NftVisualStyle = {
+  id: string;
+  name: string;
+  description: string;
+  prompt: string;
+};
+
+export type NftUploadedImageAnalysis = {
+  name: string;
+  description: string;
+  story_summary: string;
+  image_prompt: string;
+  suggested_attributes: Array<{ trait_type: string; value: string }>;
+  theme: string;
+  metadata_source: "rules" | "llm";
+  degraded: boolean;
+  prompt_version: string;
+};
+
+export type NftAgentToolEvent = {
+  tool: string;
+  status: "completed" | "degraded";
+  summary: string;
+};
+
+export type NftAgentChatResponse = {
+  conversation_id: string;
+  assistant_message: string;
+  story_summary: string;
+  missing_fields: string[];
+  ready_for_generation: boolean;
+  turn_count: number;
+  template: NftVisualTemplate;
+  draft: FanNftAiDraft | null;
+  saved_template: NftVisualTemplate | null;
+  image_generation_recommended: boolean;
+  image_generation_reason: string;
+  image_generated: boolean;
+  tool_events: NftAgentToolEvent[];
 };
 
 export type FanProfileAnalysis = {

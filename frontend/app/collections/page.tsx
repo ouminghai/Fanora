@@ -8,10 +8,12 @@ export const metadata = {
 
 export default function CollectionsPage() {
   return (
-    <>
+    <div className="relative isolate bg-[#08040f]">
       <Header3 />
       <FanNftMarket mode="market" />
-      <Footer1 />
-    </>
+      <div className="relative z-20">
+        <Footer1 />
+      </div>
+    </div>
   );
 }

@@ -6,6 +6,10 @@ const source = readFileSync(
   new URL("../components/collection/CollectionDashboard.tsx", import.meta.url),
   "utf8",
 );
+const collectionDashboardStyleSource = readFileSync(
+  new URL("../components/collection/CollectionDashboard.module.css", import.meta.url),
+  "utf8",
+);
 const transactionProgressSource = readFileSync(
   new URL("../components/nft/ChainTransactionProgress.tsx", import.meta.url),
   "utf8",
@@ -14,11 +18,30 @@ const globalInfoModalSource = readFileSync(
   new URL("../components/modals/GlobalInfoModal.tsx", import.meta.url),
   "utf8",
 );
+const globalProcessModalSource = readFileSync(
+  new URL("../components/modals/GlobalProcessModal.tsx", import.meta.url),
+  "utf8",
+);
 const styleSource = readFileSync(new URL("../public/styles/style.css", import.meta.url), "utf8");
 const profileSource = readFileSync(
   new URL("../components/profile/ProfileDashboard.tsx", import.meta.url),
   "utf8",
 );
+const collectionProfileSource = readFileSync(
+  new URL("../components/collection/CollectionProfilePanel.tsx", import.meta.url),
+  "utf8",
+);
+const collectionProfileStyleSource = readFileSync(
+  new URL("../components/collection/CollectionProfilePanel.module.css", import.meta.url),
+  "utf8",
+);
+const profileRouteSource = readFileSync(new URL("../app/profile/page.tsx", import.meta.url), "utf8");
+
+test("collection profile status badge does not apply absolute positioning to the avatar root", () => {
+  assert.match(collectionProfileSource, /className=\{styles\.avatarStatusBadge\}/);
+  assert.match(collectionProfileStyleSource, /\.avatarStatusBadge\s*\{[^}]*position:\s*absolute[^}]*\}/);
+  assert.doesNotMatch(collectionProfileStyleSource, /\.profileAvatar\s*>\s*span\s*\{/);
+});
 
 test("profile editing does not expose a separate avatar upload button", () => {
   assert.doesNotMatch(profileSource, /selectAvatar/);
@@ -26,10 +49,27 @@ test("profile editing does not expose a separate avatar upload button", () => {
   assert.match(profileSource, /avatar_url: user\.avatar_url \|\| ""/);
 });
 
-test("collection uses a profile banner, overlapping avatar, and asset tabs", () => {
-  assert.match(source, /eason-concert\.webp/);
-  assert.match(source, /-translate-y-1\/2/);
-  assert.match(source, /community-reveal relative h-\[220px\]/);
+test("collection uses the Cyber Identity passport and asset tabs without loading the fan profile", () => {
+  assert.match(source, /src="\/video\/bg\.mp4"/);
+  assert.match(source, /autoPlay muted loop playsInline preload="auto"/);
+  assert.match(source, /onCanPlay=\{\(\) => void videoRef\.current\?\.play\(\)\}/);
+  assert.match(source, /const backgroundLayers =/);
+  assert.match(source, /styles\.loadingScreen[\s\S]*\{backgroundLayers\}/);
+  assert.match(source, /className=\{styles\.videoBackground\}/);
+  assert.match(source, /className=\{styles\.videoOverlay\}/);
+  assert.match(source, /className=\{styles\.videoGrid\}/);
+  assert.match(source, /className=\{styles\.videoScanlines\}/);
+  assert.match(collectionDashboardStyleSource, /\.videoBackground\s*\{[^}]*opacity:\s*0\.56[^}]*filter:\s*saturate\(0\.95\) hue-rotate\(8deg\)/);
+  assert.match(collectionDashboardStyleSource, /\.videoGrid\s*\{[^}]*opacity:\s*0\.24/);
+  assert.match(collectionDashboardStyleSource, /\.videoScanlines\s*\{[^}]*opacity:\s*0\.12/);
+  assert.match(source, /CYBER IDENTITY \/\/ FANORA PROTOCOL/);
+  assert.match(source, /Fanora Identity Awakening/);
+  assert.match(source, /ON-CHAIN PASSPORT/);
+  assert.match(source, /NFT BADGE HOLOGRAM/);
+  assert.match(source, /IDENTITY BLOCK STREAM/);
+  assert.match(source, /api\.get<MembershipLevel\[]>\("\/membership-levels"\)/);
+  assert.match(source, /levelProgressLabel/);
+  assert.match(source, /还需 \$\{neededFan\.toLocaleString\("en-US"\)\} FAN/);
   assert.match(source, /key=\{activeTab\}/);
   assert.match(source, /<CollectibleCard/);
   assert.match(source, /key=\{item\.token_type_id\}/);
@@ -38,12 +78,17 @@ test("collection uses a profile banner, overlapping avatar, and asset tabs", () 
   assert.match(source, /animationDelay: `\$\{Math\.min\(index, 12\) \* 55\}ms`/);
   assert.match(source, /链上身份/);
   assert.match(source, /我的收藏/);
+  assert.match(source, /身份资料/);
+  assert.match(source, /<CollectionProfilePanel onSaved=\{refreshCollectionAfterProfileSave\}/);
+  assert.match(collectionProfileSource, /api\.patch<FanoraUser>\("\/users\/me"/);
+  assert.match(collectionProfileSource, /系统会自动更新链上卡面/);
+  assert.doesNotMatch(collectionProfileSource, /\/profile\/me/);
+  assert.match(profileRouteSource, /redirect\("\/collection\?tab=profile"\)/);
   assert.doesNotMatch(source, /徽章申请/);
   assert.doesNotMatch(source, /\/nft\/applications/);
-  assert.match(source, /api\.get<FanProfileAnalysis>\("\/profile\/me"\)/);
-  assert.match(source, /<FanProfileSummary profile=\{fanProfile\}/);
-  assert.doesNotMatch(source, /Promise\.all\(\[\s*api\.get<MyCollection>\("\/nft\/me"\),\s*api\.get<FanProfileAnalysis>\("\/profile\/me"\)/);
-  assert.match(source, /void api\.get<FanProfileAnalysis>\("\/profile\/me"\)[\s\S]*const response = await api\.get<MyCollection>\("\/nft\/me"\)/);
+  assert.doesNotMatch(source, /FanProfileAnalysis/);
+  assert.doesNotMatch(source, /FanProfileSummary/);
+  assert.doesNotMatch(source, /api\.get.*\("\/profile\/me"\)/);
 });
 
 test("collection keeps identity synchronization and on-chain links", () => {
@@ -62,6 +107,8 @@ test("collection keeps identity synchronization and on-chain links", () => {
   assert.match(source, /确认区块/);
   assert.match(source, /https:\/\/testnet\.monadvision\.com\/nft\/\$\{identity\.contract_address\}\/\$\{visibleTokenId\}\?tab=Overview/);
   assert.match(source, /在 MonadVision 查看 NFT/);
+  assert.match(source, /const identityExplorerUrl = membershipNftExplorerUrl\(identity, chainTokenId\)/);
+  assert.match(source, /href=\{identityExplorerUrl\}[\s\S]*身份已在 Monad 验证<ExternalLink \/>/);
   assert.match(source, /fan_nft_creation_id/);
   assert.match(source, /\/item\/\$\{item\.fan_nft_creation_id\}/);
   assert.match(source, /查看链上资产/);
@@ -74,12 +121,13 @@ test("collection keeps identity synchronization and on-chain links", () => {
   assert.match(source, /累计获得 FAN 确认会员等级/);
 });
 
-test("collection redirects inactive members to the membership join page before loading assets", () => {
+test("collection keeps profile editing available while redirecting inactive members from asset tabs", () => {
   const routeGuard = source.slice(
     source.indexOf('if (status === "anonymous"'),
     source.indexOf("const identity = collection?.identity"),
   );
-  assert.match(routeGuard, /if \(!user\.is_official_member\) \{\s*router\.replace\("\/membership\/join"\);\s*return;/);
+  assert.match(routeGuard, /requestedTab !== "profile"/);
+  assert.match(routeGuard, /if \(!user\.is_official_member && requestedTab !== "profile"\) \{\s*router\.replace\("\/membership\/join"\);\s*return;/);
   assert.ok(routeGuard.indexOf('router.replace("/membership/join")') < routeGuard.indexOf("void load()"));
 });
 
@@ -93,12 +141,18 @@ test("collection automatically creates, refreshes, reveals, and downloads a free
   assert.match(source, /\/img\/membercard\/membercard\.jpg/);
   assert.match(source, /membership-card-stage/);
   assert.match(source, /progressKind: "member-card"/);
+  assert.match(source, /const MEMBER_CARD_CELEBRATION_MS = 4_000/);
+  assert.match(source, /imageUrl: completedIdentity\?\.image_url/);
+  assert.match(source, /celebrate: response\.data\.changed/);
+  assert.match(source, /celebrationDurationMs: MEMBER_CARD_CELEBRATION_MS/);
   assert.match(transactionProgressSource, /"member-card": \["验证会员身份"/);
   assert.doesNotMatch(transactionProgressSource, /"member-card": \["扣除 FAN"/);
   assert.match(source, /downloadMembershipCard/);
   assert.match(source, /会员等级已更新，点击卡面刷新会员证/);
   const autoCardSyncBlock = source.slice(source.indexOf("const syncKey = ["), source.indexOf("].join", source.indexOf("const syncKey = [")));
   assert.doesNotMatch(autoCardSyncBlock, /fan_token_lifetime_earned/);
+  assert.match(autoCardSyncBlock, /user\.display_name/);
+  assert.match(autoCardSyncBlock, /user\.username/);
 });
 
 test("owned collection NFTs can be selected as the current profile avatar", () => {
@@ -111,38 +165,140 @@ test("owned collection NFTs can be selected as the current profile avatar", () =
   assert.match(source, /user\.avatar_url === item\.image_url/);
 });
 
-test("fan NFT publishing is guarded by spendable FAN balance", () => {
+test("Gallery routes NFT creation to the stateful Agent studio", () => {
   const marketSource = readFileSync(
     new URL("../components/nft/FanNftMarket.tsx", import.meta.url),
     "utf8",
   );
-  const markdownEditorSource = readFileSync(
-    new URL("../components/community/MarkdownEditor.tsx", import.meta.url),
+  const createPageSource = readFileSync(
+    new URL("../app/collections/create/page.tsx", import.meta.url),
+    "utf8",
+  );
+  const studioSource = readFileSync(new URL("../components/nft/NftStudioWorkbench.tsx", import.meta.url), "utf8");
+  const templateModalSource = readFileSync(
+    new URL("../components/nft/NftVisualTemplateModal.tsx", import.meta.url),
+    "utf8",
+  );
+  const templateModalStyles = readFileSync(
+    new URL("../components/nft/NftVisualTemplateModal.module.css", import.meta.url),
+    "utf8",
+  );
+  const publishConfirmModalSource = readFileSync(
+    new URL("../components/nft/PublishConfirmModal.tsx", import.meta.url),
     "utf8",
   );
 
-  assert.match(marketSource, /user\.fan_token_balance < publishFeeFanTokens/);
-  assert.match(marketSource, /可用 FAN 不足/);
-  assert.match(marketSource, /发布费/);
-  assert.match(marketSource, /function PublishModal/);
-  assert.match(marketSource, /NiceModal\.show\(GlobalProcessModal/);
-  assert.match(marketSource, /progressKind: "publish"/);
-  assert.match(marketSource, /正在上传图片与 metadata 到 IPFS/);
-  assert.match(marketSource, /transition-opacity duration-200/);
-  assert.match(marketSource, /translate-y-3 scale-95 opacity-0/);
-  assert.match(marketSource, /NFT 名称/);
-  assert.match(marketSource, /主题 \/ 分类/);
-  assert.match(marketSource, /NFT 故事描述/);
-  assert.match(marketSource, /<MarkdownEditor/);
-  assert.match(markdownEditorSource, /title: "图片"/);
-  assert.match(markdownEditorSource, /!\[/);
-  assert.match(marketSource, /imageUrls=\{storyImageUrls\}/);
-  assert.match(marketSource, /onImageUrlsChange=\{setStoryImageUrls\}/);
-  assert.match(marketSource, /story_image_urls: storyImageUrls/);
-  assert.match(marketSource, /版权声明/);
-  assert.match(marketSource, /h-11 w-11/);
-  assert.match(marketSource, /hover:bg-accent/);
-  assert.match(marketSource, /place-items-center/);
+  assert.match(marketSource, /href="\/collections\/create"/);
+  assert.match(marketSource, /创造 NFT/);
+  assert.doesNotMatch(marketSource, /setPublishOpen\(true\)/);
+  assert.match(createPageSource, /<NftStudioWorkbench/);
+  assert.match(studioSource, /\/nft\/creations\/agent\/chat/);
+  assert.match(studioSource, /\/nft\/creations\/agent\/templates/);
+  assert.match(studioSource, /\/nft\/creations\/agent\/styles/);
+  assert.match(studioSource, /conversation_id: conversationId/);
+  assert.match(studioSource, /reference_image_urls: referenceImages/);
+  assert.match(studioSource, /result\.template\.id/);
+  assert.match(studioSource, /result\.saved_template/);
+  assert.match(studioSource, /帮我推荐一个模板/);
+  assert.match(studioSource, /把当前版本另存为模板/);
+  assert.match(studioSource, /故事和画面方向成熟后，我会自动生成作品/);
+  assert.match(studioSource, /imageGenerationRecommended/);
+  assert.match(studioSource, /\/nft\/forge\/analyze/);
+  assert.match(studioSource, /\/nft\/forge\/\$\{preparedForge\.id\}\/\$\{endpoint\}/);
+  assert.doesNotMatch(studioSource, /<ForgeStrategyPanel/);
+  assert.doesNotMatch(studioSource, /<ForgeResultModal/);
+  assert.match(studioSource, /<PublishConfirmModal/);
+  assert.doesNotMatch(studioSource, /window\.confirm/);
+  assert.match(studioSource, /NiceModal\.show\(GlobalProcessModal/);
+  assert.match(studioSource, /progressKind: "publish"/);
+  assert.match(studioSource, /phase: "processing"/);
+  assert.match(studioSource, /phase: "complete"/);
+  assert.match(studioSource, /NiceModal\.show\(GlobalInfoModal/);
+  assert.match(studioSource, /eyebrow: "NFT MINTED"/);
+  assert.match(studioSource, /celebrate: true/);
+  assert.match(studioSource, /celebrationDurationMs: 4_000/);
+  assert.match(studioSource, /router\.push\("\/collections"\)/);
+  assert.doesNotMatch(studioSource, /router\.push\(`\/item\//);
+  assert.match(studioSource, /NFT 发行判定未通过/);
+  assert.match(studioSource, /返回创作台重试/);
+  assert.match(publishConfirmModalSource, /role="dialog"/);
+  assert.match(publishConfirmModalSource, /aria-modal="true"/);
+  assert.match(publishConfirmModalSource, /确认发行这件作品/);
+  assert.match(publishConfirmModalSource, /本次判定消耗/);
+  assert.match(publishConfirmModalSource, /获得 1 个 Memory Fragment/);
+  assert.doesNotMatch(studioSource, /sendMessage\("生成图片"\)/);
+  assert.match(studioSource, /NFT 展厅/);
+  assert.match(studioSource, /VERSION CABINET/);
+  assert.match(studioSource, /uploadCabinetImage/);
+  assert.match(studioSource, /上传图片/);
+  assert.match(studioSource, /\/nft\/creations\/agent\/analyze-upload/);
+  const selectVersionRequestBlock = studioSource.slice(
+    studioSource.indexOf("const selectVersion"),
+    studioSource.indexOf("useEffect(() => {", studioSource.indexOf("const selectVersion")),
+  );
+  assert.match(selectVersionRequestBlock, /api\.get<NftForgeSession>\(`\/nft\/forge\/\$\{version\.forge\.id\}`\)/);
+  assert.doesNotMatch(selectVersionRequestBlock, /forge\/analyze|\/strategy/);
+  assert.match(studioSource, /setSelectedVersionId\(pendingVersionId\)/);
+  assert.ok(
+    studioSource.indexOf("setSelectedVersionId(pendingVersionId)")
+      < studioSource.indexOf('api.post<NftUploadedImageAnalysis>('),
+  );
+  assert.match(studioSource, /AI 五维评分和发行建议/);
+  assert.match(studioSource, /TOOL TRACE/);
+  assert.match(studioSource, />STATE</);
+  assert.match(studioSource, /src="\/video\/bg\.mp4"/);
+  assert.match(studioSource, /<NftVisualTemplateModal/);
+  const loadStudioStateBlock = studioSource.slice(
+    studioSource.indexOf("const loadStudioState"),
+    studioSource.indexOf("const openTemplateLibrary"),
+  );
+  const openTemplateLibraryBlock = studioSource.slice(
+    studioSource.indexOf("const openTemplateLibrary"),
+    studioSource.indexOf("const selectTemplate"),
+  );
+  assert.doesNotMatch(loadStudioStateBlock, /\/nft\/creations\/agent\/templates/);
+  assert.match(openTemplateLibraryBlock, /\/nft\/creations\/agent\/templates/);
+  assert.match(studioSource, /defaultTemplateId = "concert"/);
+  assert.match(studioSource, /点击后加载模板和参考图/);
+  assert.match(templateModalSource, /resetCreateForm\(\)/);
+  assert.match(templateModalSource, /className=\{styles\.referenceUpload\}/);
+  assert.match(studioSource, /<MarkdownEditor/);
+  assert.match(studioSource, /story_image_urls: descriptionImages/);
+  assert.match(studioSource, /Agent 会按故事状态调用模板、保存和图片生成工具/);
+  assert.match(studioSource, /result\.image_generated && result\.draft\.image_data_url/);
+  assert.match(studioSource, /MEMORY FORGE/);
+  assert.match(studioSource, /发行成功率/);
+  assert.doesNotMatch(studioSource, /Perfect/);
+  const selectTemplateBlock = studioSource.slice(
+    studioSource.indexOf("const selectTemplate"),
+    studioSource.indexOf("const sendMessage"),
+  );
+  assert.match(selectTemplateBlock, /setInput\(`使用视觉模板「\$\{template\.name\}」：\$\{template\.prompt\}`\)/);
+  assert.doesNotMatch(selectTemplateBlock, /setInput\(\(current\)/);
+  assert.ok(
+    studioSource.indexOf(`/nft/forge/${"${preparedForge.id}"}/${"${endpoint}"}`)
+      < studioSource.indexOf('api.post<FanNftCreateResponse>("/nft/creations"'),
+  );
+
+  assert.match(templateModalSource, /视觉模板库/);
+  assert.match(templateModalSource, /从 Post 选择/);
+  assert.match(templateModalSource, /从 NFT 选择/);
+  assert.match(templateModalSource, /PAGE_SIZE = 6/);
+  assert.match(templateModalSource, /POST_PAGE_SIZE = 8/);
+  assert.match(templateModalSource, /pageItems\(posts, POST_PAGE_SIZE\)/);
+  assert.match(templateModalSource, /total=\{posts\.length\} pageSize=\{POST_PAGE_SIZE\}/);
+  assert.match(templateModalSource, /\/nft\/me\/creations/);
+  assert.match(templateModalSource, /\/nft\/me/);
+  assert.match(templateModalSource, /\/community\/posts\?limit=50&sort=latest/);
+  assert.match(templateModalSource, /reference_image_urls: referenceUrls/);
+  assert.match(templateModalSource, /source_post_id: selectedPost\?\.id/);
+  assert.match(templateModalSource, /uploadImage\(file\)/);
+  assert.match(templateModalSource, /preview_image_url/);
+  assert.equal((templateModalSource.match(/className=\{styles\.masonryGrid\}/g) ?? []).length, 3);
+  assert.equal((templateModalSource.match(/<MasonryImage /g) ?? []).length, 3);
+  assert.match(templateModalStyles, /\.masonryGrid\{column-count:3/);
+  assert.match(templateModalStyles, /\.masonryImage\{display:block;width:100%;height:auto;object-fit:contain\}/);
+  assert.doesNotMatch(templateModalStyles, /\.postImage\{[^}]*aspect-ratio/);
 });
 
 test("fan NFT marketplace has category tabs", () => {
@@ -167,6 +323,14 @@ test("fan NFT marketplace has category tabs", () => {
   assert.match(marketSource, /aria-label="NFT 分类"/);
   assert.match(marketSource, /border-b-2 px-0\.5 py-3/);
   assert.match(marketSource, /web3-action-button shrink-0 rounded-full/);
+  assert.match(marketSource, /ON-CHAIN EXHIBITION HALL/);
+  assert.match(marketSource, /COLLECTION CABINET/);
+  assert.match(marketSource, /Gallery 链路状态/);
+  assert.match(marketSource, /styles\.cardWall/);
+  assert.match(marketSource, /styles\.cardScan/);
+  assert.match(marketSource, /styles\.authorLine/);
+  assert.match(marketSource, /styles\.authorLevel/);
+  assert.doesNotMatch(marketSource, /ml-11 text-xs text-jacarta-400/);
   assert.match(marketSource, /function NftCard/);
   assert.match(marketSource, /onLike: \(item: FanNftListing\) => void/);
   assert.match(marketSource, /onOpen: \(item: FanNftListing\) => void/);
@@ -279,11 +443,23 @@ test("chain transactions connect nodes and resolve into NFT or identity artifact
   assert.match(marketSource, /progressKind: "mint"/);
   assert.match(marketSource, /await hideGlobalProcessModal\(\)/);
   assert.match(marketSource, /celebrate: true/);
+  assert.match(marketSource, /celebrationDurationMs: 4_000/);
   assert.doesNotMatch(marketSource, /<ChainTransactionProgress/);
   assert.match(collectionSource, /progressKind: "identity"/);
   assert.match(collectionSource, /progressKind: "member-card"/);
   assert.match(collectionSource, /NiceModal\.show\(GlobalInfoModal/);
   assert.doesNotMatch(collectionSource, /<ChainTransactionProgress/);
+});
+
+test("global process modal close cannot deadlock the success flow", () => {
+  const hideBlock = globalProcessModalSource.slice(
+    globalProcessModalSource.indexOf("export async function hideGlobalProcessModal"),
+    globalProcessModalSource.indexOf("export default GlobalProcessModal"),
+  );
+  assert.doesNotMatch(hideBlock, /await NiceModal\.hide/);
+  assert.match(hideBlock, /void NiceModal\.hide/);
+  assert.match(hideBlock, /await new Promise/);
+  assert.match(hideBlock, /NiceModal\.remove/);
 });
 
 test("NFT success modals are not delayed by profile refreshes", () => {
@@ -299,6 +475,20 @@ test("NFT success modals are not delayed by profile refreshes", () => {
   assert.ok(purchaseBlock.indexOf("setBusy(null)") < purchaseBlock.indexOf("NiceModal.show(GlobalInfoModal"));
   assert.ok(purchaseBlock.indexOf('phase: "complete"') < purchaseBlock.indexOf("NiceModal.show(GlobalInfoModal"));
   assert.ok(purchaseBlock.indexOf("void hideGlobalProcessModal().catch") < purchaseBlock.indexOf("NiceModal.show(GlobalInfoModal"));
+});
+
+test("NFT purchase errors appear in a dismissible tooltip", () => {
+  const marketSource = readFileSync(new URL("../components/nft/FanNftMarket.tsx", import.meta.url), "utf8");
+  const buyStart = marketSource.indexOf("const buy = async () =>");
+  const buyEnd = marketSource.indexOf("const toggleEngagement", buyStart);
+  const buyBlock = marketSource.slice(buyStart, buyEnd);
+
+  assert.match(marketSource, /You already own the creator side of this NFT/);
+  assert.match(marketSource, /已经拥有创作者侧资产，无需重复购买/);
+  assert.match(buyBlock, /showPurchaseTooltip\(purchaseErrorText\(error\)\)/);
+  assert.match(marketSource, /role="alert"/);
+  assert.match(marketSource, /关闭购买错误提示/);
+  assert.match(marketSource, /6_000/);
 });
 
 test("successful NFT publishing unlocks and closes the composer before showing the acquired modal", () => {

@@ -319,28 +319,6 @@ TASK_SEEDS = [
             }
         },
     },
-    {
-        "id": ANNIVERSARY_BADGE_TASK_ID,
-        "title": "周年限定 Badge 解锁",
-        "description": "为周年链上收藏预留资格任务，当前先展示活动规则与未来领取入口。",
-        "task_type": "future",
-        "status": "paused",
-        "reward_fan_tokens": 100,
-        "target_post_id": None,
-        "participation_limit": 10_000,
-        "validation_rule": {
-            "presentation": {
-                "catalog_key": "anniversary-badge",
-                "image_url": "/img/fanora/activity-badge.jpg",
-                "category": "special",
-                "interaction_prompt": "持续参与社区，为未来周年纪念收藏积累资格",
-                "action_url": "/community/tasks",
-                "action_label": "查看开放进度",
-                "badge_label": "限量 10,000 枚",
-                "special": True,
-            }
-        },
-    },
 ]
 
 MEMBERSHIP_LEVEL_SEEDS = [
