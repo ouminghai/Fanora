@@ -94,6 +94,7 @@ export default function NftStudioWorkbench() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const versionSelectionRequestRef = useRef(0);
   const strategyTooltipTimerRef = useRef<number | null>(null);
+  const lastStrategyRequestRef = useRef<string | null>(null);
   const [templates, setTemplates] = useState<NftVisualTemplate[]>([]);
   const [visualStyles, setVisualStyles] = useState<NftVisualStyle[]>([]);
   const [templateId, setTemplateId] = useState("");
@@ -366,7 +367,10 @@ export default function NftStudioWorkbench() {
   useEffect(() => {
     if (!forgeSession || busy || forgeSession.status === "FORGING" || forgeSession.status === "PUBLISHED") return;
     if (forgeSession.supply === supply && forgeSession.price_fan_tokens === price) return;
+    const strategyRequestKey = `${forgeSession.id}:${supply}:${price}`;
+    if (lastStrategyRequestRef.current === strategyRequestKey) return;
     const timer = window.setTimeout(async () => {
+      lastStrategyRequestRef.current = strategyRequestKey;
       setBusy("strategy");
       try {
         const response = await api.patch<NftForgeSession>(`/nft/forge/${forgeSession.id}/strategy`, {

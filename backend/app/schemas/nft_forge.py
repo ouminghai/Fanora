@@ -39,8 +39,8 @@ class NftForgeAnalyzeRequest(BaseModel):
 
 
 class NftForgeStrategyRequest(BaseModel):
-    supply: int = Field(ge=1, le=1000)
-    price_fan_tokens: int = Field(ge=1, le=1_000_000)
+    supply: int = Field(ge=1, le=1000000)
+    price_fan_tokens: int = Field(ge=1, le=1_000_000_000)
     forge_mode: ForgeMode
 
 

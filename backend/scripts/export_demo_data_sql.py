@@ -1,55 +1,25 @@
-"""Export Fanora demo data from a source database to a portable SQL file."""
+"""Export every database table except alembic_version to a portable SQL file."""
 
 import argparse
 import json
+import math
 import os
-from datetime import date, datetime
+import sys
+from datetime import date, datetime, time
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Table, select
+from sqlalchemy import MetaData, Table, select
 from sqlalchemy.ext.asyncio import AsyncEngine, create_async_engine
-from sqlmodel import SQLModel
-
-import app.models.database  # noqa: F401
-from app.core.config import settings
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_OUTPUT = BACKEND_ROOT / "fanora_demo_data.sql"
+sys.path.insert(0, str(BACKEND_ROOT))
 
-EXPORT_TABLES = [
-    "users",
-    "user_profiles",
-    "wallets",
-    "auth_identities",
-    "user_roles",
-    "user_sessions",
-    "login_challenges",
-    "auth_security_events",
-    "communities",
-    "community_members",
-    "nft_metadata_versions",
-    "chain_operations",
-    "collectible_token_types",
-    "nft_applications",
-    "membership_identity_nfts",
-    "collectible_ownerships",
-    "community_posts",
-    "community_replies",
-    "community_post_reactions",
-    "community_reply_likes",
-    "fan_tasks",
-    "task_participations",
-    "task_audit_logs",
-    "task_content_reviews",
-    "daily_check_ins",
-    "fan_token_ledger",
-    "official_membership_payments",
-    "nft_creation_reactions",
-    "task_nft_rewards",
-    "fan_profile_runs",
-]
+from app.core.config import settings  # noqa: E402
+
+DEFAULT_OUTPUT = BACKEND_ROOT / "fanora_demo_data.sql"
+EXCLUDED_TABLES = {"alembic_version"}
 
 
 def async_database_url(url: str) -> str:
@@ -74,73 +44,67 @@ def sql_identifier(value: str) -> str:
     return '"' + value.replace('"', '""') + '"'
 
 
-def sql_literal(value: Any) -> str:
+def sql_literal(value: Any, *, dialect_name: str) -> str:
     if value is None:
         return "NULL"
     if isinstance(value, bool):
         return "TRUE" if value else "FALSE"
-    if isinstance(value, int | float | Decimal):
+    if isinstance(value, int | Decimal):
         return str(value)
-    if isinstance(value, datetime):
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return "NULL"
+        return repr(value)
+    if isinstance(value, datetime | date | time):
         return "'" + value.isoformat().replace("'", "''") + "'"
-    if isinstance(value, date):
-        return "'" + value.isoformat().replace("'", "''") + "'"
-    if isinstance(value, dict | list):
-        return "'" + json.dumps(value, ensure_ascii=False).replace("'", "''") + "'"
+    if isinstance(value, bytes | bytearray | memoryview):
+        hex_value = bytes(value).hex()
+        if dialect_name == "postgresql":
+            return f"decode('{hex_value}', 'hex')"
+        return f"X'{hex_value}'"
+    if isinstance(value, dict | list | tuple):
+        value = json.dumps(value, ensure_ascii=False, separators=(",", ":"), default=str)
     return "'" + str(value).replace("'", "''") + "'"
 
 
-def upsert_statement(table: Table, row: dict[str, Any]) -> str:
+def insert_statement(table: Table, row: dict[str, Any], *, dialect_name: str) -> str:
     columns = [column.name for column in table.columns]
     column_sql = ", ".join(sql_identifier(column) for column in columns)
-    value_sql = ", ".join(sql_literal(row[column]) for column in columns)
-    primary_keys = [column.name for column in table.primary_key.columns]
-    if not primary_keys:
-        return f"INSERT INTO {sql_identifier(table.name)} ({column_sql}) VALUES ({value_sql});"
-
-    conflict_sql = ", ".join(sql_identifier(column) for column in primary_keys)
-    update_columns = [column for column in columns if column not in primary_keys]
-    if not update_columns:
-        return (
-            f"INSERT INTO {sql_identifier(table.name)} ({column_sql}) VALUES ({value_sql}) "
-            f"ON CONFLICT ({conflict_sql}) DO NOTHING;"
-        )
-
-    update_sql = ", ".join(
-        f"{sql_identifier(column)} = EXCLUDED.{sql_identifier(column)}" for column in update_columns
-    )
-    return (
-        f"INSERT INTO {sql_identifier(table.name)} ({column_sql}) VALUES ({value_sql}) "
-        f"ON CONFLICT ({conflict_sql}) DO UPDATE SET {update_sql};"
-    )
+    value_sql = ", ".join(sql_literal(row[column], dialect_name=dialect_name) for column in columns)
+    return f"INSERT INTO {sql_identifier(table.name)} ({column_sql}) VALUES ({value_sql});"
 
 
-async def export_sql(database_url: str, output_path: Path, *, tables: set[str] | None) -> None:
+async def reflect_tables(engine: AsyncEngine) -> list[Table]:
+    metadata = MetaData()
+    async with engine.connect() as connection:
+        await connection.run_sync(metadata.reflect)
+    return [table for table in metadata.sorted_tables if table.name not in EXCLUDED_TABLES]
+
+
+async def export_sql(database_url: str, output_path: Path) -> None:
     engine = create_engine(database_url)
-    metadata = SQLModel.metadata
     output_path.parent.mkdir(parents=True, exist_ok=True)
     try:
+        tables = await reflect_tables(engine)
+        dialect_name = engine.dialect.name
+        total_rows = 0
         with output_path.open("w", encoding="utf-8") as file:
-            file.write("-- Fanora demo data export. Generated by scripts/export_demo_data_sql.py\n")
-            file.write("-- Import with scripts/import_demo_data_sql.py inside Railway.\n\n")
+            file.write("-- Fanora full data export. Generated by scripts/export_demo_data_sql.py\n")
+            file.write("-- Contains every reflected table except alembic_version.\n")
+            file.write("-- Restore with scripts/import_demo_data_sql.py.\n\n")
             async with engine.connect() as connection:
-                for table_name in EXPORT_TABLES:
-                    if tables is not None and table_name not in tables:
-                        continue
-                    table = metadata.tables.get(table_name)
-                    if table is None:
-                        print(f"Warning: skipped unknown table {table_name}")
-                        continue
+                for table in tables:
                     rows = (await connection.execute(select(table))).mappings().all()
-                    file.write(f"-- table: {table_name}, rows: {len(rows)}\n")
+                    file.write(f"-- table: {table.name}, rows: {len(rows)}\n")
                     for row in rows:
-                        file.write(upsert_statement(table, dict(row)))
+                        file.write(insert_statement(table, dict(row), dialect_name=dialect_name))
                         file.write("\n")
                     file.write("\n")
-                    print(f"Exported {table_name}: {len(rows)} rows")
+                    total_rows += len(rows)
+                    print(f"Exported {table.name}: {len(rows)} rows")
     finally:
         await engine.dispose()
-    print(f"SQL export written: {output_path}")
+    print(f"SQL export written: {output_path} (tables={len(tables)}, rows={total_rows})")
 
 
 def parse_args() -> argparse.Namespace:
@@ -151,11 +115,6 @@ def parse_args() -> argparse.Namespace:
         help="Source database URL, defaults to SOURCE_DATABASE_URL or DATABASE_URL",
     )
     parser.add_argument("--output", default=str(DEFAULT_OUTPUT), help=f"Output SQL file, default: {DEFAULT_OUTPUT}")
-    parser.add_argument(
-        "--tables",
-        default="",
-        help="Optional comma-separated table names to export. Default exports the full demo table set.",
-    )
     return parser.parse_args()
 
 
@@ -163,10 +122,4 @@ if __name__ == "__main__":
     import asyncio
 
     args = parse_args()
-    asyncio.run(
-        export_sql(
-            args.source_database_url,
-            Path(args.output),
-            tables={table.strip() for table in args.tables.split(",") if table.strip()} or None,
-        )
-    )
+    asyncio.run(export_sql(args.source_database_url, Path(args.output)))

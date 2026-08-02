@@ -277,6 +277,13 @@ test("Gallery routes NFT creation to the stateful Agent studio", () => {
   assert.match(studioSource, /关闭发行参数错误提示/);
   assert.match(studioSource, /forgeStrategyTooltipText\(apiErrorMessage\(error/);
   assert.match(studioStyleSource, /\.strategyTooltip\s*\{/);
+  const strategySyncBlock = studioSource.slice(
+    studioSource.indexOf("useEffect(() => {", studioSource.indexOf("const selectVersion")),
+    studioSource.indexOf("const uploadReferences"),
+  );
+  assert.match(studioSource, /const lastStrategyRequestRef = useRef<string \| null>\(null\)/);
+  assert.match(strategySyncBlock, /lastStrategyRequestRef\.current === strategyRequestKey/);
+  assert.match(strategySyncBlock, /lastStrategyRequestRef\.current = strategyRequestKey/);
   assert.doesNotMatch(studioSource, /Perfect/);
   const selectTemplateBlock = studioSource.slice(
     studioSource.indexOf("const selectTemplate"),
