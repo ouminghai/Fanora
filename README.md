@@ -5,7 +5,9 @@
 [在线 Demo](https://fanora-orpin.vercel.app/) · [完整项目说明](docs/produce/README.md) · [系统架构](docs/produce/ARCHITECTURE.md) · [AI Agent 设计](docs/produce/AI_AGENT_DESIGN.md)
 
 ![Fanora 项目首页](docs/image.png)
+![alt text](docs/image2.png)
 ![ai agent NFT creation](docs/image3.png)
+
 ## 为什么是 Fanora
 
 粉丝在社区里的签到、创作和互动通常无法沉淀为长期资产；传统 NFT 工具又常常只生成一张缺少故事的图片。Fanora 将两条路径连接成一个闭环：
@@ -38,13 +40,13 @@ flowchart LR
 
 ## 技术架构
 
-| 层 | 技术 |
-| --- | --- |
-| Frontend | Next.js 15、React 19、TypeScript、RainbowKit、wagmi、viem |
-| Backend | FastAPI、Python 3.13、SQLModel、Pydantic、Alembic |
-| AI Agent | LangGraph、LangChain Core、OpenAI-compatible LLM / Image Model |
-| Data & Media | PostgreSQL、可选 Redis/Valkey、BeeImg、Pinata IPFS |
-| Blockchain | Monad Testnet、ERC-721 Membership SBT、ERC-1155 Collectibles |
+| 层            | 技术                                                           |
+| ------------ | ------------------------------------------------------------ |
+| Frontend     | Next.js 15、React 19、TypeScript、RainbowKit、wagmi、viem         |
+| Backend      | FastAPI、Python 3.13、SQLModel、Pydantic、Alembic                |
+| AI Agent     | LangGraph、LangChain Core、OpenAI-compatible LLM / Image Model |
+| Data & Media | PostgreSQL、可选 Redis/Valkey、BeeImg、Pinata IPFS                |
+| Blockchain   | Monad Testnet、ERC-721 Membership SBT、ERC-1155 Collectibles   |
 
 ## 本地启动
 
@@ -71,13 +73,13 @@ npm run dev
 
 ## 文档导航
 
-| 文档 | 适合谁 | 内容 |
-| --- | --- | --- |
-| [项目总览](docs/produce/README.md) | 评委、产品、开发者 | 问题、方案、MVP 路径、核心亮点与完成边界 |
-| [功能树](docs/produce/FUNCTION_TREE.md) | 评委、测试、产品 | 页面、功能、API 与角色边界 |
-| [系统架构](docs/produce/ARCHITECTURE.md) | 架构师、开发者 | 分层、数据事实源、关键时序、合约与故障边界 |
-| [AI Agent 设计](docs/produce/AI_AGENT_DESIGN.md) | AI、后端开发者 | LangGraph State、Node、Tool、Prompt 与模型降级 |
-| [系统需求](docs/produce/SYSTEM_REQUIREMENTS.md) | 产品、测试、评审 | MVP 范围、功能需求、非功能需求与验收标准 |
+| 文档                                             | 适合谁       | 内容                                     |
+| ---------------------------------------------- | --------- | -------------------------------------- |
+| [项目总览](docs/produce/README.md)                 | 评委、产品、开发者 | 问题、方案、MVP 路径、核心亮点与完成边界                 |
+| [功能树](docs/produce/FUNCTION_TREE.md)           | 评委、测试、产品  | 页面、功能、API 与角色边界                        |
+| [系统架构](docs/produce/ARCHITECTURE.md)           | 架构师、开发者   | 分层、数据事实源、关键时序、合约与故障边界                  |
+| [AI Agent 设计](docs/produce/AI_AGENT_DESIGN.md) | AI、后端开发者  | LangGraph State、Node、Tool、Prompt 与模型降级 |
+| [系统需求](docs/produce/SYSTEM_REQUIREMENTS.md)    | 产品、测试、评审  | MVP 范围、功能需求、非功能需求与验收标准                 |
 
 ## 项目结构
 
