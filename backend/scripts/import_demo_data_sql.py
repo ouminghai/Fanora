@@ -144,9 +144,9 @@ async def import_sql(
                 try:
                     if continue_on_error:
                         async with connection.begin_nested():
-                            await connection.execute(text(statement))
+                            await connection.exec_driver_sql(statement)
                     else:
-                        await connection.execute(text(statement))
+                        await connection.exec_driver_sql(statement)
                     written += 1
                 except SQLAlchemyError as error:
                     if not continue_on_error:
