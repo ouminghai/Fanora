@@ -44,6 +44,12 @@ from app.services.fan_tokens import fan_token_service
 from app.services.identity import AuthenticatedIdentity
 
 ALLOWED_IMAGE_TYPES = {"image/jpeg", "image/png", "image/webp", "image/gif"}
+IMAGE_FORMAT_MIME_TYPES = {
+    "JPEG": "image/jpeg",
+    "PNG": "image/png",
+    "WEBP": "image/webp",
+    "GIF": "image/gif",
+}
 
 
 class NftValidationError(ValueError):
@@ -109,16 +115,21 @@ class NftService:
                 response = await client.get(source)
                 response.raise_for_status()
                 content = response.content
-                mime_type = response.headers.get("content-type", "").split(";", 1)[0].lower()
-            if mime_type not in ALLOWED_IMAGE_TYPES:
-                raise NftValidationError("Remote image must be JPEG, PNG, WebP, or GIF")
+            if not content or len(content) > settings.nft_max_image_bytes:
+                raise NftValidationError("Image exceeds the configured file size limit")
             try:
                 with Image.open(io.BytesIO(content)) as image:
+                    mime_type = IMAGE_FORMAT_MIME_TYPES.get(image.format or "")
                     image.verify()
                 with Image.open(io.BytesIO(content)) as image:
                     width, height = image.size
             except (UnidentifiedImageError, OSError) as error:
                 raise NftValidationError("Remote image is not a valid image") from error
+            if mime_type not in ALLOWED_IMAGE_TYPES:
+                raise NftValidationError("Remote image must be JPEG, PNG, WebP, or GIF")
+            minimum, maximum = settings.nft_min_image_dimension, settings.nft_max_image_dimension
+            if width < minimum or height < minimum or width > maximum or height > maximum:
+                raise NftValidationError(f"Image dimensions must be between {minimum} and {maximum} pixels")
             return content, mime_type, width, height
         raise NftValidationError("Image source is unavailable")
 
@@ -470,9 +481,12 @@ class NftService:
         self, session: AsyncSession, identity: AuthenticatedIdentity, payload: NftApplicationCreate
     ) -> NftApplication:
         content, mime_type, width, height = await self._image_bytes_from_source(payload.image_data_url)
-        hosted_image_url = await beeimg_adapter.ensure_remote_url(payload.image_data_url, filename="fan-nft")
-        if hosted_image_url is None:
-            raise NftValidationError("NFT image is required")
+        hosted_image = await beeimg_adapter.upload_bytes(
+            content=content,
+            mime_type=mime_type,
+            filename="fan-nft",
+        )
+        hosted_image_url = hosted_image.url
         story_image_urls = await beeimg_adapter.ensure_remote_urls(
             payload.story_image_urls, filename_prefix="fan-nft-story"
         )
@@ -565,7 +579,9 @@ class NftService:
         finish_stage("validation")
         try:
             current_stage = "image_pin"
-            content, mime_type, _, _ = await self._image_bytes_from_source(payload.image_data_url)
+            if not application.image_data:
+                raise NftValidationError("NFT image is required")
+            content, mime_type, _, _ = await self._image_bytes_from_source(application.image_data)
             image = await pinata_adapter.pin_image(f"fan-nft-{application.id}", content, mime_type)
             finish_stage("image_pin")
             metadata_payload = {

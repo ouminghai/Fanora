@@ -2,6 +2,7 @@ import base64
 import io
 from typing import cast
 
+import httpx
 import pytest
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -9,6 +10,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 
 import app.models.database  # noqa: F401
+from app.adapters.beeimg import BeeImgUpload, beeimg_adapter
 from app.adapters.monad import ConfirmedContractTransaction, monad_contract_adapter
 from app.adapters.pinata import PinnedFile, pinata_adapter
 from app.core.config import settings
@@ -24,8 +26,9 @@ from app.models.nft import (
     TaskNftReward,
 )
 from app.models.user import Community, User, UserProfile, Wallet
-from app.services.identity import AuthenticatedIdentity
+from app.schemas.nft import NftApplicationCreate
 from app.services.fan_tokens import fan_token_service
+from app.services.identity import AuthenticatedIdentity
 from app.services.nft import NftService, NftValidationError
 
 
@@ -41,6 +44,97 @@ def test_custom_badge_image_validation_accepts_safe_png() -> None:
     assert content
     assert mime_type == "image/png"
     assert (width, height) == (256, 256)
+
+
+@pytest.mark.asyncio
+async def test_remote_png_is_detected_from_bytes_when_content_type_is_generic(monkeypatch) -> None:
+    _, encoded = image_data_url().split(",", 1)
+    png_content = base64.b64decode(encoded)
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        assert str(request.url) == "https://provider.example/generated.png"
+        return httpx.Response(
+            200,
+            content=png_content,
+            headers={"content-type": "application/octet-stream"},
+            request=request,
+        )
+
+    transport = httpx.MockTransport(handler)
+    real_async_client = httpx.AsyncClient
+
+    def mock_async_client(*args, **kwargs):
+        del args
+        return real_async_client(transport=transport, **kwargs)
+
+    monkeypatch.setattr("app.services.nft.httpx.AsyncClient", mock_async_client)
+
+    content, mime_type, width, height = await NftService()._image_bytes_from_source(
+        "https://provider.example/generated.png"
+    )
+
+    assert content == png_content
+    assert mime_type == "image/png"
+    assert (width, height) == (256, 256)
+
+
+@pytest.mark.asyncio
+async def test_create_application_rehosts_remote_image_on_beeimg(monkeypatch) -> None:
+    service = NftService()
+    source_url = "https://provider.example/generated.png"
+    png_content = base64.b64decode(image_data_url().split(",", 1)[1])
+    uploaded: list[tuple[bytes, str, str]] = []
+
+    async def image_bytes_from_source(source: str):
+        assert source == source_url
+        return png_content, "image/png", 256, 256
+
+    async def upload_bytes(*, content: bytes, mime_type: str, filename: str):
+        uploaded.append((content, mime_type, filename))
+        return BeeImgUpload(url="https://www.beeimg.cn/fan-nft.png", raw={})
+
+    async def reject_passthrough(*args, **kwargs):
+        del args, kwargs
+        raise AssertionError("Remote provider URL must not be passed through")
+
+    class FakeSession:
+        application = None
+
+        def add(self, application):
+            self.application = application
+
+        async def commit(self):
+            return None
+
+        async def refresh(self, application):
+            assert application is self.application
+
+    monkeypatch.setattr(service, "_image_bytes_from_source", image_bytes_from_source)
+    monkeypatch.setattr(beeimg_adapter, "upload_bytes", upload_bytes)
+    monkeypatch.setattr(beeimg_adapter, "ensure_remote_url", reject_passthrough)
+
+    application = await service.create_application(
+        cast(AsyncSession, FakeSession()),
+        AuthenticatedIdentity(
+            user_id="creator-user",
+            primary_wallet="0x1111111111111111111111111111111111111111",
+            wallet_type="external",
+            provider="wallet",
+        ),
+        NftApplicationCreate(
+            forge_session_id="forge-session-1",
+            name="Hosted NFT",
+            description="A remote generated image hosted for publishing.",
+            theme="memory",
+            price_fan_tokens=10,
+            max_supply=10,
+            copyright_declaration="I own the rights to publish this artwork.",
+            image_data_url=source_url,
+        ),
+    )
+
+    assert application.image_data == "https://www.beeimg.cn/fan-nft.png"
+    assert uploaded == [(png_content, "image/png", "fan-nft")]
 
 
 def test_token_ids_remain_stable_after_local_gallery_data_is_cleared() -> None:

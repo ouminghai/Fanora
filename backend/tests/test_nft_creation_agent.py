@@ -194,7 +194,7 @@ def test_image_prompt_merges_database_template_and_selected_style_into_priority_
 
 
 @pytest.mark.asyncio
-async def test_beeimg_failure_keeps_provider_preview_url(monkeypatch) -> None:
+async def test_beeimg_failure_does_not_expose_provider_preview_url(monkeypatch) -> None:
     async def reject_upload(*args, **kwargs):
         del args, kwargs
         raise BeeImgUploadError("请先绑定手机号")
@@ -215,7 +215,7 @@ async def test_beeimg_failure_keeps_provider_preview_url(monkeypatch) -> None:
 
     hosted_url, degraded, error = await _host_generated_preview(generated, filename="preview")
 
-    assert hosted_url == "https://provider.example/generated.png"
+    assert hosted_url is None
     assert degraded is True
     assert error == "请先绑定手机号"
 

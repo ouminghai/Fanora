@@ -23,7 +23,7 @@ def _tool_result(action: str, status: str, summary: str, **payload: Any) -> str:
 
 
 async def _host_generated_preview(generated: NftDraftResponse, *, filename: str) -> tuple[str | None, bool, str | None]:
-    """Prefer BeeImg, but retain the provider URL when account upload is blocked."""
+    """Return only a BeeImg-hosted preview; provider URLs are never publishable assets."""
 
     if not generated.image_data_url:
         return None, False, generated.image_error or "图片生成暂不可用。"
@@ -31,8 +31,6 @@ async def _host_generated_preview(generated: NftDraftResponse, *, filename: str)
         hosted_url = await beeimg_adapter.ensure_remote_url(generated.image_data_url, filename=filename)
         return hosted_url, False, None
     except (BeeImgConfigurationError, BeeImgUploadError, httpx.HTTPError) as error:
-        if generated.image_source_url:
-            return generated.image_source_url, True, str(error)
         return None, True, str(error)
 
 
