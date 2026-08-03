@@ -165,7 +165,7 @@ class MonadContractAdapter:
         receipt = web3.eth.wait_for_transaction_receipt(
             tx_hash,
             timeout=settings.chain_transaction_timeout_seconds,
-            poll_latency=2,
+            poll_latency=0.5,
         )
         if int(receipt["status"]) != 1:
             raise RuntimeError("Contract transaction reverted")
