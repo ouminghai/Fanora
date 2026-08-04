@@ -1,0 +1,52 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>链上与站内分工</title><style>
+@font-face{font-family:CalSans;src:url('../assets/CalSans-SemiBold.woff2')}
+@font-face{font-family:DMSans;src:url('../assets/DMSans-Regular.ttf')}
+@font-face{font-family:DMSans;src:url('../assets/DMSans-Bold.ttf');font-weight:700}
+:root{--night:#21112f;--night2:#12091d;--ink:#171123;--purple:#7444ff;--purple2:#9b72ff;--cyan:#45bfef;--paper:#f4f1ea;--paper2:#eae4da;--peach:#ffb56b;--green:#66d3a8;--muted:#675b70}
+*{box-sizing:border-box}html,body{margin:0;width:1920px;height:1080px;overflow:hidden}body{position:relative;font-family:DMSans,'PingFang SC','Microsoft YaHei',sans-serif;font-synthesis:none;line-break:strict;background:var(--paper);color:var(--ink)}h1,h2,h3,p{margin:0;text-wrap:balance}.logo{position:absolute;left:82px;top:58px;width:214px;height:auto;z-index:9}.logo-dark{padding:10px 15px;border-radius:13px;background:var(--night)}.page{position:absolute;right:82px;top:70px;font:700 18px/1 DMSans;letter-spacing:.12em;color:var(--muted)}.eyebrow{font:700 19px/1 DMSans;letter-spacing:.15em;text-transform:uppercase;color:var(--purple)}.title{font-family:CalSans,'PingFang SC','Microsoft YaHei';font-size:76px;line-height:1.18;letter-spacing:-.02em}.subtitle{font-size:29px;line-height:1.65;color:#554b5b}.paper{background:var(--paper);color:var(--ink);border-radius:42px;box-shadow:0 35px 95px rgba(31,12,43,.28)}.dark{background:var(--night);color:white}.dark .page{color:#cabfd2}.dark .eyebrow{color:#c7aaff}.rule{height:2px;background:rgba(23,17,35,.22)}.dark .rule{background:rgba(255,255,255,.18)}.mono{font-family:SFMono-Regular,Menlo,monospace;letter-spacing:.04em}.accent{color:var(--purple)}.cyan{color:var(--cyan)}.peach{color:#d67b2c}.footline{position:absolute;left:82px;right:82px;bottom:46px;padding-top:18px;border-top:1px solid rgba(23,17,35,.22);display:flex;justify-content:space-between;font:700 15px DMSans;letter-spacing:.13em;color:#6d6272}.dark .footline{border-color:rgba(255,255,255,.2);color:#c7bdce}.shadow-img{box-shadow:0 28px 75px rgba(27,10,38,.3)}
+
+body{--motion-speed:.95s;--motion-gap:.08s;--data-boost:0;--variant-glow:rgba(116,68,255,.22)}
+body:before{content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:calc(.1 + var(--data-boost)*.28);background:linear-gradient(115deg,transparent 0 42%,rgba(69,191,239,.15) 42.2% 43%,transparent 43.2%),radial-gradient(860px 520px at 78% 24%,rgba(116,68,255,.2),transparent 64%)}
+body:after{content:"";position:absolute;inset:0;z-index:50;pointer-events:none;opacity:.055;background-image:linear-gradient(90deg,rgba(23,17,35,.18) 1px,transparent 1px),linear-gradient(0deg,rgba(23,17,35,.12) 1px,transparent 1px);background-size:76px 76px;mix-blend-mode:multiply}
+.dark:after{opacity:.05;mix-blend-mode:screen;background-image:linear-gradient(90deg,rgba(244,241,234,.22) 1px,transparent 1px),linear-gradient(0deg,rgba(244,241,234,.16) 1px,transparent 1px)}
+body>*{z-index:1}
+.logo,.page,.eyebrow,h1,.subtitle,.footline,p,.memory-card,.intro-flow>*,.fragments span,.fade-id,.loop,.node,.center,.id-screen,.id-path>*,.agent-frame,.agent-points>*,.pipeline>*,.trigger>*,.forge-preview,.scores,.strategy,.fork>*,.credit>*,.publish-pipe>*,.duties>*,.timeline>*,.boundary-cols>*,.split>*,.lit-path>*,.done p,.not-now,.formula,.weights>*,.modes,.nodes>*,.state>*,.contracts>*,.matrix>*,.network,.arch-note,.layers>*{animation:slide-reveal var(--motion-speed) cubic-bezier(.16,.78,.2,1) both;animation-delay:calc(var(--i,0)*var(--motion-gap))}
+.logo,.page{--i:0}.eyebrow{--i:1}h1{--i:2}.subtitle,p{--i:3}.footline{--i:9}
+.intro-flow>*:nth-child(1),.pipeline>*:nth-child(1),.publish-pipe>*:nth-child(1),.timeline>*:nth-child(1),.lit-path>*:nth-child(1),.layers>*:nth-child(1),.matrix>*:nth-child(1){--i:3}
+.intro-flow>*:nth-child(2),.pipeline>*:nth-child(2),.publish-pipe>*:nth-child(2),.timeline>*:nth-child(2),.lit-path>*:nth-child(2),.layers>*:nth-child(2),.matrix>*:nth-child(2){--i:4}
+.intro-flow>*:nth-child(3),.pipeline>*:nth-child(3),.publish-pipe>*:nth-child(3),.timeline>*:nth-child(3),.lit-path>*:nth-child(3),.layers>*:nth-child(3),.matrix>*:nth-child(3){--i:5}
+.intro-flow>*:nth-child(n+4),.pipeline>*:nth-child(n+4),.publish-pipe>*:nth-child(n+4),.timeline>*:nth-child(n+4),.lit-path>*:nth-child(n+4),.layers>*:nth-child(n+4),.matrix>*:nth-child(n+4){--i:6}
+.scores i,.lit-path i{transform-origin:left center;animation:bar-grow 1.15s cubic-bezier(.18,.78,.18,1) both;animation-delay:calc(.35s + var(--i,0)*.08s)}
+.loop:before{content:"";position:absolute;inset:-22px;border-radius:50%;background:conic-gradient(from 250deg,var(--purple),var(--cyan),var(--peach),var(--purple));filter:blur(18px);opacity:.28;animation:spin-slow 18s linear infinite;z-index:-1}
+.loop .node,.center,.network,.source{animation-name:slide-reveal,float-soft}
+.pipeline i,.publish-pipe i,.nodes i{animation:pulse-arrow 1.8s ease-in-out infinite}
+body[data-variant="classic"]{--motion-speed:.75s;--motion-gap:.055s;--data-boost:0}
+body[data-variant="motion"]{--motion-speed:1.08s;--motion-gap:.095s;--data-boost:.2}
+body[data-variant="data"]{--motion-speed:.92s;--motion-gap:.065s;--data-boost:1}
+body[data-variant="data"] .scores,body[data-variant="data"] .layers,body[data-variant="data"] .matrix,body[data-variant="data"] .timeline,body[data-variant="data"] .loop,body[data-variant="data"] .split{filter:drop-shadow(0 28px 45px var(--variant-glow))}
+body[data-variant="data"] .node,body[data-variant="data"] .pipeline>div,body[data-variant="data"] .publish-pipe>div,body[data-variant="data"] .timeline>div,body[data-variant="data"] .layers>div,body[data-variant="data"] .matrix>div{outline:1px solid rgba(69,191,239,.28)}
+body[data-variant="data"] .scores i,body[data-variant="data"] .lit-path i{background:linear-gradient(90deg,var(--cyan),var(--purple),var(--peach))}
+@keyframes slide-reveal{from{opacity:0;transform:translate3d(0,34px,0) scale(.985);filter:blur(8px)}to{opacity:1;transform:translate3d(0,0,0) scale(1);filter:blur(0)}}
+@keyframes bar-grow{from{transform:scaleX(.02);opacity:.4}to{transform:scaleX(1);opacity:1}}
+@keyframes spin-slow{to{transform:rotate(360deg)}}
+@keyframes float-soft{50%{translate:0 -8px}}
+@keyframes pulse-arrow{50%{opacity:.45;transform:translateX(5px)}}
+@media (prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
+.chain-eye{position:absolute;left:86px;top:158px}.chain-title{position:absolute;left:84px;top:210px;font:78px/1.18 CalSans,'PingFang SC'}.split{position:absolute;left:82px;right:82px;top:455px;display:grid;grid-template-columns:1fr 1fr;gap:30px}.split section{height:380px;padding:40px 46px;border-radius:36px}.off{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.24)}.on{background:var(--paper);color:var(--ink)}.split-no{float:right;font:72px CalSans;color:rgba(199,170,255,.25)}.on .split-no{color:rgba(116,68,255,.2)}.split h2{font:38px CalSans;margin-bottom:25px}.off h2{color:#c7aaff}.on h2{color:var(--purple)}.split p{font-size:24px;line-height:1.65}.split b{display:block;margin-top:24px;font:700 17px DMSans;letter-spacing:.12em;color:var(--cyan)}.on b{color:var(--purple)}.chain-close{position:absolute;left:88px;bottom:62px;font:32px/1.45 CalSans;color:#d6ccd9}.chain-close span{color:var(--peach)}</style>
+<script>
+(function(){
+  const key = 'fanora-slide-variant';
+  function setVariant(v){
+    if (!document.body) return;
+    document.body.setAttribute('data-variant', v || localStorage.getItem(key) || 'motion');
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function(){ setVariant(); }, { once: true });
+  } else {
+    setVariant();
+  }
+  window.addEventListener('message', function(event){
+    if(event.data && event.data.type === 'fanora-variant') setVariant(event.data.variant);
+  });
+})();
+</script></head><body class="dark"><img class="logo" src="../assets/fanora-logo-white.png"><div class="page">14 / 21</div><div class="eyebrow chain-eye">RIGHT DATA · RIGHT PLACE</div><h1 class="chain-title">把高频体验留在站内，<br>把长期价值交给 Monad</h1><div class="split"><section class="off"><div class="split-no">01</div><h2>高频业务 · 站内事实</h2><p>用户、社区、任务、签到与 FAN 流水</p><p>Agent 对话状态与 Checkpoint</p><p>模板、参考图、预览与 Forge Session</p><b>POSTGRESQL · BEEIMG · LANGGRAPH</b></section><section class="on"><div class="split-no">02</div><h2>永久资产 · 链上事实</h2><p>正式会员身份：ERC-721 SBT</p><p>NFT、Badge 与收藏品：ERC-1155</p><p>最终图片与 metadata：Pinata IPFS</p><b>MONAD · IPFS</b></section></div><p class="chain-close">既保留 Web2 的交互效率，<br><span>也让关键身份与作品拥有长期可验证的归属。</span></p><div class="footline"><span>14 · ONCHAIN / OFFCHAIN</span><span>FAST WHERE NEEDED · PERMANENT WHERE VALUABLE</span></div></body></html>

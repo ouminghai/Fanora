@@ -1,0 +1,86 @@
+[
+  {
+    "file": "01-cover.html",
+    "label": "封面"
+  },
+  {
+    "file": "02-intro.html",
+    "label": "项目介绍"
+  },
+  {
+    "file": "03-problem.html",
+    "label": "问题"
+  },
+  {
+    "file": "04-loop.html",
+    "label": "产品闭环"
+  },
+  {
+    "file": "05-identity.html",
+    "label": "身份与成长"
+  },
+  {
+    "file": "06-agent.html",
+    "label": "AI 共创"
+  },
+  {
+    "file": "07-langgraph.html",
+    "label": "Agent 工作流"
+  },
+  {
+    "file": "08-forge.html",
+    "label": "Memory Forge"
+  },
+  {
+    "file": "09-recovery.html",
+    "label": "失败可恢复"
+  },
+  {
+    "file": "10-publish.html",
+    "label": "发布链路"
+  },
+  {
+    "file": "11-demo.html",
+    "label": "三分钟 Demo"
+  },
+  {
+    "file": "12-boundary.html",
+    "label": "AI 与确定性边界"
+  },
+  {
+    "file": "13-architecture.html",
+    "label": "系统架构"
+  },
+  {
+    "file": "14-onchain.html",
+    "label": "链上与站内分工"
+  },
+  {
+    "file": "15-delivered.html",
+    "label": "已实现"
+  },
+  {
+    "file": "16-close.html",
+    "label": "结尾"
+  },
+  {
+    "file": "17-thanks.html",
+    "label": "Thanks"
+  },
+  {
+    "file": "18-appendix-forge.html",
+    "label": "附录 A · Forge 规则"
+  },
+  {
+    "file": "19-appendix-agent.html",
+    "label": "附录 B · LangGraph"
+  },
+  {
+    "file": "20-appendix-contracts.html",
+    "label": "附录 C · 合约与部署"
+  },
+  {
+    "file": "21-appendix-safety.html",
+    "label": "附录 D · 安全与恢复"
+  }
+]

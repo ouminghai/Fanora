@@ -1,0 +1,66 @@
+{"kind":"deck","id":"pr/0pmrqq","name":"Deck"}
+{"kind":"layout","layoutId":"b32367e3-5822-4dc8-92db-bfb9c9504b17","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"b0dc3fd1-88a6-403a-9575-3ee31715c696","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/yn5d62","slide":1,"title":"Slide 1","textShapes":0}
+{"kind":"image","id":"im/5gz6tsre","slide":1,"name":"","alt":"Fanora presentation slide 1: 封面","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/yn5d62","slide":1,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/5zr4hc","slide":2,"title":"Slide 2","textShapes":0}
+{"kind":"image","id":"im/jyt4jito","slide":2,"name":"","alt":"Fanora presentation slide 2: 项目介绍","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/5zr4hc","slide":2,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/uaks38","slide":3,"title":"Slide 3","textShapes":0}
+{"kind":"image","id":"im/mlkn65on","slide":3,"name":"","alt":"Fanora presentation slide 3: 问题","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/uaks38","slide":3,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/jlndxj","slide":4,"title":"Slide 4","textShapes":0}
+{"kind":"image","id":"im/lkbqp0je","slide":4,"name":"","alt":"Fanora presentation slide 4: 产品闭环","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/jlndxj","slide":4,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/tz9smt","slide":5,"title":"Slide 5","textShapes":0}
+{"kind":"image","id":"im/ix8j2p0r","slide":5,"name":"","alt":"Fanora presentation slide 5: 身份与成长","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/tz9smt","slide":5,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/73ff1t","slide":6,"title":"Slide 6","textShapes":0}
+{"kind":"image","id":"im/mp4z29wf","slide":6,"name":"","alt":"Fanora presentation slide 6: AI 共创","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/73ff1t","slide":6,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/799bgw","slide":7,"title":"Slide 7","textShapes":0}
+{"kind":"image","id":"im/kjut4nm1","slide":7,"name":"","alt":"Fanora presentation slide 7: Agent 工作流","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/799bgw","slide":7,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/hf3ala","slide":8,"title":"Slide 8","textShapes":0}
+{"kind":"image","id":"im/cnm9kv6d","slide":8,"name":"","alt":"Fanora presentation slide 8: Memory Forge","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/hf3ala","slide":8,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/9rlf44","slide":9,"title":"Slide 9","textShapes":0}
+{"kind":"image","id":"im/gvi9o3yd","slide":9,"name":"","alt":"Fanora presentation slide 9: 失败可恢复","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/9rlf44","slide":9,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/x9fw28","slide":10,"title":"Slide 10","textShapes":0}
+{"kind":"image","id":"im/1gjetsbe","slide":10,"name":"","alt":"Fanora presentation slide 10: 发布链路","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/x9fw28","slide":10,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/2ig5la","slide":11,"title":"Slide 11","textShapes":0}
+{"kind":"image","id":"im/d03ip8nm","slide":11,"name":"","alt":"Fanora presentation slide 11: 三分钟 Demo","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/2ig5la","slide":11,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/oglf92","slide":12,"title":"Slide 12","textShapes":0}
+{"kind":"image","id":"im/qd8nix87","slide":12,"name":"","alt":"Fanora presentation slide 12: AI 与确定性边界","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/oglf92","slide":12,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/kovzjn","slide":13,"title":"Slide 13","textShapes":0}
+{"kind":"image","id":"im/lsjalof6","slide":13,"name":"","alt":"Fanora presentation slide 13: 系统架构","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/kovzjn","slide":13,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/loj9yh","slide":14,"title":"Slide 14","textShapes":0}
+{"kind":"image","id":"im/w7utsv6l","slide":14,"name":"","alt":"Fanora presentation slide 14: 链上与站内分工","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/loj9yh","slide":14,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/7vdyiq","slide":15,"title":"Slide 15","textShapes":0}
+{"kind":"image","id":"im/f250fuh4","slide":15,"name":"","alt":"Fanora presentation slide 15: 已实现","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/7vdyiq","slide":15,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/d3ef3x","slide":16,"title":"Slide 16","textShapes":0}
+{"kind":"image","id":"im/sv2to76t","slide":16,"name":"","alt":"Fanora presentation slide 16: 结尾","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/d3ef3x","slide":16,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/7xugsf","slide":17,"title":"Slide 17","textShapes":0}
+{"kind":"image","id":"im/94r214bi","slide":17,"name":"","alt":"Fanora presentation slide 17: Thanks","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/7xugsf","slide":17,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/6gg0p6","slide":18,"title":"Slide 18","textShapes":0}
+{"kind":"image","id":"im/pgvaxwna","slide":18,"name":"","alt":"Fanora presentation slide 18: 附录 A · Forge 规则","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/6gg0p6","slide":18,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/qbx0uj","slide":19,"title":"Slide 19","textShapes":0}
+{"kind":"image","id":"im/3el432lg","slide":19,"name":"","alt":"Fanora presentation slide 19: 附录 B · LangGraph","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/qbx0uj","slide":19,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n- Monad network reference: https://docs.monad.xyz/developer-essentials/network-information\n[/Sources]"}
+{"kind":"slide","id":"sl/lvmtjn","slide":20,"title":"Slide 20","textShapes":0}
+{"kind":"image","id":"im/29036pgj","slide":20,"name":"","alt":"Fanora presentation slide 20: 附录 C · 合约与部署","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/lvmtjn","slide":20,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
+{"kind":"slide","id":"sl/yc03om","slide":21,"title":"Slide 21","textShapes":0}
+{"kind":"image","id":"im/kri90vq1","slide":21,"name":"","alt":"Fanora presentation slide 21: 附录 D · 安全与恢复","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/yc03om","slide":21,"text":"[Sources]\n- User-provided outline: docs/ppt/Fanora_展示文稿题纲.md\n- Product UI and brand assets: local Fanora repository\n[/Sources]"}
