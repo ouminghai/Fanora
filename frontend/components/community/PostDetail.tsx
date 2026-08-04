@@ -66,7 +66,7 @@ function LinkedNftCard({ item, onOpen }: { item: FanNftListing; onOpen: () => vo
       </span>
       <span className="flex shrink-0 flex-col justify-center">
         <FanTokenAmount amount={item.price_fan_tokens} showSymbol className="font-display text-xl font-semibold text-green" />
-        <span className="mt-2 rounded-full bg-accent px-5 py-2 text-center text-sm font-semibold text-white">购买并铸造</span>
+        <span className="mt-2 rounded-full bg-accent px-5 py-2 text-center text-sm font-semibold text-white">购买作品</span>
       </span>
     </button>
   );

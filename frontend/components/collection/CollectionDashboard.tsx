@@ -21,7 +21,7 @@ import type { CollectibleAvatarResponse, CollectibleNft, MembershipCardAction, M
 import membershipIdentityArtifact from "../../../shared/contracts/FanoraMembershipIdentity.json";
 import CollectionProfilePanel from "./CollectionProfilePanel";
 import styles from "./CollectionDashboard.module.css";
-
+import { startRealisticConfetti } from "@/lib/ui/confetti";
 type CollectionTab = "identity" | "collectibles" | "profile";
 
 const statusLabels: Record<string, string> = {
@@ -597,6 +597,9 @@ export default function CollectionDashboard() {
       if (window.location.search.includes("welcome=member-card")) {
         window.history.replaceState(null, "", "/collection");
       }
+      const FREE_SUCCESS_CELEBRATION_MS = 4_000;
+      startRealisticConfetti(FREE_SUCCESS_CELEBRATION_MS);
+      
       await NiceModal.show(GlobalInfoModal, {
         title: response.data.changed ? `获得 ${user?.level || "Fanora"} 会员证 NFT` : "会员证 NFT 已是最新状态",
         message: response.data.changed

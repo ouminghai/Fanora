@@ -917,8 +917,8 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
     setPurchaseTooltip(null);
     if (purchaseTooltipTimer.current) clearTimeout(purchaseTooltipTimer.current);
     void NiceModal.show(GlobalProcessModal, {
-      title: "正在购买并铸造",
-      message: "交易已提交，正在扣除 FAN、连接 Monad 验证节点并把 NFT 铸造到你的钱包。",
+      title: "正在购买作品",
+      message: "交易已提交，正在扣除 FAN、连接 Monad 验证节点并把 作品 铸造到你的钱包。",
       eyebrow: "MONAD TRANSACTION",
       gifUrl: null,
       phase: "processing",
@@ -1195,7 +1195,7 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
                     </div>
                   ) : null}
                   <button type="button" disabled={Boolean(busy) || item.remaining_supply <= 0} onClick={() => void buy()} className="inline-block w-full rounded-full bg-accent px-8 py-3 text-center font-semibold text-white shadow-accent-volume transition-all hover:bg-accent-dark disabled:opacity-50">
-                    {busy === "buy" ? "正在购买..." : item.remaining_supply <= 0 ? "已售罄" : "购买并铸造"}
+                    {busy === "buy" ? "正在购买..." : item.remaining_supply <= 0 ? "已售罄" : "购买作品"}
                   </button>
                 </div>
               </div>
@@ -1250,7 +1250,7 @@ function FanNftMarketContent({ mode, itemId, variant = "page", onClose }: FanNft
               className={`${styles.createButton} web3-action-button shrink-0 rounded-full px-5 py-2.5 text-sm font-semibold text-white`}
             >
               <Sparkles aria-hidden="true" />
-              创造 NFT
+                开始共创
               <span className={styles.photon} aria-hidden="true" />
               <span className={`${styles.photon} ${styles.photonSecond}`} aria-hidden="true" />
             </Link>
