@@ -102,7 +102,7 @@ class Settings(BaseSettings):
     cos_scheme: str = "https"
     cos_public_base_url: str = ""
     cos_key_prefix: str = "fanora"
-    cos_timeout_seconds: float = 30.0
+    cos_timeout_seconds: float = 60.0
     nft_max_image_bytes: int = 5_000_000
     nft_min_image_dimension: int = 256
     nft_max_image_dimension: int = 4096
