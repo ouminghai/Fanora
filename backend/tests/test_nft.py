@@ -10,7 +10,7 @@ from sqlalchemy.pool import StaticPool
 from sqlmodel import SQLModel
 
 import app.models.database  # noqa: F401
-from app.adapters.beeimg import BeeImgUpload, beeimg_adapter
+from app.adapters.cos import CosUpload, cos_adapter
 from app.adapters.monad import ConfirmedContractTransaction, monad_contract_adapter
 from app.adapters.pinata import PinnedFile, pinata_adapter
 from app.core.config import settings
@@ -79,7 +79,7 @@ async def test_remote_png_is_detected_from_bytes_when_content_type_is_generic(mo
 
 
 @pytest.mark.asyncio
-async def test_create_application_rehosts_remote_image_on_beeimg(monkeypatch) -> None:
+async def test_create_application_rehosts_remote_image_on_cos(monkeypatch) -> None:
     service = NftService()
     source_url = "https://provider.example/generated.png"
     png_content = base64.b64decode(image_data_url().split(",", 1)[1])
@@ -91,7 +91,7 @@ async def test_create_application_rehosts_remote_image_on_beeimg(monkeypatch) ->
 
     async def upload_bytes(*, content: bytes, mime_type: str, filename: str):
         uploaded.append((content, mime_type, filename))
-        return BeeImgUpload(url="https://www.beeimg.cn/fan-nft.png", raw={})
+        return CosUpload(url="https://fanora-1251127085.cos.ap-guangzhou.myqcloud.com/fan-nft.png", raw={})
 
     async def reject_passthrough(*args, **kwargs):
         del args, kwargs
@@ -110,8 +110,8 @@ async def test_create_application_rehosts_remote_image_on_beeimg(monkeypatch) ->
             assert application is self.application
 
     monkeypatch.setattr(service, "_image_bytes_from_source", image_bytes_from_source)
-    monkeypatch.setattr(beeimg_adapter, "upload_bytes", upload_bytes)
-    monkeypatch.setattr(beeimg_adapter, "ensure_remote_url", reject_passthrough)
+    monkeypatch.setattr(cos_adapter, "upload_bytes", upload_bytes)
+    monkeypatch.setattr(cos_adapter, "ensure_remote_url", reject_passthrough)
 
     application = await service.create_application(
         cast(AsyncSession, FakeSession()),
@@ -133,7 +133,7 @@ async def test_create_application_rehosts_remote_image_on_beeimg(monkeypatch) ->
         ),
     )
 
-    assert application.image_data == "https://www.beeimg.cn/fan-nft.png"
+    assert application.image_data == "https://fanora-1251127085.cos.ap-guangzhou.myqcloud.com/fan-nft.png"
     assert uploaded == [(png_content, "image/png", "fan-nft")]
 
 

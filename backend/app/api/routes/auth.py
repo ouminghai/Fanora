@@ -6,7 +6,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import select
 
-from app.adapters.beeimg import BeeImgConfigurationError, BeeImgUploadError, beeimg_adapter
+from app.adapters.cos import CosConfigurationError, CosUploadError, cos_adapter
 from app.core.config import settings
 from app.core.database import get_database_session
 from app.core.limiter import limiter
@@ -158,10 +158,10 @@ async def update_me(
     user.updated_at = utc_now()
     profile.username = payload.username
     try:
-        profile.avatar_url = await beeimg_adapter.ensure_remote_url(payload.avatar_url, filename="user-avatar")
-    except BeeImgConfigurationError as error:
+        profile.avatar_url = await cos_adapter.ensure_remote_url(payload.avatar_url, filename="user-avatar")
+    except CosConfigurationError as error:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
-    except (BeeImgUploadError, OSError, ValueError) as error:
+    except (CosUploadError, OSError, ValueError) as error:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}") from error
     profile.bio = payload.bio
     profile.locale = payload.locale

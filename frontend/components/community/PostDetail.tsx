@@ -18,9 +18,44 @@ import { apiErrorMessage } from "@/lib/api/errors";
 import type { CommunityPostDetail, CommunityReply, FanNftListing, FanTask, PostEngagement, ReplyEngagement } from "@/lib/api/types";
 
 const categoryLabels: Record<string, string> = { creation: "社区共创", story: "粉丝故事", music: "音乐分享", discussion: "社区讨论" };
+const YOUTUBE_URL_PATTERN = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?[^ \n)]*v=|shorts\/|embed\/)|youtu\.be\/)[A-Za-z0-9_-]{6,}[^ \n)]*/i;
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+
+function youtubeEmbedUrl(value: string): string | null {
+  const match = value.match(YOUTUBE_URL_PATTERN);
+  if (!match) return null;
+  const rawUrl = match[0].startsWith("http") ? match[0] : `https://${match[0]}`;
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.replace(/^www\./, "");
+    const id = host === "youtu.be"
+      ? url.pathname.split("/").filter(Boolean)[0]
+      : url.pathname.startsWith("/shorts/")
+        ? url.pathname.split("/").filter(Boolean)[1]
+        : url.pathname.startsWith("/embed/")
+          ? url.pathname.split("/").filter(Boolean)[1]
+          : url.searchParams.get("v");
+    return id ? `https://www.youtube.com/embed/${encodeURIComponent(id)}` : null;
+  } catch {
+    return null;
+  }
+}
+
+function YoutubePlayer({ url, title }: { url: string; title: string }) {
+  return (
+    <div className="community-reveal mx-auto mb-7 max-w-4xl overflow-hidden rounded-2xl border border-white/10 bg-[#090c24] shadow-[0_25px_80px_rgba(5,6,25,.35)]">
+      <iframe
+        src={url}
+        title={title}
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowFullScreen
+        className="aspect-video w-full"
+      />
+    </div>
+  );
 }
 
 function updateReplyTree(replies: CommunityReply[], engagement: ReplyEngagement): CommunityReply[] {
@@ -155,11 +190,13 @@ export default function PostDetail({ postId, variant = "page", onClose }: PostDe
     : <main className="web3-page-shell min-h-screen pt-40 text-center text-white"><h1 className="font-display text-3xl">帖子暂时无法打开</h1><Link href="/community/creations" className="web3-action-button mt-8 inline-block rounded-full px-6 py-3">返回创作社区</Link></main>;
   const activeTask = tasks.find((task) => task.participation_status === "claimed");
   const postImages = post.image_urls.length ? post.image_urls : post.cover_url ? [post.cover_url] : [];
+  const videoUrl = youtubeEmbedUrl(post.body);
   const content = <div className={variant === "drawer" ? "mx-auto w-full max-w-5xl px-5 pt-10 md:px-10 md:pt-12" : "container max-w-6xl"}>
     {variant === "page" ? <div className="community-reveal mb-6 flex items-center justify-between gap-4"><Link href="/community/creations" className="text-sm font-semibold text-white/50 hover:text-accent-light">← 返回创作社区</Link>{activeTask && <span className="rounded-full bg-orange/15 px-4 py-2 text-xs font-semibold text-orange">进行中的任务：{activeTask.title}</span>}</div> : activeTask ? <div className="community-reveal mb-4 flex justify-end pr-12"><span className="rounded-full bg-orange/15 px-4 py-2 text-xs font-semibold text-orange">进行中的任务：{activeTask.title}</span></div> : null}
     {notice && <div className={`community-reveal mb-6 rounded-2xl border px-5 py-4 text-sm font-semibold ${notice.kind === "success" ? "border-green/20 bg-green/10 text-green" : "border-red/20 bg-red/10 text-red"}`}>{notice.text}</div>}
     <header className={`community-reveal mx-auto max-w-4xl text-center text-white ${variant === "drawer" ? "py-5 md:py-7" : "py-10 md:py-16"}`}><span className={`inline-flex rounded-full border border-accent/25 bg-accent/10 font-bold uppercase tracking-[.2em] text-accent-lighter ${variant === "drawer" ? "px-3 py-1.5 text-[10px]" : "px-4 py-2 text-xs"}`}>{categoryLabels[post.category] || post.category}</span><h1 className={`font-display font-semibold leading-[1.12] ${variant === "drawer" ? "mt-5 text-2xl md:text-4xl" : "mt-7 text-4xl md:text-6xl"}`}>{post.title}</h1><div className={`${variant === "drawer" ? "mt-5" : "mt-7"} flex items-center justify-center gap-3`}><UserIdentityLink author={post.author} avatarClassName={`${variant === "drawer" ? "h-9 w-9" : "h-10 w-10"} rounded-full`} nameClassName={`${variant === "drawer" ? "text-xs" : "text-sm"} font-semibold`} /><span className="text-left text-[11px] text-white/35">{post.author.level} · {formatDate(post.created_at)}</span></div></header>
     <ImageGallery images={postImages} alt={post.title} mode="natural" className={`community-reveal bg-[#090c24] ${variant === "drawer" ? "mb-7 rounded-2xl" : "mb-10 rounded-[2rem] border border-white/10 shadow-[0_30px_100px_rgba(5,6,25,.5)]"}`} />
+    {videoUrl ? <YoutubePlayer url={videoUrl} title={`${post.title} YouTube 视频`} /> : null}
     {post.linked_nft ? <LinkedNftCard item={post.linked_nft} onOpen={() => setSelectedItemId(post.linked_nft?.id || null)} /> : null}
     <article className={`community-reveal mx-auto max-w-4xl overflow-hidden text-white ${variant === "drawer" ? "rounded-2xl bg-white/[.025]" : "rounded-[2rem] border border-white/10 bg-[#111538] shadow-[0_25px_80px_rgba(5,6,25,.35)]"}`}><div className={variant === "drawer" ? "p-5 md:p-7" : "p-7 md:p-10"}><MarkdownContent content={post.body} className={variant === "drawer" ? "[&_h1]:text-2xl [&_h2]:text-xl [&_h3]:text-lg [&_li]:text-sm [&_p]:text-sm [&_p]:leading-7" : undefined} /><div className={`${variant === "drawer" ? "mt-6" : "mt-8"} flex flex-wrap items-center gap-3 border-t border-white/5 pt-5`}><button onClick={() => void togglePost("like")} disabled={busy === "like"} className={`post-action ${post.liked ? "is-active" : ""}`}>{post.liked ? "♥" : "♡"} {post.like_count} </button><a href="#comments" className="post-action">◯ {post.reply_count} </a><button onClick={() => void togglePost("bookmark")} disabled={busy === "bookmark"} className={`post-action ml-auto ${post.bookmarked ? "is-active" : ""}`}>{post.bookmarked ? "★" : "☆"} {post.bookmark_count} </button></div></div></article>
     <section id="comments" className={`community-reveal mx-auto mt-7 max-w-4xl scroll-mt-20 text-white ${variant === "drawer" ? "rounded-t-2xl bg-white/[.025] p-5 md:p-7" : "rounded-[2rem] border border-white/10 bg-[#111538] p-6 md:p-9"}`}><div className="flex items-center justify-between"><h2 className={`font-display font-semibold ${variant === "drawer" ? "text-xl" : "text-2xl"}`}>社区评论</h2><span className="rounded-full bg-white/5 px-3 py-1 text-xs text-white/45">{post.reply_count} 条</span></div>

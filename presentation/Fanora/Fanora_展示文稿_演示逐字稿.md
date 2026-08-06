@@ -58,7 +58,7 @@ Forge 不一定每次成功，但失败不应该让故事归零。如果 Forge �
 
 从预览到永久资产，中间必须经过严格校验。只有被确认的记忆，才进入永久保存和链上归属。流程先校验本人和成功的 Forge Session，然后规范化作品图片，再通过 Pinata 固定图片和 metadata，接着创建 ERC-1155 Token Type，最后 Mint 首枚并进入 Gallery。
 
-这里我们区分了不同系统的职责：BeeImg 负责社区图片、模板、参考图和 AI 预览；IPFS 负责最终 NFT 图片和 metadata；Monad 负责 NFT、Badge、持有和交易证明。创作预览可以变化，但正式资产必须校验、固定、可追踪。
+这里我们区分了不同系统的职责：COS 负责社区图片、模板、参考图和 AI 预览；IPFS 负责最终 NFT 图片和 metadata；Monad 负责 NFT、Badge、持有和交易证明。创作预览可以变化，但正式资产必须校验、固定、可追踪。
 
 ## 第 11 页 · 三分钟 Demo
 
@@ -74,7 +74,7 @@ Fanora 的设计原则是：让 AI 保持想象力，让资产规则保持确定
 
 ## 第 13 页 · 系统架构
 
-系统架构这里我们用一个自下而上的分层图来说明。最底层是 Data & Model Store，负责 PostgreSQL、Pinata、BeeImg、Monad，以及 LLM 和图像生成模型这些基础能力。往上是核心业务逻辑和确定性领域服务，承接会员、社区、FAN、Forge、NFT 发布和购买这些必须稳定结算的业务。
+系统架构这里我们用一个自下而上的分层图来说明。最底层是 Data & Model Store，负责 PostgreSQL、Pinata、COS、Monad，以及 LLM 和图像生成模型这些基础能力。往上是核心业务逻辑和确定性领域服务，承接会员、社区、FAN、Forge、NFT 发布和购买这些必须稳定结算的业务。
 
 中间层是 Intelligent Orchestration，也就是基于 LangGraph 的 Agent 编排，负责 NFT Studio Agent、用户画像和审核 Agent。再往上是 API、鉴权和连接枢纽，基于 FastAPI 和 Pydantic 提供可靠接口、角色控制和安全连接。最上面是 Presentation Layer，也就是用户看到的 Web 应用层。关键保障包括事务与幂等、模型失败保留状态、Pinata 失败不 Mint、链上失败恢复 FAN，以及私钥只在服务端。
 
@@ -88,7 +88,7 @@ Fanora 的设计原则是：让 AI 保持想象力，让资产规则保持确定
 
 目前我们的 MVP 已经打通从热爱到链上收藏的最后一公里。完整路径包括身份、贡献、AI 共创、Forge、IPFS + Monad，以及 Gallery。
 
-已经实现的部分包括：钱包登录、正式会员、链上身份和动态会员卡；社区、任务、签到、FAN、等级、排行榜和粉丝画像；数据库模板、多轮 Agent、Tool、参考图和多模态预览；五维分析、三种 Forge 模式、Fragment 和幂等结算；BeeImg、Pinata IPFS、Monad ERC-1155 发布链路；以及 Gallery、互动、FAN 购买和个人 Collection。
+已经实现的部分包括：钱包登录、正式会员、链上身份和动态会员卡；社区、任务、签到、FAN、等级、排行榜和粉丝画像；数据库模板、多轮 Agent、Tool、参考图和多模态预览；五维分析、三种 Forge 模式、Fragment 和幂等结算；COS、Pinata IPFS、Monad ERC-1155 发布链路；以及 Gallery、互动、FAN 购买和个人 Collection。
 
 本次我们刻意不做二级交易市场、跨链资产、DAO 治理、法币支付、法律意义的版权确权，以及完整多社区运营后台。我们希望先把核心闭环做完整。
 

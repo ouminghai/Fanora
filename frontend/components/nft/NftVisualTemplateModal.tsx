@@ -131,7 +131,7 @@ export default function NftVisualTemplateModal({ open, templates, selectedId, on
       const urls = await Promise.all(selected.map((file) => uploadImage(file)));
       setReferenceUrls((current) => [...current, ...urls]);
     } catch (error) {
-      setNotice(apiErrorMessage(error, "参考图上传 BeeImg 失败。"));
+      setNotice(apiErrorMessage(error, "参考图上传 COS 失败。"));
     } finally {
       setBusy(null);
     }
@@ -210,7 +210,7 @@ export default function NftVisualTemplateModal({ open, templates, selectedId, on
             <div className={styles.referenceHeader}><span><FileImage /> 参考图</span></div>
             <div className={styles.references}>
               {referenceUrls.map((url, index) => <div key={`${url}-${index}`}><Image src={url} alt={`模板参考图 ${index + 1}`} fill sizes="88px" className="object-cover" /><button type="button" aria-label={`移除参考图 ${index + 1}`} onClick={() => setReferenceUrls((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X /></button></div>)}
-              {referenceUrls.length < 6 ? <label className={styles.referenceUpload} title="上传到 BeeImg" aria-label="上传参考图到 BeeImg">
+              {referenceUrls.length < 6 ? <label className={styles.referenceUpload} title="上传到 COS" aria-label="上传参考图到 COS">
                 {busy === "upload" ? <LoaderCircle className="animate-spin" /> : <Plus />}
                 <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple disabled={Boolean(busy)} onChange={(event) => void uploadReferences(event.target.files)} />
               </label> : null}

@@ -94,17 +94,15 @@ class Settings(BaseSettings):
     pinata_gateway_url: str = "https://gateway.pinata.cloud/ipfs"
     pinata_timeout_seconds: float = 30.0
     pinata_max_retries: int = 3
-    beeimg_base_url: str = "https://www.beeimg.cn"
-    beeimg_login_path: str = "/api/v2/login"
-    beeimg_upload_path: str = "/api/v2/upload"
-    beeimg_username: str = ""
-    beeimg_password: str = ""
-    beeimg_token: str = ""
-    beeimg_permission: int = 1
-    beeimg_storage_id: str = "1"
-    beeimg_strategy_id: str = ""
-    beeimg_album_id: str = ""
-    beeimg_timeout_seconds: float = 30.0
+    cos_bucket: str = "fanora-1251127085"
+    cos_region: str = "ap-guangzhou"
+    cos_secret_id: str = ""
+    cos_secret_key: str = ""
+    cos_session_token: str = ""
+    cos_scheme: str = "https"
+    cos_public_base_url: str = ""
+    cos_key_prefix: str = "fanora"
+    cos_timeout_seconds: float = 30.0
     nft_max_image_bytes: int = 5_000_000
     nft_min_image_dimension: int = 256
     nft_max_image_dimension: int = 4096
@@ -169,13 +167,21 @@ class Settings(BaseSettings):
             return value.replace("postgresql://", "postgresql+psycopg://", 1)
         return value
 
-    @field_validator("beeimg_base_url", mode="before")
+    @field_validator("cos_public_base_url", mode="before")
     @classmethod
-    def normalize_beeimg_base_url(cls, value: object) -> object:
+    def normalize_cos_public_base_url(cls, value: object) -> object:
         if not isinstance(value, str):
             return value
         cleaned = value.strip().lstrip(":：").strip().rstrip("/")
-        return cleaned or "https://www.beeimg.cn"
+        return cleaned
+
+    @field_validator("cos_scheme", mode="before")
+    @classmethod
+    def normalize_cos_scheme(cls, value: object) -> object:
+        if not isinstance(value, str):
+            return value
+        cleaned = value.strip().lower()
+        return cleaned if cleaned in {"http", "https"} else "https"
 
     @property
     def postgres_connect_args(self) -> dict[str, int]:

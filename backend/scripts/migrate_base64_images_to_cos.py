@@ -1,8 +1,8 @@
-"""Migrate persisted image data URLs to BeeImg-hosted URLs.
+"""Migrate persisted image data URLs to COS-hosted URLs.
 
 Run from backend/:
-    python scripts/migrate_base64_images_to_beeimg.py --dry-run
-    python scripts/migrate_base64_images_to_beeimg.py --apply
+    python scripts/migrate_base64_images_to_cos.py --dry-run
+    python scripts/migrate_base64_images_to_cos.py --apply
 """
 
 import argparse
@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import create_async_engine
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from app.adapters.beeimg import beeimg_adapter, parse_data_url
+from app.adapters.cos import cos_adapter, parse_data_url
 from app.core.config import settings
 
 
@@ -82,7 +82,7 @@ class Migrator:
             content, mime_type = parse_data_url(value)
             cache_key = f"{mime_type}:{hashlib.sha256(content).hexdigest()}"
             if cache_key not in self.upload_cache:
-                uploaded = await beeimg_adapter.upload_bytes(content=content, mime_type=mime_type, filename=label)
+                uploaded = await cos_adapter.upload_bytes(content=content, mime_type=mime_type, filename=label)
                 self.upload_cache[cache_key] = uploaded.url
                 self.upload_count += 1
             return self.upload_cache[cache_key], 1
@@ -138,14 +138,14 @@ class Migrator:
 
 
 async def main() -> int:
-    parser = argparse.ArgumentParser(description="Migrate persisted base64 image data URLs to BeeImg.")
+    parser = argparse.ArgumentParser(description="Migrate persisted base64 image data URLs to COS.")
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--dry-run", action="store_true", help="Only count rows and images; do not upload or update.")
     mode.add_argument("--apply", action="store_true", help="Upload images and update the database.")
     args = parser.parse_args()
 
-    if args.apply and not beeimg_adapter.configured:
-        print("BeeImg is not configured. Set BEEIMG_TOKEN or BEEIMG_USERNAME/BEEIMG_PASSWORD in .env first.")
+    if args.apply and not cos_adapter.configured:
+        print("COS is not configured. Set COS_BUCKET, COS_REGION, COS_SECRET_ID, and COS_SECRET_KEY in .env first.")
         return 2
 
     engine = create_async_engine(settings.database_url)
@@ -161,7 +161,7 @@ async def main() -> int:
     for target, (rows, images) in totals.items():
         print(f"{target}: {action} {rows} rows / {images} images")
     if args.apply:
-        print(f"Uploaded {migrator.upload_count} unique images to BeeImg.")
+        print(f"Uploaded {migrator.upload_count} unique images to COS.")
     return 0
 
 

@@ -3,7 +3,7 @@
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
-from app.adapters.beeimg import beeimg_adapter
+from app.adapters.cos import cos_adapter
 from app.models.base import utc_now
 from app.models.community import CommunityPost
 from app.models.nft import NftVisualTemplate as NftVisualTemplateModel
@@ -46,7 +46,7 @@ class NftVisualTemplateService:
         item = await session.get(NftVisualTemplateModel, template_id)
         if item is None or (not item.is_system and item.owner_user_id != user_id):
             return None
-        normalized = await beeimg_adapter.ensure_remote_urls(
+        normalized = await cos_adapter.ensure_remote_urls(
             item.reference_image_urls,
             filename_prefix=f"nft-template-{item.id}",
         )
@@ -75,7 +75,7 @@ class NftVisualTemplateService:
         references = list(dict.fromkeys(references))[:6]
         if not references:
             raise ValueError("A visual template requires at least one reference image")
-        remote_urls = await beeimg_adapter.ensure_remote_urls(
+        remote_urls = await cos_adapter.ensure_remote_urls(
             references,
             filename_prefix=f"nft-template-{user_id}",
         )

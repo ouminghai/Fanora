@@ -18,7 +18,7 @@ from qrcode.constants import ERROR_CORRECT_Q
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
-from app.adapters.beeimg import beeimg_adapter
+from app.adapters.cos import cos_adapter
 from app.adapters.monad import ChainConfigurationError, monad_contract_adapter
 from app.adapters.pinata import pinata_adapter
 from app.core.config import settings
@@ -111,7 +111,7 @@ class NftService:
         if source.startswith("data:image/"):
             return self._parse_image(source)
         if source.startswith(("http://", "https://")):
-            async with httpx.AsyncClient(timeout=settings.beeimg_timeout_seconds) as client:
+            async with httpx.AsyncClient(timeout=settings.cos_timeout_seconds) as client:
                 response = await client.get(source)
                 response.raise_for_status()
                 content = response.content
@@ -481,13 +481,13 @@ class NftService:
         self, session: AsyncSession, identity: AuthenticatedIdentity, payload: NftApplicationCreate
     ) -> NftApplication:
         content, mime_type, width, height = await self._image_bytes_from_source(payload.image_data_url)
-        hosted_image = await beeimg_adapter.upload_bytes(
+        hosted_image = await cos_adapter.upload_bytes(
             content=content,
             mime_type=mime_type,
             filename="fan-nft",
         )
         hosted_image_url = hosted_image.url
-        story_image_urls = await beeimg_adapter.ensure_remote_urls(
+        story_image_urls = await cos_adapter.ensure_remote_urls(
             payload.story_image_urls, filename_prefix="fan-nft-story"
         )
         application = NftApplication(

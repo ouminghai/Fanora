@@ -17,7 +17,7 @@
 | 社区运营者 | 发布任务、配置奖励、维护社区内容 |
 | 平台管理员 | 管理权限、资金、合约 Operator 和异常审计 |
 | AI Agent | 理解故事、维护创作状态、推荐模板并调用受控 Tool |
-| 区块链 / 外部服务 | 提供 Monad、BeeImg、Pinata 与模型能力 |
+| 区块链 / 外部服务 | 提供 Monad、COS、Pinata 与模型能力 |
 
 ## 3. MVP 用户旅程
 
@@ -70,7 +70,7 @@ journey
 | ID | 优先级 | 需求 | 验收标准 |
 | --- | --- | --- | --- |
 | COMM-001 | P0 | 用户可浏览并加入官方社区 | 加入状态持久化且重复调用幂等 |
-| COMM-002 | P0 | 正式会员可发布带图片的 Post | 图片上传 BeeImg，数据库只保存 URL |
+| COMM-002 | P0 | 正式会员可发布带图片的 Post | 图片上传 COS，数据库只保存 URL |
 | COMM-003 | P0 | 用户可回复及创建二级回复 | 回复关系、计数和作者信息正确 |
 | COMM-004 | P1 | Post 与回复支持点赞，Post 支持收藏 | 同一用户状态可切换且计数一致 |
 | COMM-005 | P1 | 社区图片应支持历史 Base64 数据迁移 | 迁移后 URL 可展示，失败记录可追踪 |
@@ -134,16 +134,16 @@ journey
 
 | ID | 优先级 | 需求 | 验收标准 |
 | --- | --- | --- | --- |
-| MEDIA-001 | P0 | 持久化业务图片应上传 BeeImg | Post、回复、任务、模板、参考图和预览只保存 URL |
-| MEDIA-002 | P0 | BeeImg 应使用服务端 `BEEIMG_TOKEN` | Token 不返回浏览器、不写入日志明文 |
-| MEDIA-003 | P0 | 最终 NFT 使用 IPFS，不以 BeeImg 作为链上永久 URI | Metadata 中图片指向 IPFS URI |
+| MEDIA-001 | P0 | 持久化业务图片应上传 COS | Post、回复、任务、模板、参考图和预览只保存 URL |
+| MEDIA-002 | P0 | COS 应使用服务端 `COS_SECRET_ID` | Token 不返回浏览器、不写入日志明文 |
+| MEDIA-003 | P0 | 最终 NFT 使用 IPFS，不以 COS 作为链上永久 URI | Metadata 中图片指向 IPFS URI |
 | MEDIA-004 | P1 | 远程图加载失败应提供错误信息与重试路径 | 数据库事务和 Agent State 不因单次上传失败而丢失 |
 
 ## 5. 非功能需求
 
 | ID | 类别 | 要求 |
 | --- | --- | --- |
-| NFR-001 | 安全 | 私钥、BeeImg Token、Pinata JWT 和 LLM Key 仅存在服务端环境变量 |
+| NFR-001 | 安全 | 私钥、COS Token、Pinata JWT 和 LLM Key 仅存在服务端环境变量 |
 | NFR-002 | 安全 | 管理 API、Agent 内部 API 和链上 Operator 操作必须鉴权 |
 | NFR-003 | 一致性 | FAN、Fragment、任务奖励和发布使用事务与幂等键 |
 | NFR-004 | 可用性 | Redis、Langfuse 或 LLM 不可用时，核心确定性业务应降级而非越权 |

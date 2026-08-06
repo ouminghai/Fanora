@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, select
 
-from app.adapters.beeimg import BeeImgConfigurationError, BeeImgUploadError, beeimg_adapter
+from app.adapters.cos import CosConfigurationError, CosUploadError, cos_adapter
 from app.core.database import get_database_session
 from app.core.security import get_current_identity
 from app.models.base import utc_now
@@ -77,10 +77,10 @@ async def update_community(
     await require_creator(session, identity.user_id)
     values = payload.model_dump()
     try:
-        values["logo_url"] = await beeimg_adapter.ensure_remote_url(values["logo_url"], filename="community-logo")
-    except BeeImgConfigurationError as error:
+        values["logo_url"] = await cos_adapter.ensure_remote_url(values["logo_url"], filename="community-logo")
+    except CosConfigurationError as error:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
-    except (BeeImgUploadError, OSError, ValueError) as error:
+    except (CosUploadError, OSError, ValueError) as error:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}") from error
     for field, value in values.items():
         setattr(community, field, value)

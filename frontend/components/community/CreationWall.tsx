@@ -23,6 +23,18 @@ const categories = [
 ];
 const labels: Record<string, string> = { creation: "共创", story: "故事", music: "音乐", discussion: "讨论" };
 const POST_PAGE_SIZE = 25;
+const YOUTUBE_URL_PATTERN = /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:watch\?[^ \n)]*v=|shorts\/|embed\/)|youtu\.be\/)[A-Za-z0-9_-]{6,}[^ \n)]*/i;
+
+function hasYoutubeVideo(value: string) {
+  return YOUTUBE_URL_PATTERN.test(value);
+}
+
+function buildPostBody(body: string, videoUrl: string) {
+  const cleanBody = body.trim();
+  const cleanVideoUrl = videoUrl.trim();
+  if (!cleanVideoUrl) return cleanBody;
+  return [`视频：${cleanVideoUrl}`, cleanBody].filter(Boolean).join("\n\n");
+}
 
 export default function CreationWall() {
   const { user, refreshUser } = useAuth();
@@ -33,7 +45,7 @@ export default function CreationWall() {
   const [columnCount, setColumnCount] = useState(1);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [draft, setDraft] = useState({ title: "", body: "", category: "creation", image_urls: [] as string[], linked_nft_creation_id: "" });
+  const [draft, setDraft] = useState({ title: "", body: "", category: "creation", image_urls: [] as string[], video_url: "", linked_nft_creation_id: "" });
   const [tasks, setTasks] = useState<FanTask[]>([]);
   const [myNftItems, setMyNftItems] = useState<FanNftListing[]>([]);
   const tagInjectedForOpenComposer = useRef(false);
@@ -219,6 +231,11 @@ export default function CreationWall() {
 
   const publish = async (event: FormEvent) => {
     event.preventDefault();
+    const body = buildPostBody(draft.body, draft.video_url);
+    if (draft.video_url.trim() && !hasYoutubeVideo(draft.video_url)) {
+      setNotice("请输入有效的 YouTube 视频链接。");
+      return;
+    }
     setBusy("publish");
     setNotice(null);
     void NiceModal.show(GlobalProcessModal, {
@@ -230,11 +247,11 @@ export default function CreationWall() {
     try {
       const response = await api.post<CommunityPostDetail>("/community/posts", {
         ...draft,
-        body: draft.body.trim(),
+        body,
         cover_url: draft.image_urls[0] || null,
         linked_nft_creation_id: draft.linked_nft_creation_id || null,
       });
-      setDraft({ title: "", body: "", category: "creation", image_urls: [], linked_nft_creation_id: "" });
+      setDraft({ title: "", body: "", category: "creation", image_urls: [], video_url: "", linked_nft_creation_id: "" });
       setComposer(false);
       await Promise.all([reload(), refreshUser()]);
       await hideGlobalProcessModal();
@@ -270,6 +287,13 @@ export default function CreationWall() {
           <div>
             <div className="grid gap-4 md:grid-cols-[1fr_150px]"><input required minLength={4} maxLength={120} value={draft.title} onChange={(event) => setDraft({ ...draft, title: event.target.value })} placeholder="创作标题" className="rounded-xl border-white/10 bg-white/[.06] text-white placeholder:text-white/30" /><select value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} className="rounded-xl border-white/10 bg-[#181d49] text-white"><option value="creation">共创</option><option value="story">故事</option><option value="music">音乐</option><option value="discussion">讨论</option></select></div>
             <MarkdownEditor value={draft.body} onChange={(body) => setDraft((current) => ({ ...current, body }))} imageUrls={draft.image_urls} onImageUrlsChange={(image_urls) => setDraft((current) => ({ ...current, image_urls }))} onImageError={setNotice} />
+            <input
+              type="url"
+              value={draft.video_url}
+              onChange={(event) => setDraft((current) => ({ ...current, video_url: event.target.value }))}
+              placeholder="YouTube 视频链接，可选；上传图片会作为封面"
+              className="mt-4 w-full rounded-xl border border-white/10 bg-white/[.06] px-4 py-3 text-sm text-white placeholder:text-white/30"
+            />
             {myNftItems.length ? (
               <div className="mt-5 rounded-2xl border border-white/10 bg-white/[.035] p-4">
                 <div className="flex items-center justify-between gap-3">
@@ -304,7 +328,7 @@ export default function CreationWall() {
           {masonryColumns.map((column, columnIndex) => <div key={columnIndex} className="space-y-5">{column.map(({ post, index }) => (
             <article key={post.id} className="web3-interactive-card community-reveal mb-5 inline-block w-full break-inside-avoid overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#111538] text-white" style={{ animationDelay: `${Math.min(index, 12) * 55}ms` }}>
               <Link href={`/community/posts/${post.id}`} onClick={(event) => { event.preventDefault(); openPost(post.id); }} className="group block overflow-hidden">
-                {post.cover_url ? <div className="overflow-hidden bg-[#090c24]"><img src={post.cover_url} alt="" className="block h-auto w-full transition-opacity duration-300 group-hover:opacity-95" /></div> : <div className={`flex ${index % 2 ? "min-h-72" : "min-h-52"} items-center bg-gradient-to-br from-accent/25 via-[#45BFEF]/10 to-[#111538] p-7`}><p className="font-display text-2xl font-semibold leading-relaxed text-white/90">{post.title}</p></div>}
+                {post.cover_url ? <div className="relative overflow-hidden bg-[#090c24]"><img src={post.cover_url} alt="" className="block h-auto w-full transition-opacity duration-300 group-hover:opacity-95" />{hasYoutubeVideo(post.body_preview) ? <span className="absolute left-3 top-3 rounded-full bg-black/70 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">▶ YouTube</span> : null}</div> : <div className={`flex ${index % 2 ? "min-h-72" : "min-h-52"} items-center bg-gradient-to-br from-accent/25 via-[#45BFEF]/10 to-[#111538] p-7`}><p className="font-display text-2xl font-semibold leading-relaxed text-white/90">{post.title}</p></div>}
               </Link>
               <div className="p-4">
                 <span className="rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent-lighter">{labels[post.category] || post.category}</span>

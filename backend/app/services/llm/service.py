@@ -2,8 +2,10 @@
 
 import asyncio
 import json
+import re
 import time
 from collections.abc import Sequence
+from json import JSONDecodeError
 from typing import Any, TypeVar
 
 from langchain_core.messages import AIMessage, BaseMessage
@@ -23,6 +25,29 @@ T = TypeVar("T", bound=BaseModel)
 
 class LLMUnavailable(RuntimeError):
     pass
+
+
+def _extract_json_object(value: str) -> dict[str, Any]:
+    text = value.strip()
+    if text.startswith("```"):
+        lines = text.splitlines()
+        if lines and lines[0].startswith("```"):
+            lines = lines[1:]
+        if lines and lines[-1].strip() == "```":
+            lines = lines[:-1]
+        text = "\n".join(lines).strip()
+    text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL | re.IGNORECASE).strip()
+    decoder = json.JSONDecoder()
+    for index, char in enumerate(text):
+        if char != "{":
+            continue
+        try:
+            parsed, _ = decoder.raw_decode(text[index:])
+        except JSONDecodeError:
+            continue
+        if isinstance(parsed, dict):
+            return parsed
+    raise JSONDecodeError("No JSON object found in model response", text, 0)
 
 
 class LLMService:
@@ -69,10 +94,7 @@ class LLMService:
                             )
                         if not isinstance(content, str):
                             raise ValueError("SiliconFlow returned a non-text structured response")
-                        json_text = content.strip()
-                        if json_text.startswith("```json") and json_text.endswith("```"):
-                            json_text = json_text[7:-3].strip()
-                        return response_model.model_validate(json.loads(json_text))
+                        return response_model.model_validate(_extract_json_object(content))
                     else:
                         runnable = model.with_structured_output(response_model)
                         result = await self._invoke(runnable, messages, model_name)

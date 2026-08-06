@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncEngine, async_sessionmaker, create_async_engine
 from sqlmodel import select
 
-from app.adapters.beeimg import beeimg_adapter, parse_data_url
+from app.adapters.cos import cos_adapter, parse_data_url
 from app.core.config import settings
 from app.models.community import CommunityPost, FanTask
 from app.models.user import AuthIdentity, Community, User, UserProfile, UserRole, UserSession, Wallet
@@ -54,7 +54,7 @@ class SnapshotImageHoster:
         content, mime_type = parse_data_url(value)
         cache_key = f"{mime_type}:{hashlib.sha256(content).hexdigest()}"
         if cache_key not in self.upload_cache:
-            uploaded = await beeimg_adapter.upload_bytes(content=content, mime_type=mime_type, filename=label)
+            uploaded = await cos_adapter.upload_bytes(content=content, mime_type=mime_type, filename=label)
             self.upload_cache[cache_key] = uploaded.url
             self.upload_count += 1
         return self.upload_cache[cache_key]
@@ -412,12 +412,12 @@ async def synchronize(
             return
         if not normalized_target:
             raise RuntimeError("Target database URL is required unless --dry-run is used")
-        if not beeimg_adapter.configured:
-            raise RuntimeError("BeeImg must be configured before synchronizing images")
+        if not cos_adapter.configured:
+            raise RuntimeError("COS must be configured before synchronizing images")
 
         image_hoster = SnapshotImageHoster()
         snapshot = await image_hoster.host_snapshot(snapshot)
-        print(f"BeeImg image hosting completed: uploaded {image_hoster.upload_count} unique images")
+        print(f"COS image hosting completed: uploaded {image_hoster.upload_count} unique images")
 
         if target_proxy_enabled:
             enable_target_proxy(

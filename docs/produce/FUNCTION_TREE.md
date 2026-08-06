@@ -32,7 +32,7 @@ Fanora
 │   ├── 从 Post、NFT 或上传图片建立模板
 │   ├── 视觉风格与多模态参考图
 │   ├── 模板推荐与另存 Tool
-│   └── 条件式图片生成与 BeeImg 预览
+│   └── 条件式图片生成与 COS 预览
 ├── 5. Memory Forge
 │   ├── AI 五维分析与 RareScore
 │   ├── 数量、价格和模式建议
@@ -41,7 +41,7 @@ Fanora
 │   ├── 可审计成功或失败判定
 │   └── Memory Fragment 与兑换
 ├── 6. NFT 发行与市场
-│   ├── BeeImg URL 规范化
+│   ├── COS URL 规范化
 │   ├── Pinata 图片与 Metadata 固定
 │   ├── ERC-1155 Token Type 创建
 │   ├── 创作者首枚 Mint
@@ -51,7 +51,7 @@ Fanora
 └── 7. 平台基础设施
     ├── PostgreSQL 与 Alembic
     ├── LangGraph Checkpoint
-    ├── BeeImg / Pinata / Monad Adapter
+    ├── COS / Pinata / Monad Adapter
     ├── 结构化日志与 Request ID
     ├── Prometheus 与可选 Langfuse
     └── 限流、幂等、降级与退款
@@ -107,7 +107,7 @@ Fanora
 | 签到 | `GET /check-ins/me`、`POST /check-ins` |
 | FAN 流水 | `GET /fan-tokens/me/ledger` |
 | 排行榜 | `GET /fan-tokens/leaderboard` |
-| 图片上传 | `POST /media/images`；上传 BeeImg，返回 URL |
+| 图片上传 | `POST /media/images`；上传 COS，返回 URL |
 
 ### 3.3 AI Studio、Forge 与 NFT
 
@@ -140,7 +140,7 @@ Fanora
 
 ## 5. 关键业务约束
 
-- 业务图片持久化到 BeeImg，数据库保存 URL，不保存 Base64 正文。
+- 业务图片持久化到 COS，数据库保存 URL，不保存 Base64 正文。
 - 最终链上 NFT 图片与 metadata 使用 Pinata IPFS；AI 临时预览不等于链上资产。
 - LLM 不直接扣 FAN、不修改权限、不决定随机结果，也不直接持有合约私钥。
 - NFT 发布必须关联当前用户的 `SUCCESS` Forge Session，且选中图片版本一致。

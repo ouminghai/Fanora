@@ -50,7 +50,7 @@ test("profile editing does not expose a separate avatar upload button", () => {
 });
 
 test("collection uses the Cyber Identity passport and asset tabs without loading the fan profile", () => {
-  assert.match(source, /src="\/video\/bg\.mp4"/);
+  assert.match(source, /https:\/\/fanora-1251127085\.cos\.ap-guangzhou\.myqcloud\.com\/bg\.mp4/);
   assert.match(source, /autoPlay muted loop playsInline preload="auto"/);
   assert.match(source, /onCanPlay=\{\(\) => void videoRef\.current\?\.play\(\)\}/);
   assert.match(source, /const backgroundLayers =/);
@@ -197,7 +197,7 @@ test("Gallery routes NFT creation to the stateful Agent studio", () => {
   );
 
   assert.match(marketSource, /href="\/collections\/create"/);
-  assert.match(marketSource, /创造 NFT/);
+  assert.match(marketSource, /开始共创/);
   assert.doesNotMatch(marketSource, /setPublishOpen\(true\)/);
   assert.match(createPageSource, /<NftStudioWorkbench/);
   assert.match(studioSource, /\/nft\/creations\/agent\/chat/);
@@ -254,7 +254,7 @@ test("Gallery routes NFT creation to the stateful Agent studio", () => {
   assert.match(studioSource, /AI 五维评分和发行建议/);
   assert.match(studioSource, /TOOL TRACE/);
   assert.match(studioSource, />STATE</);
-  assert.match(studioSource, /src="\/video\/bg\.mp4"/);
+  assert.match(studioSource, /https:\/\/fanora-1251127085\.cos\.ap-guangzhou\.myqcloud\.com\/bg\.mp4/);
   assert.match(studioSource, /<NftVisualTemplateModal/);
   const loadStudioStateBlock = studioSource.slice(
     studioSource.indexOf("const loadStudioState"),
@@ -264,7 +264,9 @@ test("Gallery routes NFT creation to the stateful Agent studio", () => {
     studioSource.indexOf("const openTemplateLibrary"),
     studioSource.indexOf("const selectTemplate"),
   );
-  assert.doesNotMatch(loadStudioStateBlock, /\/nft\/creations\/agent\/templates/);
+  assert.match(loadStudioStateBlock, /\/nft\/creations\/agent\/templates/);
+  assert.match(loadStudioStateBlock, /defaultTemplateAppliedRef/);
+  assert.match(loadStudioStateBlock, /使用视觉模板/);
   assert.match(openTemplateLibraryBlock, /\/nft\/creations\/agent\/templates/);
   assert.match(studioSource, /defaultTemplateId = "concert"/);
   assert.match(studioSource, /点击后加载模板和参考图/);

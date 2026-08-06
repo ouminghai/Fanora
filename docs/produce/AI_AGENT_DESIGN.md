@@ -65,7 +65,7 @@ flowchart TD
 | `interview_story` | History、故事、风格 | 助手回复、故事摘要、缺失字段与成熟度 |
 | `compose_nft_brief` | 当前故事与视觉上下文 | 名称、描述、英文 Prompt、公开属性 |
 | `plan_image_tool` | 草稿、视觉签名、用户意图 | 是否调用 `generate_nft_image` |
-| `apply_image_tool_result` | 图片 Tool 结果 | BeeImg URL、最后生成签名和降级信息 |
+| `apply_image_tool_result` | 图片 Tool 结果 | COS URL、最后生成签名和降级信息 |
 | `finalize_image_offer` | 不生图状态 | 返回继续创作或可生图提示 |
 
 ## 4. State 设计
@@ -153,7 +153,7 @@ Tool 位于 `backend/app/agents/nft_visual_tools.py`。
 - 参考图 URL，最多 6 张。
 - 上一版本图片，可作为迭代图。
 
-生成结果优先上传 BeeImg；数据库和 State 保存 URL，而不是 Base64。
+生成结果优先上传 COS；数据库和 State 保存 URL，而不是 Base64。
 
 ## 6. Tool 触发规则
 
@@ -223,11 +223,11 @@ flowchart TB
 sequenceDiagram
     actor User as "用户"
     participant Web as "Studio UI"
-    participant Media as "Media API / BeeImg"
+    participant Media as "Media API / COS"
     participant Agent as "NFT Studio Agent"
     participant Fetch as "Image Fetcher"
     participant Model as "Image Edit Model"
-    participant Bee as "BeeImg"
+    participant Bee as "COS"
 
     User->>Web: "上传图 / 选择 Post / 选择 NFT"
     Web->>Media: "上传或取得持久化 URL"
@@ -316,7 +316,7 @@ flowchart LR
 - Tool 名称、状态和摘要，不记录敏感 Prompt 附件正文。
 - LLM / Image Model 的模型名、请求 URL、HTTP 状态、Trace ID 与耗时。
 - 参考图数量、格式和是否真正进入模型请求。
-- 图片生成、BeeImg 上传和结构化校验的独立失败率。
+- 图片生成、COS 上传和结构化校验的独立失败率。
 
 应重点测试：
 

@@ -72,7 +72,7 @@ flowchart LR
 - **贡献与成长**：社区、回复、任务、签到、FAN 流水、终身等级和排行榜。
 - **AI NFT Studio**：LangGraph 多轮状态、数据库视觉模板、参考图、多模态生图与 Tool 调用。
 - **Memory Forge**：五维评分、发行数量与价格建议、可审计的成功或失败判定、Fragment 补偿。
-- **NFT 发行与收藏**：BeeImg 业务图片、Pinata IPFS、Monad ERC-1155、Gallery、点赞、收藏与 FAN 购买。
+- **NFT 发行与收藏**：COS 业务图片、Pinata IPFS、Monad ERC-1155、Gallery、点赞、收藏与 FAN 购买。
 
 ## 技术架构
 
@@ -81,7 +81,7 @@ flowchart LR
 | Frontend     | Next.js 15、React 19、TypeScript、RainbowKit、wagmi、viem         |
 | Backend      | FastAPI、Python 3.13、SQLModel、Pydantic、Alembic                |
 | AI Agent     | LangGraph、LangChain Core、OpenAI-compatible LLM / Image Model |
-| Data & Media | PostgreSQL、可选 Redis/Valkey、BeeImg、Pinata IPFS                |
+| Data & Media | PostgreSQL、可选 Redis/Valkey、COS、Pinata IPFS                |
 | Blockchain   | Monad Testnet、ERC-721 Membership SBT、ERC-1155 Collectibles   |
 
 ## 本地启动

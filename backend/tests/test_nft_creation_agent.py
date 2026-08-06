@@ -4,7 +4,7 @@ from langgraph.prebuilt import ToolRuntime
 from pydantic import ValidationError
 
 import app.agents.nft_studio as nft_studio_module
-from app.adapters.beeimg import BeeImgUploadError
+from app.adapters.cos import CosUploadError
 from app.agents.nft_creation import (
     _image_log_value,
     _prepare_multimodal_references,
@@ -194,12 +194,12 @@ def test_image_prompt_merges_database_template_and_selected_style_into_priority_
 
 
 @pytest.mark.asyncio
-async def test_beeimg_failure_does_not_expose_provider_preview_url(monkeypatch) -> None:
+async def test_cos_failure_does_not_expose_provider_preview_url(monkeypatch) -> None:
     async def reject_upload(*args, **kwargs):
         del args, kwargs
-        raise BeeImgUploadError("请先绑定手机号")
+        raise CosUploadError("请先绑定手机号")
 
-    monkeypatch.setattr("app.agents.nft_visual_tools.beeimg_adapter.ensure_remote_url", reject_upload)
+    monkeypatch.setattr("app.agents.nft_visual_tools.cos_adapter.ensure_remote_url", reject_upload)
     generated = NftDraftResponse(
         name="大头仔",
         description="一件具有温暖陪伴感和收藏质感的原创粉丝 NFT。",
@@ -224,17 +224,17 @@ async def test_beeimg_failure_does_not_expose_provider_preview_url(monkeypatch) 
 async def test_image_tool_exception_is_reported_instead_of_evaluate_event(monkeypatch) -> None:
     @tool("generate_nft_image")
     async def failing_image_tool(runtime: ToolRuntime) -> str:
-        """Simulate a BeeImg account rejection after image generation."""
+        """Simulate a COS account rejection after image generation."""
 
         del runtime
-        raise BeeImgUploadError("请先绑定手机号")
+        raise CosUploadError("请先绑定手机号")
 
     monkeypatch.setattr(nft_studio_module, "NFT_IMAGE_TOOLS", (failing_image_tool,))
     agent = NftStudioAgent(model_service=LLMService())
     template = _test_visual_template()
 
     result = await agent.chat(
-        "creator-beeimg-error",
+        "creator-cos-error",
         NftAgentChatRequest(message="生成图片", template_id="concert"),
         template,
     )

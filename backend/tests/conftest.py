@@ -16,7 +16,7 @@ os.environ["MEMBERSHIP_PAYMENT_CONTRACT_ADDRESS"] = ""
 os.environ["MEMBERSHIP_IDENTITY_CONTRACT_ADDRESS"] = ""
 os.environ["PINATA_JWT"] = ""
 
-from app.adapters.beeimg import BeeImgUpload, beeimg_adapter  # noqa: E402
+from app.adapters.cos import CosUpload, cos_adapter  # noqa: E402
 from app.core.database import database_service  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.community import CommunityPost, FanTask  # noqa: E402
@@ -84,30 +84,30 @@ async def seed_test_community_content() -> None:
 
 
 @pytest.fixture(autouse=True)
-def stub_beeimg_uploads(monkeypatch):
-    async def upload_bytes(*, content: bytes, mime_type: str, filename: str = "fanora-image") -> BeeImgUpload:
+def stub_cos_uploads(monkeypatch):
+    async def upload_bytes(*, content: bytes, mime_type: str, filename: str = "fanora-image") -> CosUpload:
         del content, mime_type
-        return BeeImgUpload(url=f"https://www.beeimg.cn/{filename}.png", raw={"data": {"public_url": filename}})
+        return CosUpload(url=f"https://fanora-1251127085.cos.ap-guangzhou.myqcloud.com/{filename}.png", raw={"data": {"public_url": filename}})
 
     async def upload_data_url(value: str, *, filename: str = "fanora-image") -> str:
         del value
-        return f"https://www.beeimg.cn/{filename}.png"
+        return f"https://fanora-1251127085.cos.ap-guangzhou.myqcloud.com/{filename}.png"
 
     async def ensure_remote_url(value: str | None, *, filename: str = "fanora-image") -> str | None:
         if value and value.startswith("data:image/"):
-            return f"https://www.beeimg.cn/{filename}.png"
+            return f"https://fanora-1251127085.cos.ap-guangzhou.myqcloud.com/{filename}.png"
         return value
 
     async def ensure_remote_urls(values: list[str], *, filename_prefix: str = "fanora-image") -> list[str]:
         return [
-            f"https://www.beeimg.cn/{filename_prefix}-{index + 1}.png" if value.startswith("data:image/") else value
+            f"https://fanora-1251127085.cos.ap-guangzhou.myqcloud.com/{filename_prefix}-{index + 1}.png" if value.startswith("data:image/") else value
             for index, value in enumerate(values)
         ]
 
-    monkeypatch.setattr(beeimg_adapter, "upload_bytes", upload_bytes)
-    monkeypatch.setattr(beeimg_adapter, "upload_data_url", upload_data_url)
-    monkeypatch.setattr(beeimg_adapter, "ensure_remote_url", ensure_remote_url)
-    monkeypatch.setattr(beeimg_adapter, "ensure_remote_urls", ensure_remote_urls)
+    monkeypatch.setattr(cos_adapter, "upload_bytes", upload_bytes)
+    monkeypatch.setattr(cos_adapter, "upload_data_url", upload_data_url)
+    monkeypatch.setattr(cos_adapter, "ensure_remote_url", ensure_remote_url)
+    monkeypatch.setattr(cos_adapter, "ensure_remote_urls", ensure_remote_urls)
 
 
 @pytest.fixture(scope="session")

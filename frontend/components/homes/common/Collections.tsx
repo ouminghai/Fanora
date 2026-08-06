@@ -37,7 +37,7 @@ export default function Collections() {
             <div className={styles.agentCapabilities}>
               <span><Cpu /> LangGraph State</span>
               <span><Fingerprint /> Visual Identity</span>
-              <span><ScanLine /> BeeImg Reference</span>
+              <span><ScanLine /> COS Reference</span>
             </div>
             <Link href="/collections/create" className={styles.agentAction}><Sparkles /> 进入 AI NFT 创作台</Link>
           </div>

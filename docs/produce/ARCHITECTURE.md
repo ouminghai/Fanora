@@ -6,7 +6,7 @@ Fanora 的架构围绕四个目标设计：
 
 1. **AI 可演进，资产操作确定**：Agent 负责理解和创作，领域服务负责权限、余额、概率和链上写入。
 2. **链上与站内职责清楚**：高频社区与 FAN 数据留在 PostgreSQL，最终身份与收藏品进入 Monad。
-3. **媒体按生命周期分层**：业务图片使用 BeeImg URL，最终 NFT 图片与 metadata 固定到 IPFS。
+3. **媒体按生命周期分层**：业务图片使用 COS URL，最终 NFT 图片与 metadata 固定到 IPFS。
 4. **失败可恢复、操作可审计**：事务、幂等键、状态机、链上操作记录和结构化日志共同保护关键流程。
 
 ## 2. 系统上下文
@@ -18,7 +18,7 @@ flowchart LR
     Web --> API["Fanora FastAPI"]
     Web --> Wallet["浏览器钱包"]
     API --> Models["LLM / Image Model"]
-    API --> Bee["BeeImg"]
+    API --> Bee["COS"]
     API --> Pinata["Pinata IPFS"]
     API --> PG[("PostgreSQL")]
     API --> Monad["Monad Testnet"]
@@ -59,7 +59,7 @@ flowchart TB
     end
 
     subgraph Integration["适配器层"]
-        BeeAdapter["BeeImg Adapter"]
+        BeeAdapter["COS Adapter"]
         PinataAdapter["Pinata Adapter"]
         MonadAdapter["Monad / Contract Adapters"]
         LLMService["LLM Service"]
@@ -86,7 +86,7 @@ flowchart TB
 - Route 只处理 HTTP、鉴权、Schema 和错误映射，不承载资产规则。
 - Agent Node 可以读取 State、调用 LLM 和受控 Tool，但不能直接修改 FAN 或发送合约交易。
 - Domain Service 管理事务、幂等、状态转换和权限。
-- Adapter 隔离 BeeImg、Pinata、Monad、LLM 等供应商协议。
+- Adapter 隔离 COS、Pinata、Monad、LLM 等供应商协议。
 - SQLModel 与 Alembic 定义可迁移的数据事实。
 
 ## 4. 核心组件
@@ -100,7 +100,7 @@ flowchart TB
 | NFT Studio Agent | 多轮故事状态、模板 Tool、Prompt 优化与条件式生图 |
 | Memory Forge | 五维分析、策略建议、成功率、FAN / Credit 结算和 Fragment |
 | NFT Service | 发布校验、IPFS pin、ERC-1155 创建 / Mint、购买与退款编排 |
-| Media Adapters | BeeImg 业务图片与 Pinata 链上永久内容 |
+| Media Adapters | COS 业务图片与 Pinata 链上永久内容 |
 | Contract Adapters | Gateway、Membership Identity 和 Collectibles 的读写封装 |
 
 ## 5. 数据与事实源
@@ -109,7 +109,7 @@ flowchart TB
 flowchart LR
     App["Fanora Domain"] --> PG[("PostgreSQL\n业务事实")]
     Agent["LangGraph Agent"] --> CP[("Checkpoint\n对话状态")]
-    Media["业务媒体"] --> Bee["BeeImg\n可变 URL"]
+    Media["业务媒体"] --> Bee["COS\n可变 URL"]
     Final["最终 NFT"] --> IPFS["Pinata IPFS\n不可变内容"]
     Identity["正式会员"] --> SBT["Monad ERC-721"]
     Assets["NFT / Badge"] --> Multi["Monad ERC-1155"]
@@ -121,7 +121,7 @@ flowchart LR
 | 社区、Post、回复、任务、签到 | PostgreSQL | 高频业务状态 |
 | FAN 余额、终身累计、流水 | PostgreSQL | 所有增减必须有幂等流水 |
 | Agent History 与创作 State | PostgreSQL Checkpoint | 初始化失败时可退回内存，仅适合本地降级 |
-| 模板、参考图、AI 预览 | PostgreSQL + BeeImg | 数据库保存结构和 URL，图片正文在 BeeImg |
+| 模板、参考图、AI 预览 | PostgreSQL + COS | 数据库保存结构和 URL，图片正文在 COS |
 | Forge Session、Analysis、Attempt、Fragment | PostgreSQL | 发行策略与审计事实 |
 | 最终 NFT image / metadata | Pinata IPFS | 发布成功后固定 |
 | 会员身份 | Monad ERC-721 | 不可转让 SBT |
@@ -196,7 +196,7 @@ sequenceDiagram
     participant Graph as "NFT Studio LangGraph"
     participant LLM as "LLM Service"
     participant Tool as "Template / Image Tools"
-    participant Bee as "BeeImg"
+    participant Bee as "COS"
     participant CP as "Checkpoint"
 
     Fan->>Web: "故事 + 模板 + 风格 + 参考图"
@@ -304,7 +304,7 @@ flowchart LR
 | --- | --- |
 | LLM 超时或结构校验失败 | 使用规则草稿 / 评分降级；不允许 LLM 绕过资产规则 |
 | Image Model 失败 | 保留对话与草稿，返回失败原因，允许下一轮重试 |
-| BeeImg 失败 | 不把 Base64 写入数据库；预览可在供应商 URL 可用时临时展示 |
+| COS 失败 | 不把 Base64 写入数据库；预览可在供应商 URL 可用时临时展示 |
 | Pinata 失败 | 停止正式发布，不发送 ERC-1155 创建 / Mint |
 | Monad RPC / 交易失败 | 不标记链上操作成功；购买链路执行对应退款 / 恢复处理 |
 | Redis / Langfuse 不可用 | 缓存或观测降级，核心 PostgreSQL 业务继续运行 |
@@ -314,7 +314,7 @@ flowchart LR
 
 - Challenge 一次性消费，服务端会话控制受保护 API。
 - 角色依赖保护管理接口；Operator 私钥只存在后端环境变量。
-- BeeImg Token、Pinata JWT、LLM Key 不进入 `NEXT_PUBLIC_*`。
+- COS Token、Pinata JWT、LLM Key 不进入 `NEXT_PUBLIC_*`。
 - 请求使用关联 ID，结构化日志记录阶段、状态和耗时。
 - 图片模型日志可记录模型、URL、HTTP 状态和耗时，但隐藏 Authorization 与 Base64 正文。
 - Prometheus 提供接口指标；Langfuse 为可选 LLM 观测能力。
@@ -332,7 +332,7 @@ Fanora/
 │   ├── app/api/routes/         # FastAPI 接口
 │   ├── app/agents/             # LangGraph、Prompt 与 Tool
 │   ├── app/services/           # 领域规则与外部操作编排
-│   ├── app/adapters/           # BeeImg、Pinata、Monad 等适配器
+│   ├── app/adapters/           # COS、Pinata、Monad 等适配器
 │   ├── app/models/             # SQLModel 数据模型
 │   ├── app/schemas/            # Pydantic 输入输出
 │   └── alembic/                # 数据库迁移

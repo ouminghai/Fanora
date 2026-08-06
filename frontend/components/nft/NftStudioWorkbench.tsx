@@ -92,6 +92,7 @@ export default function NftStudioWorkbench() {
   const { user, status, refreshUser } = useAuth();
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const defaultTemplateAppliedRef = useRef(false);
   const versionSelectionRequestRef = useRef(0);
   const strategyTooltipTimerRef = useRef<number | null>(null);
   const lastStrategyRequestRef = useRef<string | null>(null);
@@ -164,13 +165,23 @@ export default function NftStudioWorkbench() {
 
   const loadStudioState = useCallback(async () => {
     try {
-      const [styleResponse, fragmentResponse] = await Promise.all([
+      const [styleResponse, fragmentResponse, templateResponse] = await Promise.all([
         api.get<NftVisualStyle[]>("/nft/creations/agent/styles"),
         api.get<NftFragmentBalance>("/nft/fragments/me"),
+        api.get<NftVisualTemplate[]>("/nft/creations/agent/templates"),
       ]);
       setVisualStyles(styleResponse.data);
       setFragments(fragmentResponse.data);
       setStyleId((current) => current || styleResponse.data[0]?.id || "");
+      setTemplates(templateResponse.data);
+      setTemplateLibraryLoaded(true);
+      const defaultTemplate = templateResponse.data.find((item) => item.id === defaultTemplateId) ?? templateResponse.data[0];
+      if (defaultTemplate && !defaultTemplateAppliedRef.current) {
+        defaultTemplateAppliedRef.current = true;
+        setTemplateId(defaultTemplate.id);
+        setReferenceImages(defaultTemplate.reference_image_urls);
+        setInput((current) => current || `使用视觉模板「${defaultTemplate.name}」：${defaultTemplate.prompt}`);
+      }
     } catch (error) {
       setNotice(getMessage(error));
     }
@@ -397,7 +408,7 @@ export default function NftStudioWorkbench() {
     try {
       const urls = await Promise.all(selected.map((file) => uploadImage(file)));
       setReferenceImages((current) => [...current, ...urls]);
-      setNotice("参考图已上传 BeeImg，并会用于下一轮生成。");
+      setNotice("参考图已上传 COS，并会用于下一轮生成。");
     } catch (error) {
       setNotice(apiErrorMessage(error, "参考图上传失败。"));
     } finally {
@@ -640,7 +651,7 @@ export default function NftStudioWorkbench() {
 
   return (
     <main className={styles.stage}>
-      <video ref={videoRef} className={styles.videoBackground} autoPlay muted loop playsInline preload="auto" aria-hidden="true" onCanPlay={() => void videoRef.current?.play()} onEnded={() => { if (videoRef.current) { videoRef.current.currentTime = 0; void videoRef.current.play(); } }}><source src="/video/bg.mp4" type="video/mp4" /></video>
+      <video ref={videoRef} className={styles.videoBackground} autoPlay muted loop playsInline preload="auto" aria-hidden="true" onCanPlay={() => void videoRef.current?.play()} onEnded={() => { if (videoRef.current) { videoRef.current.currentTime = 0; void videoRef.current.play(); } }}><source src="https://fanora-1251127085.cos.ap-guangzhou.myqcloud.com/bg.mp4" type="video/mp4" /></video>
       <div className={styles.videoOverlay} aria-hidden="true" />
       <div className={styles.grid} aria-hidden="true" />
       <div className={styles.scanlines} aria-hidden="true" />
@@ -666,7 +677,7 @@ export default function NftStudioWorkbench() {
           <div className={styles.styleList}>{visualStyles.map((item) => <button key={item.id} type="button" onClick={() => setStyleId(item.id)} className={styleId === item.id ? styles.styleActive : ""}><strong>{item.name}</strong><span>{item.description}</span></button>)}</div>
 
           <div className={styles.referenceHeader}><span><FileImage /> 参考图</span><label><ImagePlus /> 添加<input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple onChange={(event) => void uploadReferences(event.target.files)} /></label></div>
-          <div className={styles.referenceStrip}>{referenceImages.map((url, index) => <div key={`${url}-${index}`}><Image src={url} alt={`参考图 ${index + 1}`} fill sizes="58px" className="object-cover" /><button type="button" aria-label={`移除参考图 ${index + 1}`} onClick={() => setReferenceImages((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X /></button></div>)}{!referenceImages.length ? <span>下一轮可加入最多 6 张 BeeImg 参考图</span> : null}</div>
+          <div className={styles.referenceStrip}>{referenceImages.map((url, index) => <div key={`${url}-${index}`}><Image src={url} alt={`参考图 ${index + 1}`} fill sizes="58px" className="object-cover" /><button type="button" aria-label={`移除参考图 ${index + 1}`} onClick={() => setReferenceImages((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X /></button></div>)}{!referenceImages.length ? <span>下一轮可加入最多 6 张 COS 参考图</span> : null}</div>
 
           <div className={styles.sessionInfo}><span>当前会话<strong>{conversationId ? conversationId.slice(0, 8) : "等待输入"}</strong></span><button type="button" onClick={resetSession}>新建</button></div>
           <div className={styles.toolLog}><p>TOOL TRACE</p>{toolEvents.length ? toolEvents.map((event, index) => <div key={`${event.tool}-${index}`}><Check /><span>{event.tool}<small>{event.summary}</small></span></div>) : <span>Agent 会按故事状态调用模板、保存和图片生成工具</span>}</div>

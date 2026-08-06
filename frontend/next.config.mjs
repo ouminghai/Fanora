@@ -33,15 +33,7 @@ const nextConfig = {
       },
       {
         protocol: "https",
-        hostname: "www.beeimg.cn",
-      },
-      {
-        protocol: "https",
-        hostname: "beeimg.cn",
-      },
-      {
-        protocol: "https",
-        hostname: "**.beeimg.cn",
+        hostname: "fanora-1251127085.cos.ap-guangzhou.myqcloud.com",
       },
       {
         protocol: "https",

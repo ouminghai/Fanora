@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlmodel import col, func, select
 
-from app.adapters.beeimg import BeeImgConfigurationError, BeeImgUploadError, beeimg_adapter
+from app.adapters.cos import CosConfigurationError, CosUploadError, cos_adapter
 from app.api.routes.community import get_official_community, require_creator
 from app.core.database import get_database_session
 from app.core.security import get_current_identity, get_optional_identity, require_official_member
@@ -335,10 +335,10 @@ async def complete_page_task(
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Claim the task before completing it")
     if participation.status == "claimed":
         try:
-            image_urls = await beeimg_adapter.ensure_remote_urls(payload.image_urls, filename_prefix="task-submission")
-        except BeeImgConfigurationError as error:
+            image_urls = await cos_adapter.ensure_remote_urls(payload.image_urls, filename_prefix="task-submission")
+        except CosConfigurationError as error:
             raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
-        except (BeeImgUploadError, OSError, ValueError) as error:
+        except (CosUploadError, OSError, ValueError) as error:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}"
             ) from error
@@ -394,13 +394,13 @@ async def create_task(
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Target post not found")
     presentation = payload.presentation.model_copy(deep=True)
     try:
-        presentation.image_url = await beeimg_adapter.ensure_remote_url(
+        presentation.image_url = await cos_adapter.ensure_remote_url(
             presentation.image_url,
             filename="task-presentation",
         )
-    except BeeImgConfigurationError as error:
+    except CosConfigurationError as error:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
-    except (BeeImgUploadError, OSError, ValueError) as error:
+    except (CosUploadError, OSError, ValueError) as error:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}") from error
     values = payload.model_dump(exclude={"minimum_reply_length", "content_categories", "presentation"})
     task = FanTask(
@@ -440,13 +440,13 @@ async def update_task(
             raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Target post not found")
     presentation = payload.presentation.model_copy(deep=True)
     try:
-        presentation.image_url = await beeimg_adapter.ensure_remote_url(
+        presentation.image_url = await cos_adapter.ensure_remote_url(
             presentation.image_url,
             filename="task-presentation",
         )
-    except BeeImgConfigurationError as error:
+    except CosConfigurationError as error:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(error)) from error
-    except (BeeImgUploadError, OSError, ValueError) as error:
+    except (CosUploadError, OSError, ValueError) as error:
         raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY, detail=f"Image upload failed: {error}") from error
     for field, value in payload.model_dump(
         exclude={"minimum_reply_length", "content_categories", "presentation"}

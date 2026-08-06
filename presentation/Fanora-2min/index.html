@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>Fanora · Demo Day 2 分钟版本</title>
+<script>
+  window.DECK_MANIFEST = [
+    { file: "slides/01-cover.html", label: "封面" },
+    { file: "slides/02-market.html", label: "真实消费场景" },
+    { file: "slides/03-problem.html", label: "问题" },
+    { file: "slides/04-loop.html", label: "解决方案闭环" },
+    { file: "slides/05-demo.html", label: "Demo 路径" },
+    { file: "slides/06-monad.html", label: "Monad 适配" },
+    { file: "slides/07-thanks.html", label: "Thanks" }
+  ];
+  window.DECK_WIDTH = 1920;
+  window.DECK_HEIGHT = 1080;
+  window.DECK_OVERVIEW = 'grid';
+</script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; overflow: hidden; font-family: -apple-system, "PingFang SC", sans-serif; background: #0a0a0a; }
+  .overview { position: fixed; inset: 0; }
+  body[data-mode="present"] .overview, body[data-mode="present"] .start-btn { display: none; }
+  body[data-mode="overview"] #present-ui { display: none; }
+  #ov-grid { display: flex; justify-content: center; align-items:center; perspective: 2200px; perspective-origin: 50% 42%; background: radial-gradient(120% 90% at 50% 0%, #f4f1e9, #e7e3d8 75%); overflow:hidden; }
+  .wall-wrap { transform: translateY(-2vh); }
+  .wall { display: grid; gap: 24px; transform-origin: center center; margin: 0 auto; }
+  #ov-grid .card { position: relative; aspect-ratio: 16/9; border-radius: 10px; overflow: hidden; background: #fff; cursor: pointer; box-shadow: 0 18px 40px rgba(40,34,24,0.22), 0 4px 12px rgba(40,34,24,0.13); transition: transform .28s cubic-bezier(.2,.7,.2,1), box-shadow .28s; }
+  #ov-grid .card:hover { transform: scale(1.14); box-shadow: 0 48px 92px rgba(40,34,24,0.36), 0 14px 30px rgba(40,34,24,0.22); z-index: 20; }
+  .card .thumb { position: absolute; top: 0; left: 0; width: 1920px; height: 1080px; transform-origin: top left; pointer-events: none; }
+  .card .thumb iframe { width: 1920px; height: 1080px; border: 0; display: block; background: #fff; pointer-events: none; }
+  .card .num { position: absolute; bottom: 7px; left: 8px; background: rgba(16,12,7,0.78); color: #fff; font-size: 12px; line-height: 1; padding: 5px 8px; border-radius: 6px; font-variant-numeric: tabular-nums; letter-spacing: 0.03em; z-index: 3; pointer-events: none; }
+  .overview-title { position: fixed; top: 24px; left: 0; right: 0; text-align: center; font-size: 13px; letter-spacing: 0.22em; text-transform: uppercase; z-index: 40; color: #5a5346; opacity: 0.66; pointer-events: none; }
+  .start-btn { position: fixed; bottom: 26px; right: 26px; border: 0; padding: 13px 24px; border-radius: 999px; font-size: 15px; font-family: inherit; letter-spacing: 0.04em; cursor: pointer; z-index: 200; background: #1a1712; color: #fff; box-shadow: 0 8px 28px rgba(40,34,24,0.28); transition: transform .18s, box-shadow .18s; }
+  .start-btn:hover { transform: translateY(-2px); }
+  #stage { position: fixed; top: 0; left: 0; transform-origin: top left; will-change: transform; background: #fff; box-shadow: 0 10px 60px rgba(0,0,0,0.4); }
+  #stage iframe { width: 100%; height: 100%; border: 0; display: block; background: #fff; }
+  .counter { position: fixed; bottom: 20px; right: 20px; background: rgba(0,0,0,0.65); color: #fff; padding: 6px 14px; border-radius: 999px; font-size: 13px; letter-spacing: 0.05em; font-variant-numeric: tabular-nums; z-index: 100; opacity: 0.7; }
+  .counter .label { color: rgba(255,255,255,0.7); margin-left: 8px; }
+  .overview-btn { position: fixed; top: 20px; left: 20px; background: rgba(0,0,0,0.55); color: rgba(255,255,255,0.85); border: 0; padding: 7px 14px; border-radius: 999px; font-size: 13px; font-family: inherit; cursor: pointer; z-index: 100; opacity: 0.6; }
+  .overview-btn:hover { opacity: 1; }
+  .nav-zone { position: fixed; top: 0; bottom: 0; width: 15%; cursor: pointer; z-index: 50; }
+  .nav-zone.left { left: 0; } .nav-zone.right { right: 0; }
+  .nav-hint { position: absolute; top: 50%; transform: translateY(-50%); width: 44px; height: 44px; border-radius: 999px; background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.6); display: flex; align-items: center; justify-content: center; font-size: 22px; opacity: 0; transition: opacity .2s; }
+  .nav-zone.left .nav-hint { left: 20px; } .nav-zone.right .nav-hint { right: 20px; }
+  .nav-zone:hover .nav-hint { opacity: 1; }
+  .tweaks-panel{position:fixed;top:18px;right:20px;z-index:260;width:286px;padding:13px 14px 14px;border-radius:18px;background:rgba(18,13,24,.74);color:#f4f1ea;backdrop-filter:blur(18px);box-shadow:0 18px 56px rgba(0,0,0,.32);font-family:-apple-system,"PingFang SC",sans-serif;transition:transform .25s ease,opacity .25s ease}
+  body[data-mode="overview"] .tweaks-panel{opacity:.76}
+  .tweaks-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .tweaks-title{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#e9e0ee}
+  .tweaks-toggle{border:0;background:rgba(255,255,255,.12);color:#fff;width:30px;height:30px;border-radius:999px;cursor:pointer}
+  .tweaks-body{margin-top:12px}
+  .variant-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+  .variant-btn{border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.07);color:#e7deeb;border-radius:10px;padding:9px 0;font-size:13px;font-weight:700;cursor:pointer}
+  .variant-btn[aria-pressed="true"]{background:#f4f1ea;color:#21112f;border-color:#f4f1ea}
+  .tweaks-note{margin-top:11px;font-size:12px;line-height:1.45;color:rgba(244,241,234,.68)}
+  .tweaks-panel[data-collapsed="true"]{width:118px;padding:9px 12px;border-radius:999px}
+  .tweaks-panel[data-collapsed="true"] .tweaks-title{font-size:0}
+  .tweaks-panel[data-collapsed="true"] .tweaks-title::before{content:"Tweaks";font-size:12px}
+  .tweaks-panel[data-collapsed="true"] .tweaks-body{display:none}
+  @media print { @page { size: 1920px 1080px; margin: 0; } html, body { background: #fff; overflow: visible; height: auto; } body[data-mode] .overview { display: none !important; } #stage { position: static; transform: none !important; box-shadow: none; } .counter, .nav-zone, .overview-btn, .start-btn, .tweaks-panel { display: none !important; } .print-stack { display: block; } .print-stack iframe { width: 1920px; height: 1080px; page-break-after: always; display: block; } }
+</style>
+</head>
+<body data-mode="overview">
+<div id="ov-grid" class="overview"><div class="overview-title">Overview · 点击任意页进入演示</div><div class="wall-wrap"><div class="wall" id="wall"></div></div></div>
+<button class="start-btn" id="startBtn">▶ 开始 2 分钟演示</button>
+<div class="tweaks-panel" id="tweaksPanel" data-collapsed="true"><div class="tweaks-head"><div class="tweaks-title">Tweaks · 实时变体切换</div><button class="tweaks-toggle" id="tweaksToggle" title="收起或展开">⌁</button></div><div class="tweaks-body"><div class="variant-row"><button class="variant-btn" data-variant="classic">经典</button><button class="variant-btn" data-variant="motion">动态</button><button class="variant-btn" data-variant="data">数据</button></div><div class="tweaks-note">数据模式会强化信息图、权重条、流程层级和可视化网格。</div></div></div>
+<div id="present-ui"><div id="stage"><iframe id="frame" src="about:blank"></iframe></div><button class="overview-btn" id="overviewBtn">⊞ 概览</button><div class="nav-zone left" id="navL"><div class="nav-hint">‹</div></div><div class="nav-zone right" id="navR"><div class="nav-hint">›</div></div><div class="counter" id="counter">1 / 1</div></div>
+<div class="print-stack" id="printStack" style="display:none;"></div>
+<script>
+(function () {
+  const W = window.DECK_WIDTH || 1920, H = window.DECK_HEIGHT || 1080, deck = window.DECK_MANIFEST || [];
+  const stage = document.getElementById('stage'), frame = document.getElementById('frame'), counter = document.getElementById('counter'), wall = document.getElementById('wall'), printStack = document.getElementById('printStack');
+  const storageKey = 'deck-index-' + location.pathname, variantKey = 'fanora-slide-variant';
+  let activeVariant = localStorage.getItem(variantKey) || 'motion', current = 0;
+  stage.style.width = W + 'px'; stage.style.height = H + 'px';
+  function setMode(mode) { document.body.setAttribute('data-mode', mode); if (mode === 'present') { fit(); show(current); } else buildGrid(); }
+  function makeCard(idx) { const card = document.createElement('div'); card.className = 'card'; const thumb = document.createElement('div'); thumb.className = 'thumb'; const ifr = document.createElement('iframe'); ifr.src = deck[idx].file; ifr.setAttribute('scrolling', 'no'); thumb.appendChild(ifr); card.appendChild(thumb); const num = document.createElement('div'); num.className = 'num'; num.textContent = (idx + 1) + ' · ' + (deck[idx].label || ''); card.appendChild(num); card.addEventListener('click', () => { current = idx; setMode('present'); }); return card; }
+  function buildGrid() { wall.innerHTML = ''; deck.forEach((_, i) => wall.appendChild(makeCard(i))); layoutWall(); }
+  function layoutWall() { const n = deck.length, vw = innerWidth, vh = innerHeight, gap = 24, cols = Math.min(4, n), rows = Math.ceil(n / cols); const cardW = Math.min(360, (vw * 0.86 - (cols - 1) * gap) / cols), cardH = cardW * 9 / 16; const baseW = cols * cardW + (cols - 1) * gap, wallH = rows * cardH + (rows - 1) * gap; wall.style.gridTemplateColumns = 'repeat(' + cols + ', 1fr)'; wall.style.gap = gap + 'px'; wall.style.width = baseW + 'px'; const tilt = 'rotateX(12deg) rotateZ(-7deg)'; wall.style.transform = tilt; const r = wall.getBoundingClientRect(); const s = Math.max(0.7, Math.min(Math.min(vw * 0.92 / r.width, vh * 0.78 / r.height), 1.45)); wall.style.transform = 'scale(' + s + ') ' + tilt; wall.querySelectorAll('.card .thumb').forEach(t => { const c = t.parentElement; t.style.transform = 'scale(' + (c.clientWidth / W || cardW / W) + ')'; }); }
+  function fit() { const s = Math.min(innerWidth / W, innerHeight / H); stage.style.transform = 'translate(' + ((innerWidth - W * s) / 2) + 'px, ' + ((innerHeight - H * s) / 2) + 'px) scale(' + s + ')'; }
+  function show(idx) { if (idx < 0 || idx >= deck.length) return; current = idx; frame.addEventListener('load', () => sendVariant(), { once: true }); if (frame.getAttribute('src') !== deck[idx].file) frame.src = deck[idx].file; sendVariant(); counter.innerHTML = (idx + 1) + ' / ' + deck.length + ' <span class="label">' + (deck[idx].label || '') + '</span>'; try { localStorage.setItem(storageKey, String(idx)); } catch (_) {} if (location.hash !== '#' + (idx + 1)) history.replaceState(null, '', '#' + (idx + 1)); }
+  function next() { show(Math.min(current + 1, deck.length - 1)); } function prev() { show(Math.max(current - 1, 0)); }
+  function sendVariant() { try { frame.contentWindow.postMessage({ type: 'fanora-variant', variant: activeVariant }, '*'); } catch (_) {} }
+  function setVariant(v) { activeVariant = v; localStorage.setItem(variantKey, v); document.body.setAttribute('data-variant', v); document.querySelectorAll('.variant-btn').forEach(btn => btn.setAttribute('aria-pressed', btn.dataset.variant === v ? 'true' : 'false')); sendVariant(); }
+  async function toggleFullscreen() { try { if (!document.fullscreenElement) await document.documentElement.requestFullscreen(); else await document.exitFullscreen(); } catch (_) {} }
+  document.addEventListener('keydown', (e) => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return; if (e.key === 'Escape') { if (document.body.getAttribute('data-mode') === 'present') { e.preventDefault(); setMode('overview'); } return; } if (e.key === 'f' || e.key === 'F') { e.preventDefault(); if (document.body.getAttribute('data-mode') !== 'present') setMode('present'); toggleFullscreen(); return; } if (e.key === 'p' || e.key === 'P') { window.print(); return; } if (document.body.getAttribute('data-mode') !== 'present') return; switch (e.key) { case 'ArrowRight': case ' ': case 'PageDown': e.preventDefault(); next(); break; case 'ArrowLeft': case 'PageUp': e.preventDefault(); prev(); break; case 'Home': e.preventDefault(); show(0); break; case 'End': e.preventDefault(); show(deck.length - 1); break; default: if (e.key >= '1' && e.key <= '7') { const i = parseInt(e.key, 10) - 1; if (i < deck.length) { e.preventDefault(); show(i); } } } });
+  document.getElementById('navL').addEventListener('click', prev); document.getElementById('navR').addEventListener('click', next); document.getElementById('startBtn').addEventListener('click', () => setMode('present')); document.getElementById('overviewBtn').addEventListener('click', () => setMode('overview')); document.getElementById('tweaksToggle').addEventListener('click', () => { const panel = document.getElementById('tweaksPanel'); panel.dataset.collapsed = panel.dataset.collapsed === 'true' ? 'false' : 'true'; }); document.querySelectorAll('.variant-btn').forEach(btn => btn.addEventListener('click', () => setVariant(btn.dataset.variant)));
+  setVariant(activeVariant); window.addEventListener('resize', () => { fit(); setTimeout(buildGrid, 80); }); window.addEventListener('hashchange', () => { const m = location.hash.match(/^#(\d+)$/); if (m) { current = parseInt(m[1], 10) - 1; setMode('present'); } });
+  const hashMatch = location.hash.match(/^#(\d+)$/); if (hashMatch) current = Math.min(parseInt(hashMatch[1], 10) - 1, deck.length - 1); else { try { const v = parseInt(localStorage.getItem(storageKey), 10); if (!isNaN(v) && v >= 0 && v < deck.length) current = v; } catch (_) {} }
+  fit(); show(current); if (hashMatch) setMode('present'); else { setMode('overview'); buildGrid(); }
+  window.addEventListener('blur', () => setTimeout(() => window.focus(), 100));
+  window.addEventListener('beforeprint', () => { printStack.innerHTML = ''; deck.forEach(item => { const f = document.createElement('iframe'); f.src = item.file; printStack.appendChild(f); }); printStack.style.display = 'block'; stage.style.display = 'none'; });
+  window.addEventListener('afterprint', () => { printStack.innerHTML = ''; printStack.style.display = 'none'; stage.style.display = ''; });
+})();
+</script>
+</body>
+</html>

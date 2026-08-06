@@ -230,7 +230,8 @@ test("creation publishing supports Markdown, task tags and multiple images", () 
   assert.match(creationWallSource, /<MarkdownEditor/);
   assert.match(creationWallSource, /requiredTags/);
   assert.match(creationWallSource, /tagInjectedForOpenComposer/);
-  assert.match(creationWallSource, /body: draft\.body\.trim\(\)/);
+  assert.match(creationWallSource, /const body = buildPostBody\(draft\.body, draft\.video_url\)/);
+  assert.match(creationWallSource, /body,/);
   assert.match(creationWallSource, /image_urls/);
   assert.match(markdownEditorSource, /编辑/);
   assert.match(markdownEditorSource, /预览/);
@@ -270,6 +271,16 @@ test("community posts can link an owned NFT and open its purchase drawer", () =>
   assert.match(creationWallSource, /\/nft\/me\/creations/);
   assert.match(creationWallSource, /linked_nft_creation_id/);
   assert.match(postSource, /post\.linked_nft/);
-  assert.match(postSource, /购买并铸造/);
+  assert.match(postSource, /购买作品/);
   assert.match(postSource, /<FanNftMarket mode="item" itemId=\{itemId\} variant="drawer"/);
+});
+
+test("community creations accept YouTube links and play them inside post detail", () => {
+  assert.match(creationWallSource, /video_url/);
+  assert.match(creationWallSource, /YouTube 视频链接/);
+  assert.match(creationWallSource, /buildPostBody\(draft\.body, draft\.video_url\)/);
+  assert.match(postSource, /youtubeEmbedUrl/);
+  assert.match(postSource, /www\.youtube\.com\/embed/);
+  assert.match(postSource, /<YoutubePlayer url=\{videoUrl\}/);
+  assert.match(postSource, /allowFullScreen/);
 });

@@ -45,7 +45,7 @@ sequenceDiagram
     participant Agent as "LangGraph Agent"
     participant AI as "LLM / Image Model"
     participant Forge as "Memory Forge"
-    participant Storage as "BeeImg / IPFS"
+    participant Storage as "COS / IPFS"
     participant Monad as "Monad Contracts"
 
     Fan->>Web: "钱包签名登录并激活会员"
@@ -53,7 +53,7 @@ sequenceDiagram
     Fan->>Agent: "多轮讲述故事并选择模板/风格"
     Agent->>AI: "优化名称、描述与艺术 Prompt"
     Agent->>AI: "满足规则时携带参考图生成预览"
-    Agent->>Storage: "预览上传 BeeImg"
+    Agent->>Storage: "预览上传 COS"
     Web->>Forge: "自动五维分析"
     Forge-->>Web: "RareScore 与数量/价格建议"
     Fan->>Forge: "确认发行"
@@ -131,7 +131,7 @@ SuccessRate = clamp(
 
 ```mermaid
 flowchart LR
-    A["校验 Forge SUCCESS"] --> B["规范化 BeeImg URL"]
+    A["校验 Forge SUCCESS"] --> B["规范化 COS URL"]
     B --> C["图片固定到 Pinata IPFS"]
     C --> D["Metadata 固定到 IPFS"]
     D --> E["创建 ERC-1155 Token Type"]
@@ -163,7 +163,7 @@ flowchart TB
     subgraph Data["Data & Media"]
         PG[("PostgreSQL")]
         CP[("LangGraph Checkpoint")]
-        Bee["BeeImg"]
+        Bee["COS"]
         IPFS["Pinata IPFS"]
     end
 
@@ -195,7 +195,7 @@ flowchart TB
 | --- | --- |
 | 用户、会话、社区、任务、FAN、Forge | PostgreSQL |
 | Agent 多轮对话状态 | LangGraph Checkpoint；不可用时进程内降级 |
-| Post、回复、任务、模板、参考图、AI 预览 | BeeImg URL |
+| Post、回复、任务、模板、参考图、AI 预览 | COS URL |
 | 最终 NFT 图片与 metadata | Pinata IPFS |
 | 正式会员身份 | Monad ERC-721 SBT |
 | NFT、Badge 与持有关系 | Monad ERC-1155；PostgreSQL 建立业务索引 |
@@ -217,7 +217,7 @@ flowchart TB
 | Web | Next.js 15、React 19、TypeScript、RainbowKit、wagmi、viem |
 | API | FastAPI、Python 3.13、SQLModel、Pydantic、Alembic |
 | Agent | LangGraph、LangChain Core、结构化 LLM 输出、多模态 Image Model |
-| Storage | PostgreSQL、可选 Redis/Valkey、BeeImg、Pinata IPFS |
+| Storage | PostgreSQL、可选 Redis/Valkey、COS、Pinata IPFS |
 | Chain | Solidity、Hardhat、web3.py、Monad Testnet |
 | Operations | Structlog、Prometheus、可选 Langfuse、接口耗时指标 |
 
@@ -229,7 +229,7 @@ flowchart TB
 - 社区、任务、签到、FAN、等级、排行榜和粉丝画像。
 - 数据库视觉模板、多轮 NFT Agent、Tool、参考图与多模态预览。
 - 五维分析、发行建议、三种 Forge 模式、Fragment 与幂等结算。
-- BeeImg、Pinata IPFS、Monad ERC-1155 发布链路。
+- COS、Pinata IPFS、Monad ERC-1155 发布链路。
 - Gallery、点赞、收藏、FAN 购买和 Collection。
 
 不属于本次 MVP：多社区运营后台、二级市场、跨链资产、去中心化治理、版权确权服务和法币支付。
@@ -257,7 +257,7 @@ npm run dev
 - API Docs: `http://localhost:8000/docs`
 - Health: `http://localhost:8000/api/v1/health`
 
-服务端至少需要配置数据库、LLM、BeeImg、Pinata、Monad RPC、运营钱包和合约地址；前端只配置 `NEXT_PUBLIC_*` 公共变量，禁止放入私钥或服务端 Token。
+服务端至少需要配置数据库、LLM、COS、Pinata、Monad RPC、运营钱包和合约地址；前端只配置 `NEXT_PUBLIC_*` 公共变量，禁止放入私钥或服务端 Token。
 
 ## 12. 继续阅读
 

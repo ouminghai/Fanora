@@ -1,6 +1,6 @@
 import base64
 
-from app.adapters.beeimg import BeeImgUpload, beeimg_adapter
+from app.adapters.cos import CosUpload, cos_adapter
 from scripts.seed_eason_fan_attraction_posts import CommunitySnapshot, SnapshotImageHoster
 
 
@@ -8,11 +8,11 @@ async def test_snapshot_image_hoster_replaces_and_deduplicates_base64_images(mon
     data_url = f"data:image/png;base64,{base64.b64encode(b'fanora-image').decode('ascii')}"
     uploads: list[bytes] = []
 
-    async def fake_upload_bytes(*, content: bytes, mime_type: str, filename: str) -> BeeImgUpload:
+    async def fake_upload_bytes(*, content: bytes, mime_type: str, filename: str) -> CosUpload:
         uploads.append(content)
-        return BeeImgUpload(url="https://cdn.example.test/v/image.png", raw={})
+        return CosUpload(url="https://cdn.example.test/v/image.png", raw={})
 
-    monkeypatch.setattr(beeimg_adapter, "upload_bytes", fake_upload_bytes)
+    monkeypatch.setattr(cos_adapter, "upload_bytes", fake_upload_bytes)
     snapshot = CommunitySnapshot(
         users=[],
         user_profiles=[{"avatar_url": data_url}],

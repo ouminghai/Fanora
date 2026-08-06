@@ -92,7 +92,7 @@ export function HeroView({ status, hasUser, isOfficialMember = false }: HeroView
         poster="/img/fanora/eason-concert.webp"
         aria-hidden="true"
       >
-        <source src="/video/bg.mp4" type="video/mp4" />
+        <source src="https://fanora-1251127085.cos.ap-guangzhou.myqcloud.com/bg.mp4" type="video/mp4" />
       </video>
       <div className="pointer-events-none absolute inset-0 -z-10 bg-white/30 dark:bg-jacarta-900/55" />
       <div className="pointer-events-none absolute inset-0 -z-10 bg-gradient-to-b from-transparent via-white/10 to-white dark:to-jacarta-900" />
