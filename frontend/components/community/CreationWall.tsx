@@ -1,6 +1,7 @@
 "use client";
 
 import NiceModal from "@ebay/nice-modal-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import MarkdownEditor from "@/components/community/MarkdownEditor";
@@ -308,8 +309,8 @@ export default function CreationWall() {
                       onClick={() => setDraft((current) => ({ ...current, linked_nft_creation_id: current.linked_nft_creation_id === item.id ? "" : item.id }))}
                       className={`flex min-w-0 items-center gap-3 rounded-lg border p-3 text-left transition-colors ${draft.linked_nft_creation_id === item.id ? "border-accent bg-accent/10" : "border-white/10 bg-white/[.04] hover:border-white/25"}`}
                     >
-                      <span className="block h-14 w-14 shrink-0 overflow-hidden rounded-md bg-black/30">
-                        {item.image_url ? <img src={item.image_url} alt="" className="h-full w-full object-cover" /> : null}
+                      <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-md bg-black/30">
+                        {item.image_url ? <Image src={item.image_url} alt="" fill sizes="56px" className="object-cover" /> : null}
                       </span>
                       <span className="min-w-0">
                         <span className="block truncate text-sm font-semibold text-white">{item.name}</span>
@@ -328,7 +329,7 @@ export default function CreationWall() {
           {masonryColumns.map((column, columnIndex) => <div key={columnIndex} className="space-y-5">{column.map(({ post, index }) => (
             <article key={post.id} className="web3-interactive-card community-reveal mb-5 inline-block w-full break-inside-avoid overflow-hidden rounded-[1.5rem] border border-white/10 bg-[#111538] text-white" style={{ animationDelay: `${Math.min(index, 12) * 55}ms` }}>
               <Link href={`/community/posts/${post.id}`} onClick={(event) => { event.preventDefault(); openPost(post.id); }} className="group block overflow-hidden">
-                {post.cover_url ? <div className="relative overflow-hidden bg-[#090c24]"><img src={post.cover_url} alt="" className="block h-auto w-full transition-opacity duration-300 group-hover:opacity-95" />{hasYoutubeVideo(post.body_preview) ? <span className="absolute left-3 top-3 rounded-full bg-black/70 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">▶ YouTube</span> : null}</div> : <div className={`flex ${index % 2 ? "min-h-72" : "min-h-52"} items-center bg-gradient-to-br from-accent/25 via-[#45BFEF]/10 to-[#111538] p-7`}><p className="font-display text-2xl font-semibold leading-relaxed text-white/90">{post.title}</p></div>}
+                {post.cover_url ? <div className={`relative overflow-hidden bg-[#090c24] ${index % 2 ? "min-h-72" : "min-h-52"}`}><Image src={post.cover_url} alt="" fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, (max-width: 1280px) 33vw, 25vw" className="object-cover transition-opacity duration-300 group-hover:opacity-95" />{hasYoutubeVideo(post.body_preview) ? <span className="absolute left-3 top-3 rounded-full bg-black/70 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur">▶ YouTube</span> : null}</div> : <div className={`flex ${index % 2 ? "min-h-72" : "min-h-52"} items-center bg-gradient-to-br from-accent/25 via-[#45BFEF]/10 to-[#111538] p-7`}><p className="font-display text-2xl font-semibold leading-relaxed text-white/90">{post.title}</p></div>}
               </Link>
               <div className="p-4">
                 <span className="rounded-full bg-accent/15 px-2.5 py-1 text-[11px] font-semibold text-accent-lighter">{labels[post.category] || post.category}</span>

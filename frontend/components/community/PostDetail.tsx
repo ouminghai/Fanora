@@ -1,6 +1,7 @@
 "use client";
 
 import NiceModal from "@ebay/nice-modal-react";
+import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import CommentPhotoGallery from "@/components/community/CommentPhotoGallery";
@@ -90,8 +91,8 @@ function CommentImageAttachments({ images, authorName }: { images: string[]; aut
 function LinkedNftCard({ item, onOpen }: { item: FanNftListing; onOpen: () => void }) {
   return (
     <button type="button" onClick={onOpen} className="community-reveal mx-auto mb-7 flex w-full max-w-4xl flex-wrap gap-5 rounded-lg bg-white p-5 text-left shadow-sm transition-transform hover:-translate-y-0.5 dark:bg-jacarta-700 lg:flex-nowrap">
-      <span className="block h-28 w-28 shrink-0 overflow-hidden rounded-lg bg-jacarta-100 dark:bg-white/5">
-        {item.image_url ? <img src={item.image_url} alt="" className="h-full w-full object-cover" /> : null}
+      <span className="relative block h-28 w-28 shrink-0 overflow-hidden rounded-lg bg-jacarta-100 dark:bg-white/5">
+        {item.image_url ? <Image src={item.image_url} alt="" fill sizes="112px" className="object-cover" /> : null}
       </span>
       <span className="min-w-0 flex-1">
         <span className="mb-2 flex text-orange" aria-hidden="true">★★★★★</span>
