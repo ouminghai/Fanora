@@ -2,7 +2,7 @@
 
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "@/components/providers/AuthProvider";
 import { privyLoginMethods } from "@/components/providers/PrivyAuthProvider";
 
@@ -60,6 +60,10 @@ export default function PrivyLoginButton({ className }: PrivyLoginButtonProps) {
     wallets,
     walletsReady,
   ]);
+
+  useEffect(() => {
+    void connectFanoraSession();
+  }, [connectFanoraSession]);
 
   const handleLogin = () => {
     clearError();
