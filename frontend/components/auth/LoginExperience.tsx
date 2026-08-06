@@ -3,14 +3,16 @@
 import { useEffect } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
+import PrivyLoginButton from "@/components/auth/PrivyLoginButton";
 import RainbowWalletLoginButton from "@/components/web3/RainbowWalletLoginButton";
 import { useAuth } from "@/components/providers/AuthProvider";
+import { isPrivyConfigured } from "@/components/providers/PrivyAuthProvider";
 import styles from "./LoginExperience.module.css";
 
 const steps = [
-  ["01", "连接钱包", "通过 RainbowKit 选择 MetaMask、WalletConnect 等钱包。"],
-  ["02", "确认签名", "签署一次性登录消息，不会产生链上费用。"],
-  ["03", "进入 Fanora", "验证成功后绑定主钱包并开始积累粉丝身份。"],
+  ["01", "快速登录", "使用邮箱、Google 或钱包进入 Fanora。"],
+  ["02", "生成身份钱包", "Privy 自动连接或创建可签名的钱包身份。"],
+  ["03", "进入 Fanora", "完成一次无 Gas 确认后开始积累粉丝身份。"],
 ];
 
 export default function LoginExperience() {
@@ -49,7 +51,7 @@ export default function LoginExperience() {
             <span className={`${styles.typewriterLine} ${styles.typewriterForever}`}>On-chain. Forever.</span>
           </h1>
           <p className={`${styles.heroCopy} mt-6 max-w-xl text-lg leading-8`}>
-            Fanora 使用 RainbowKit 连接你熟悉的钱包。完成一次无 Gas 的消息签名后，即可获得可验证的粉丝身份。
+            Fanora 接入 Privy，让新用户可以用邮箱、Google 或钱包快速进入。完成一次无 Gas 的身份确认后，即可获得可验证的粉丝身份。
           </p>
           <div className={`${styles.stepFlow} mt-10 grid gap-4 sm:grid-cols-3`}>
             {steps.map(([number, title, text]) => (
@@ -73,8 +75,8 @@ export default function LoginExperience() {
           <span className={styles.photon} aria-hidden="true"><i /></span>
           <span className={`${styles.photon} ${styles.photonSecondary}`} aria-hidden="true"><i /></span>
           <div className={styles.loginSystemBar}>
-            <span><i aria-hidden="true" /> WALLET AUTH NODE</span>
-            <span>MONAD // READY</span>
+            <span><i aria-hidden="true" /> PRIVY AUTH NODE</span>
+            <span>FANORA // READY</span>
           </div>
           <div className={styles.loginCardBody}>
           <div className="relative mx-auto mb-8 flex h-28 w-28 items-center justify-center">
@@ -94,7 +96,11 @@ export default function LoginExperience() {
             <p className={`${styles.loginCopy} mt-3 text-sm leading-6`}>完成确认后，即可开启签到、粉丝任务和会员专属权益。</p>
           </div>
           <div className="mt-8">
-            <RainbowWalletLoginButton variant="full" />
+            {isPrivyConfigured ? (
+              <PrivyLoginButton />
+            ) : (
+              <RainbowWalletLoginButton variant="full" />
+            )}
           </div>
           {error && (
             <button
@@ -107,7 +113,7 @@ export default function LoginExperience() {
           )}
           <div className={`${styles.securityNotes} mt-6 flex items-center justify-center gap-5 text-xs`}>
             <span>✓ 不保存私钥</span>
-            <span>✓ 钱包强绑定</span>
+            <span>✓ Privy 钱包身份</span>
             <span>✓ 随时退出</span>
           </div>
           </div>

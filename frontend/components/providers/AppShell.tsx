@@ -7,6 +7,7 @@ import BidModal from "@/components/modals/BidModal";
 import BuyModal from "@/components/modals/BuyModal";
 import LevelsModal from "@/components/modals/LevelsModal";
 import PropertiesModal from "@/components/modals/PropertiesModal";
+import PrivyAuthProvider from "@/components/providers/PrivyAuthProvider";
 import Web3Provider from "@/components/providers/Web3Provider";
 
 export default function AppShell({ children }: { children: ReactNode }) {
@@ -17,12 +18,14 @@ export default function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <Web3Provider>
-      <ModeChanger />
-      {children}
-      <BuyModal />
-      <BidModal />
-      <PropertiesModal />
-      <LevelsModal />
+      <PrivyAuthProvider>
+        <ModeChanger />
+        {children}
+        <BuyModal />
+        <BidModal />
+        <PropertiesModal />
+        <LevelsModal />
+      </PrivyAuthProvider>
     </Web3Provider>
   );
 }

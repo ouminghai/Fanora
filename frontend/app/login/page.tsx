@@ -3,7 +3,7 @@ import LoginExperience from "@/components/auth/LoginExperience";
 
 export const metadata = {
   title: "登录 | Fanora",
-  description: "使用 RainbowKit 连接钱包并获得 Fanora 钱包身份。",
+  description: "使用 Privy、邮箱、Google 或钱包快速获得 Fanora 粉丝身份。",
 };
 
 export default function LoginPage() {

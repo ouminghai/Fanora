@@ -25,8 +25,13 @@
   },
   "dependencies": {
     "@ebay/nice-modal-react": "^1.2.13",
+    "@farcaster/mini-app-solana": "^2.0.0",
+    "@farcaster/miniapp-sdk": "^0.3.0",
     "@popperjs/core": "^2.11.8",
+    "@privy-io/react-auth": "^3.37.0",
     "@rainbow-me/rainbowkit": "^2.2.11",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@stripe/stripe-js": "^9.13.0",
     "@tailwindcss/forms": "^0.5.10",
     "@tanstack/react-query": "^5.101.2",
     "axios": "^1.18.1",
