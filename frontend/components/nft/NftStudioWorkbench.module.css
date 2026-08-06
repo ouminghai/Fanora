@@ -616,10 +616,21 @@
 .nftCard {
   overflow: hidden;
   transform: translateZ(36px);
+  background:
+    radial-gradient(circle at 50% 45%, rgba(124, 58, 237, 0.18), transparent 60%),
+    #10061f;
   box-shadow:
     0 26px 65px rgba(0, 0, 0, 0.58),
     0 0 35px rgba(169, 92, 255, 0.15);
   animation: cardFloat 5s ease-in-out infinite;
+}
+.previewArtwork {
+  inset: 8px !important;
+  width: calc(100% - 16px) !important;
+  height: calc(100% - 16px) !important;
+  object-fit: contain;
+  object-position: center;
+  border-radius: 4px;
 }
 .emptyArtwork {
   position: absolute;

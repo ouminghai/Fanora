@@ -32,11 +32,16 @@ const clampInteger = (value: number, minimum: number, maximum: number) => {
 
 export function buildForgeAnalyzePayload(input: ForgeAnalyzeInput) {
   const imageUrl = input.imageUrl.trim();
-  if (!imageUrl.startsWith("http://") && !imageUrl.startsWith("https://")) {
-    throw new Error("当前版本图片尚未完成托管，请重新生成或上传后再分析。");
+  const isRemoteImage = imageUrl.startsWith("http://") || imageUrl.startsWith("https://");
+  const isTemporaryImage = imageUrl.startsWith("data:image/") && imageUrl.includes(";base64,");
+  if (!isRemoteImage && !isTemporaryImage) {
+    throw new Error("当前版本图片不可用，请重新生成或上传后再分析。");
   }
-  if (imageUrl.length > 2_048) {
+  if (isRemoteImage && imageUrl.length > 2_048) {
     throw new Error("当前版本图片托管地址无效，请重新生成或上传后再分析。");
+  }
+  if (isTemporaryImage && imageUrl.length > 7_000_000) {
+    throw new Error("当前临时图片过大，请重新生成更小的图片后再分析。");
   }
 
   const referenceImageUrls = Array.from(new Set(input.referenceImageUrls.map((item) => item.trim())))
