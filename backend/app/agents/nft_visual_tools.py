@@ -3,11 +3,9 @@
 import json
 from typing import Any
 
-import httpx
 from langchain_core.tools import tool
 from langgraph.prebuilt import ToolRuntime
 
-from app.adapters.cos import CosConfigurationError, CosUploadError, cos_adapter
 from app.agents.nft_creation import nft_creation_agent
 from app.agents.nft_visual_templates import STYLE_PROMPTS
 from app.core.database import database_service
@@ -20,18 +18,6 @@ def _tool_result(action: str, status: str, summary: str, **payload: Any) -> str:
         {"action": action, "status": status, "summary": summary, **payload},
         ensure_ascii=False,
     )
-
-
-async def _host_generated_preview(generated: NftDraftResponse, *, filename: str) -> tuple[str | None, bool, str | None]:
-    """Return only a COS-hosted preview; provider URLs are never publishable assets."""
-
-    if not generated.image_data_url:
-        return None, False, generated.image_error or "图片生成暂不可用。"
-    try:
-        hosted_url = await cos_adapter.ensure_remote_url(generated.image_data_url, filename=filename)
-        return hosted_url, False, None
-    except (CosConfigurationError, CosUploadError, httpx.HTTPError) as error:
-        return None, True, str(error)
 
 
 @tool
@@ -114,7 +100,7 @@ async def save_visual_template(
 
 @tool
 async def generate_nft_image(runtime: ToolRuntime) -> str:
-    """Generate and host a new NFT image when story state or user intent warrants it."""
+    """Generate a temporary NFT image preview when story state or user intent warrants it."""
 
     state = runtime.state
     template = state.get("template") or {}
@@ -161,28 +147,12 @@ async def generate_nft_image(runtime: ToolRuntime) -> str:
             generated.image_error or "图片生成暂不可用。",
             draft=generated.model_dump(),
         )
-    hosted_url, hosting_degraded, hosting_error = await _host_generated_preview(
-        generated,
-        filename=f"nft-studio-{template.get('id', 'custom')}",
-    )
-    if not hosted_url:
-        return _tool_result(
-            "generate_nft_image",
-            "degraded",
-            f"图片已经生成，但上传 COS 失败：{hosting_error or '未知错误'}",
-            draft=generated.model_dump(),
-        )
-    generated = generated.model_copy(update={"image_data_url": hosted_url})
     return _tool_result(
         "generate_nft_image",
-        "degraded" if hosting_degraded else "completed",
-        (
-            "图片已生成并显示临时预览，但上传 COS 失败；请检查 COS 账号状态。"
-            if hosting_degraded
-            else "已按当前作品状态生成新图并上传 COS。"
-        ),
+        "completed",
+        "已按当前作品状态生成临时预览图；发布时会直接上传 Pinata。",
         draft=generated.model_dump(),
-        image_url=hosted_url,
+        image_url=generated.image_data_url,
     )
 
 

@@ -4,7 +4,6 @@ from langgraph.prebuilt import ToolRuntime
 from pydantic import ValidationError
 
 import app.agents.nft_studio as nft_studio_module
-from app.adapters.cos import CosUploadError
 from app.agents.nft_creation import (
     _image_log_value,
     _prepare_multimodal_references,
@@ -16,7 +15,6 @@ from app.agents.nft_creation import (
     nft_creation_agent,
 )
 from app.agents.nft_studio import NftStudioAgent, _wants_generate_image
-from app.agents.nft_visual_tools import _host_generated_preview
 from app.core.database import database_service
 from app.models.nft import NftVisualTemplate as NftVisualTemplateModel
 from app.schemas.nft_agent import NftAgentChatRequest, NftDraftRequest, NftDraftResponse, NftVisualTemplate
@@ -193,13 +191,7 @@ def test_image_prompt_merges_database_template_and_selected_style_into_priority_
     assert "gentle hand-drawn illustration" in prompt
 
 
-@pytest.mark.asyncio
-async def test_cos_failure_does_not_expose_provider_preview_url(monkeypatch) -> None:
-    async def reject_upload(*args, **kwargs):
-        del args, kwargs
-        raise CosUploadError("请先绑定手机号")
-
-    monkeypatch.setattr("app.agents.nft_visual_tools.cos_adapter.ensure_remote_url", reject_upload)
+def test_generated_preview_keeps_temporary_data_url_until_publish() -> None:
     generated = NftDraftResponse(
         name="大头仔",
         description="一件具有温暖陪伴感和收藏质感的原创粉丝 NFT。",
@@ -213,21 +205,18 @@ async def test_cos_failure_does_not_expose_provider_preview_url(monkeypatch) -> 
         degraded=False,
     )
 
-    hosted_url, degraded, error = await _host_generated_preview(generated, filename="preview")
-
-    assert hosted_url is None
-    assert degraded is True
-    assert error == "请先绑定手机号"
+    assert generated.image_data_url == "data:image/png;base64,aGVsbG8="
+    assert generated.image_source_url == "https://provider.example/generated.png"
 
 
 @pytest.mark.asyncio
 async def test_image_tool_exception_is_reported_instead_of_evaluate_event(monkeypatch) -> None:
     @tool("generate_nft_image")
     async def failing_image_tool(runtime: ToolRuntime) -> str:
-        """Simulate a COS account rejection after image generation."""
+        """Simulate an image tool failure after image generation."""
 
         del runtime
-        raise CosUploadError("请先绑定手机号")
+        raise RuntimeError("图片生成服务暂时不可用")
 
     monkeypatch.setattr(nft_studio_module, "NFT_IMAGE_TOOLS", (failing_image_tool,))
     agent = NftStudioAgent(model_service=LLMService())
@@ -241,7 +230,7 @@ async def test_image_tool_exception_is_reported_instead_of_evaluate_event(monkey
 
     image_event = next(event for event in result.tool_events if event.tool == "generate_nft_image")
     assert image_event.status == "degraded"
-    assert "绑定手机号" in image_event.summary
+    assert "图片生成服务暂时不可用" in image_event.summary
     assert all(event.tool != "evaluate_image_generation" for event in result.tool_events)
 
 

@@ -19,7 +19,7 @@ class NftForgeAnalyzeRequest(BaseModel):
     story_summary: str = Field(min_length=10, max_length=1500)
     description: str = Field(min_length=10, max_length=1000)
     image_prompt: str = Field(min_length=10, max_length=2500)
-    image_url: str = Field(min_length=12, max_length=2048)
+    image_url: str = Field(min_length=12, max_length=7_000_000)
     reference_image_urls: list[str] = Field(default_factory=list, max_length=6)
     suggested_attributes: list[PublicAttribute] = Field(default_factory=list, max_length=8)
     supply: int = Field(default=50, ge=1, le=1000)
@@ -35,7 +35,7 @@ class NftForgeAnalyzeRequest(BaseModel):
     @field_validator("image_url")
     @classmethod
     def validate_generated_image(cls, value: str) -> str:
-        return validate_image_url(value, label="Generated NFT image") or ""
+        return validate_image_url(value, label="Generated NFT image", max_bytes=7_000_000) or ""
 
 
 class NftForgeStrategyRequest(BaseModel):
