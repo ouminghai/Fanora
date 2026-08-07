@@ -3,7 +3,7 @@
 import { usePrivy, useWallets } from "@privy-io/react-auth";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useAuth } from "@/components/providers/AuthProvider";
+import { FORCE_FRESH_LOGIN_KEY, useAuth } from "@/components/providers/AuthProvider";
 import { privyLoginMethods } from "@/components/providers/PrivyAuthProvider";
 
 type PrivyLoginButtonProps = {
@@ -14,6 +14,10 @@ function normalizePrivyError(error: unknown) {
   if (error instanceof Error) return error.message;
   if (typeof error === "string") return error;
   return "Privy 登录没有完成，请重试。";
+}
+
+function shouldForceFreshLogin() {
+  return window.localStorage.getItem(FORCE_FRESH_LOGIN_KEY) === "1";
 }
 
 export default function PrivyLoginButton({ className }: PrivyLoginButtonProps) {
@@ -62,13 +66,25 @@ export default function PrivyLoginButton({ className }: PrivyLoginButtonProps) {
   ]);
 
   useEffect(() => {
+    if (!ready) return;
+    if (shouldForceFreshLogin()) {
+      if (authenticated) void privyLogout().catch(() => undefined);
+      return;
+    }
     void connectFanoraSession();
-  }, [connectFanoraSession]);
+  }, [authenticated, connectFanoraSession, privyLogout, ready]);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     clearError();
     setPrivyError(null);
     if (!ready) return;
+    if (shouldForceFreshLogin()) {
+      window.localStorage.removeItem(FORCE_FRESH_LOGIN_KEY);
+      loginAttemptRef.current = null;
+      if (authenticated) await privyLogout();
+      login({ loginMethods: [...privyLoginMethods] });
+      return;
+    }
     if (authenticated) {
       void connectFanoraSession();
       return;
@@ -93,7 +109,7 @@ export default function PrivyLoginButton({ className }: PrivyLoginButtonProps) {
       <div className="space-y-3">
         <button
           type="button"
-          onClick={handleLogin}
+          onClick={() => void handleLogin()}
           disabled={isBusy}
           className={
             className ||

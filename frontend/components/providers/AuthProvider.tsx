@@ -52,6 +52,7 @@ type AuthContextValue = {
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+export const FORCE_FRESH_LOGIN_KEY = "fanora_force_fresh_login";
 
 function getErrorMessage(error: unknown) {
   if (axios.isAxiosError(error)) {
@@ -134,6 +135,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
           signature,
         });
         window.localStorage.setItem(SESSION_TOKEN_KEY, response.data.access_token);
+        window.localStorage.removeItem(FORCE_FRESH_LOGIN_KEY);
         setUser(response.data.user);
         setStatus("authenticated");
         return response.data.user;
@@ -154,6 +156,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
       // The local session and wallet connection are still cleared if the API is offline.
     }
     window.localStorage.removeItem(SESSION_TOKEN_KEY);
+    window.localStorage.setItem(FORCE_FRESH_LOGIN_KEY, "1");
     await disconnect(wagmiConfig);
     setUser(null);
     setError(null);
