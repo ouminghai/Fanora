@@ -112,6 +112,22 @@ class NftVisualTemplateCreate(BaseModel):
         return [item if item.startswith("/img/") else (validate_image_url(item, label="Template reference") or "") for item in value]
 
 
+class NftVisualTemplateUpdate(BaseModel):
+    name: str = Field(min_length=2, max_length=80)
+    category: str = Field(min_length=2, max_length=40)
+    description: str = Field(min_length=4, max_length=500)
+    prompt: str = Field(min_length=10, max_length=2000)
+    reference_image_urls: list[str] = Field(default_factory=list, max_length=6)
+    palette: list[str] = Field(default_factory=lambda: ["#8B5CF6", "#EC4899", "#111827"], max_length=6)
+    elements: list[str] = Field(default_factory=list, max_length=12)
+    forbidden: list[str] = Field(default_factory=lambda: ["Logo", "水印", "可读文字"], max_length=12)
+
+    @field_validator("reference_image_urls")
+    @classmethod
+    def validate_images(cls, value: list[str]) -> list[str]:
+        return [item if item.startswith("/img/") else (validate_image_url(item, label="Template reference") or "") for item in value]
+
+
 class NftVisualStyle(BaseModel):
     id: str
     name: str

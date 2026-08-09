@@ -7,7 +7,7 @@ from app.adapters.cos import cos_adapter
 from app.models.base import utc_now
 from app.models.community import CommunityPost
 from app.models.nft import NftVisualTemplate as NftVisualTemplateModel
-from app.schemas.nft_agent import NftVisualTemplate, NftVisualTemplateCreate
+from app.schemas.nft_agent import NftVisualTemplate, NftVisualTemplateCreate, NftVisualTemplateUpdate
 
 
 def template_response(template: NftVisualTemplateModel) -> NftVisualTemplate:
@@ -50,13 +50,47 @@ class NftVisualTemplateService:
             item.reference_image_urls,
             filename_prefix=f"nft-template-{item.id}",
         )
-        if normalized != item.reference_image_urls:
+        if normalized and normalized != item.reference_image_urls:
             item.reference_image_urls = normalized
             item.preview_image_url = normalized[0]
             item.updated_at = utc_now()
             session.add(item)
             await session.commit()
             await session.refresh(item)
+        return template_response(item)
+
+    async def update(
+        self,
+        session: AsyncSession,
+        user_id: str,
+        template_id: str,
+        payload: NftVisualTemplateUpdate,
+    ) -> NftVisualTemplate | None:
+        item = await session.get(NftVisualTemplateModel, template_id)
+        if item is None or item.owner_user_id != user_id or item.is_system:
+            return None
+        references = list(dict.fromkeys(payload.reference_image_urls))[:6]
+        if not references:
+            raise ValueError("A visual template requires at least one reference image")
+        remote_urls = await cos_adapter.ensure_remote_urls(
+            references,
+            filename_prefix=f"nft-template-{template_id}",
+        )
+        if not remote_urls:
+            raise ValueError("A visual template requires at least one reference image")
+        item.name = payload.name.strip()
+        item.category = payload.category.strip()
+        item.description = payload.description.strip()
+        item.prompt = payload.prompt.strip()
+        item.preview_image_url = remote_urls[0]
+        item.reference_image_urls = remote_urls
+        item.palette = payload.palette
+        item.elements = payload.elements
+        item.forbidden = payload.forbidden
+        item.updated_at = utc_now()
+        session.add(item)
+        await session.commit()
+        await session.refresh(item)
         return template_response(item)
 
     async def create(
@@ -79,6 +113,8 @@ class NftVisualTemplateService:
             references,
             filename_prefix=f"nft-template-{user_id}",
         )
+        if not remote_urls:
+            raise ValueError("A visual template requires at least one reference image")
         item = NftVisualTemplateModel(
             owner_user_id=user_id,
             source_post_id=payload.source_post_id,

@@ -730,7 +730,15 @@ export default function NftStudioWorkbench() {
         </section>
       </div>
 
-      <NftVisualTemplateModal open={templateModalOpen} templates={templates} selectedId={templateId} onClose={() => setTemplateModalOpen(false)} onSelect={selectTemplate} onCreated={(template) => setTemplates((current) => [template, ...current])} />
+      <NftVisualTemplateModal
+        open={templateModalOpen}
+        templates={templates}
+        selectedId={templateId}
+        onClose={() => setTemplateModalOpen(false)}
+        onSelect={selectTemplate}
+        onCreated={(template) => setTemplates((current) => [template, ...current.filter((item) => item.id !== template.id)])}
+        onUpdated={(template) => setTemplates((current) => current.map((item) => item.id === template.id ? template : item))}
+      />
       <PublishConfirmModal
         open={publishConfirmOpen}
         successRate={Math.round(forgeSession?.probability.success_rate ?? 0)}

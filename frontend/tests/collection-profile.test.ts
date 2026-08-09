@@ -256,6 +256,7 @@ test("Gallery routes NFT creation to the stateful Agent studio", () => {
   assert.match(studioSource, />STATE</);
   assert.match(studioSource, /https:\/\/fanora-1251127085\.cos\.ap-guangzhou\.myqcloud\.com\/bg\.mp4/);
   assert.match(studioSource, /<NftVisualTemplateModal/);
+  assert.match(studioSource, /onUpdated=\{\(template\) => setTemplates/);
   const loadStudioStateBlock = studioSource.slice(
     studioSource.indexOf("const loadStudioState"),
     studioSource.indexOf("const openTemplateLibrary"),
@@ -314,8 +315,15 @@ test("Gallery routes NFT creation to the stateful Agent studio", () => {
   assert.match(templateModalSource, /\/community\/posts\?limit=50&sort=latest/);
   assert.match(templateModalSource, /reference_image_urls: referenceUrls/);
   assert.match(templateModalSource, /source_post_id: selectedPost\?\.id/);
+  assert.match(templateModalSource, /setEditingTemplate\(template\)/);
+  assert.match(templateModalSource, /setTab\("edit"\)/);
+  assert.match(templateModalSource, /api\.put<NftVisualTemplate>\(`\/nft\/creations\/agent\/templates\/\$\{editingTemplate\.id\}`/);
   assert.match(templateModalSource, /uploadImage\(file\)/);
   assert.match(templateModalSource, /preview_image_url/);
+  assert.match(templateModalSource, /className=\{styles\.templateSelect\}/);
+  assert.match(templateModalSource, /className=\{styles\.editTemplateButton\}/);
+  assert.match(templateModalSource, /className=\{styles\.editBanner\}/);
+  assert.match(templateModalSource, /event\.currentTarget\.value = ""/);
   assert.equal((templateModalSource.match(/className=\{styles\.masonryGrid\}/g) ?? []).length, 3);
   assert.equal((templateModalSource.match(/<MasonryImage /g) ?? []).length, 3);
   assert.match(templateModalStyles, /\.masonryGrid\{column-count:3/);

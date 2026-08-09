@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useMemo, useState } from "react";
-import { ChevronLeft, ChevronRight, FileImage, Gem, LoaderCircle, Plus, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, FileImage, Gem, LoaderCircle, Pencil, Plus, Search, X } from "lucide-react";
 import { api, uploadImage } from "@/lib/api/client";
 import { apiErrorMessage } from "@/lib/api/errors";
 import type { CommunityPostSummary, FanNftListing, MyCollection, NftVisualTemplate } from "@/lib/api/types";
@@ -15,9 +15,10 @@ type Props = {
   onClose: () => void;
   onSelect: (template: NftVisualTemplate) => void;
   onCreated: (template: NftVisualTemplate) => void;
+  onUpdated: (template: NftVisualTemplate) => void;
 };
 
-type Tab = "library" | "posts" | "nfts" | "create";
+type Tab = "library" | "posts" | "nfts" | "create" | "edit";
 type NftSource = { id: string; name: string; description: string; category: string; imageUrl: string; referenceUrls: string[] };
 
 const PAGE_SIZE = 6;
@@ -35,7 +36,7 @@ function MasonryImage({ src, alt }: { src: string; alt: string }) {
   return <img src={src} alt={alt} loading="lazy" decoding="async" className={styles.masonryImage} />;
 }
 
-export default function NftVisualTemplateModal({ open, templates, selectedId, onClose, onSelect, onCreated }: Props) {
+export default function NftVisualTemplateModal({ open, templates, selectedId, onClose, onSelect, onCreated, onUpdated }: Props) {
   const [tab, setTab] = useState<Tab>("library");
   const [posts, setPosts] = useState<CommunityPostSummary[]>([]);
   const [nfts, setNfts] = useState<NftSource[]>([]);
@@ -47,6 +48,7 @@ export default function NftVisualTemplateModal({ open, templates, selectedId, on
   const [description, setDescription] = useState("");
   const [prompt, setPrompt] = useState("");
   const [referenceUrls, setReferenceUrls] = useState<string[]>([]);
+  const [editingTemplate, setEditingTemplate] = useState<NftVisualTemplate | null>(null);
   const [busy, setBusy] = useState<"posts" | "nfts" | "upload" | "create" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
@@ -92,6 +94,7 @@ export default function NftVisualTemplateModal({ open, templates, selectedId, on
   const pageItems = <T,>(items: T[], pageSize = PAGE_SIZE) => items.slice((page - 1) * pageSize, page * pageSize);
 
   const resetCreateForm = () => {
+    setEditingTemplate(null);
     setSelectedPost(null);
     setName("");
     setCategory("粉丝周边");
@@ -101,7 +104,31 @@ export default function NftVisualTemplateModal({ open, templates, selectedId, on
     setNotice(null);
   };
 
+  const templatePayload = () => ({
+    name: name.trim(),
+    category: category.trim(),
+    description: description.trim(),
+    prompt: prompt.trim(),
+    reference_image_urls: referenceUrls,
+    elements: editingTemplate?.elements ?? [],
+    forbidden: editingTemplate?.forbidden?.length ? editingTemplate.forbidden : ["Logo", "水印", "可读文字", "未经授权的真实艺人肖像"],
+    palette: editingTemplate?.palette?.length ? editingTemplate.palette : ["#8B5CF6", "#EC4899", "#111827"],
+  });
+
+  const startEditTemplate = (template: NftVisualTemplate) => {
+    setEditingTemplate(template);
+    setSelectedPost(null);
+    setName(template.name);
+    setCategory(template.category);
+    setDescription(template.description);
+    setPrompt(template.prompt);
+    setReferenceUrls(template.reference_image_urls.length ? template.reference_image_urls : [template.preview_image_url]);
+    setNotice(template.is_system ? "官方模板会保存为你的个人副本，原模板不会被覆盖。" : null);
+    setTab("edit");
+  };
+
   const choosePost = (post: CommunityPostSummary) => {
+    setEditingTemplate(null);
     setSelectedPost(post);
     setName(`${post.title.slice(0, 28)}视觉模板`);
     setCategory(post.category === "music" ? "音乐" : post.category === "story" ? "故事" : "共创");
@@ -112,6 +139,7 @@ export default function NftVisualTemplateModal({ open, templates, selectedId, on
   };
 
   const chooseNft = (nft: NftSource) => {
+    setEditingTemplate(null);
     setSelectedPost(null);
     setName(`${nft.name.slice(0, 30)}视觉模板`);
     setCategory(nft.category || "NFT 收藏");
@@ -137,7 +165,7 @@ export default function NftVisualTemplateModal({ open, templates, selectedId, on
     }
   };
 
-  const createTemplate = async () => {
+  const saveTemplate = async () => {
     if (!name.trim() || !description.trim() || !prompt.trim() || (!referenceUrls.length && !selectedPost)) {
       setNotice("请填写模板名称、说明、提示词并添加至少一张参考图。");
       return;
@@ -145,17 +173,15 @@ export default function NftVisualTemplateModal({ open, templates, selectedId, on
     setBusy("create");
     setNotice(null);
     try {
-      const response = await api.post<NftVisualTemplate>("/nft/creations/agent/templates", {
-        name: name.trim(),
-        category: category.trim(),
-        description: description.trim(),
-        prompt: prompt.trim(),
-        reference_image_urls: referenceUrls,
+      const payload = {
+        ...templatePayload(),
         source_post_id: selectedPost?.id ?? null,
-        elements: [],
-        forbidden: ["Logo", "水印", "可读文字", "未经授权的真实艺人肖像"],
-      });
-      onCreated(response.data);
+      };
+      const response = editingTemplate && !editingTemplate.is_system
+        ? await api.put<NftVisualTemplate>(`/nft/creations/agent/templates/${editingTemplate.id}`, templatePayload())
+        : await api.post<NftVisualTemplate>("/nft/creations/agent/templates", payload);
+      if (editingTemplate && !editingTemplate.is_system) onUpdated(response.data);
+      else onCreated(response.data);
       onSelect(response.data);
       resetCreateForm();
       onClose();
@@ -176,16 +202,20 @@ export default function NftVisualTemplateModal({ open, templates, selectedId, on
           <button type="button" className={tab === "library" ? styles.activeTab : ""} onClick={() => setTab("library")}>模板库</button>
           <button type="button" className={tab === "posts" ? styles.activeTab : ""} onClick={() => setTab("posts")}>从 Post 选择</button>
           <button type="button" className={tab === "nfts" ? styles.activeTab : ""} onClick={() => setTab("nfts")}><Gem /> 从 NFT 选择</button>
-          <button type="button" className={tab === "create" ? styles.activeTab : ""} onClick={() => setTab("create")}><Plus /> 新建模板</button>
+          <button type="button" className={tab === "create" ? styles.activeTab : ""} onClick={() => { resetCreateForm(); setTab("create"); }}><Plus /> 新建模板</button>
+          {editingTemplate ? <button type="button" className={tab === "edit" ? styles.activeTab : ""} onClick={() => setTab("edit")}><Pencil /> 编辑模板</button> : null}
         </nav>
         {notice ? <div className={styles.notice}>{notice}</div> : null}
 
         {tab === "library" ? <div className={styles.libraryView}>
           <label className={styles.search}><Search /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="搜索模板名称、分类或说明" /></label>
-          <div className={styles.masonryGrid}>{pageItems(visibleTemplates).map((template) => <button key={template.id} type="button" className={`${styles.masonryCard} ${template.id === selectedId ? styles.selectedTemplate : ""}`} onClick={() => { onSelect(template); onClose(); }}>
-            <span className={styles.masonryImageFrame}><MasonryImage src={template.preview_image_url} alt={template.name} /></span>
-            <span className={styles.templateCopy}><strong>{template.name}</strong><small>{template.description}</small><em>{template.is_system ? "官方模板" : "我的模板"} · {template.category}</em></span>
-          </button>)}</div><Pager page={page} total={visibleTemplates.length} onChange={setPage} />
+          <div className={styles.masonryGrid}>{pageItems(visibleTemplates).map((template) => <article key={template.id} className={`${styles.masonryCard} ${template.id === selectedId ? styles.selectedTemplate : ""}`}>
+            <button type="button" className={styles.templateSelect} onClick={() => { onSelect(template); onClose(); }}>
+              <span className={styles.masonryImageFrame}><MasonryImage src={template.preview_image_url} alt={template.name} /></span>
+              <span className={styles.templateCopy}><strong>{template.name}</strong><small>{template.description}</small><em>{template.is_system ? "官方模板" : "我的模板"} · {template.category}</em></span>
+            </button>
+            <button type="button" className={styles.editTemplateButton} onClick={() => startEditTemplate(template)}><Pencil /> 编辑</button>
+          </article>)}</div><Pager page={page} total={visibleTemplates.length} onChange={setPage} />
         </div> : null}
 
         {tab === "posts" ? <div className={styles.sourceView}>
@@ -199,7 +229,8 @@ export default function NftVisualTemplateModal({ open, templates, selectedId, on
           {!busy && !nfts.length ? <div className={styles.loading}>暂时没有可用的 NFT 图片</div> : null}<Pager page={page} total={nfts.length} onChange={setPage} />
         </div> : null}
 
-        {tab === "create" ? <div className={styles.createView}>
+        {tab === "create" || tab === "edit" ? <div className={styles.createView}>
+          {tab === "edit" && editingTemplate ? <div className={styles.editBanner}>{editingTemplate.is_system ? "正在基于官方模板另存为个人模板" : "正在编辑我的模板"}</div> : null}
           <div className={styles.formFields}>
             <label>模板名称<input value={name} onChange={(event) => setName(event.target.value)} placeholder="例如：紫色返场票根" /></label>
             <label>分类<input value={category} onChange={(event) => setCategory(event.target.value)} /></label>
@@ -212,12 +243,12 @@ export default function NftVisualTemplateModal({ open, templates, selectedId, on
               {referenceUrls.map((url, index) => <div key={`${url}-${index}`}><Image src={url} alt={`模板参考图 ${index + 1}`} fill sizes="88px" className="object-cover" /><button type="button" aria-label={`移除参考图 ${index + 1}`} onClick={() => setReferenceUrls((current) => current.filter((_, itemIndex) => itemIndex !== index))}><X /></button></div>)}
               {referenceUrls.length < 6 ? <label className={styles.referenceUpload} title="上传到 COS" aria-label="上传参考图到 COS">
                 {busy === "upload" ? <LoaderCircle className="animate-spin" /> : <Plus />}
-                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple disabled={Boolean(busy)} onChange={(event) => void uploadReferences(event.target.files)} />
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" multiple disabled={Boolean(busy)} onChange={(event) => { void uploadReferences(event.target.files); event.currentTarget.value = ""; }} />
               </label> : null}
               {!referenceUrls.length ? <span>点击 + 上传图片，或先从 Post、NFT 选择图片。</span> : null}
             </div>
           </div>
-          <button type="button" className={styles.saveButton} disabled={Boolean(busy)} onClick={() => void createTemplate()}>{busy === "create" ? <LoaderCircle className="animate-spin" /> : <Plus />} 保存并使用模板</button>
+          <button type="button" className={styles.saveButton} disabled={Boolean(busy)} onClick={() => void saveTemplate()}>{busy === "create" ? <LoaderCircle className="animate-spin" /> : <Plus />} {tab === "edit" ? "保存并使用模板" : "保存并使用模板"}</button>
         </div> : null}
       </section>
     </div>

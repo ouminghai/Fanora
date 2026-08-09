@@ -53,6 +53,7 @@ from app.schemas.nft_agent import (
     NftVisualStyle,
     NftVisualTemplate,
     NftVisualTemplateCreate,
+    NftVisualTemplateUpdate,
 )
 from app.schemas.nft_forge import (
     NftForgeAnalyzeRequest,
@@ -807,6 +808,22 @@ async def create_fan_nft_visual_template(
         return await nft_visual_template_service.create(session, identity.user_id, payload)
     except ValueError as error:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+
+
+@router.put("/creations/agent/templates/{template_id}", response_model=NftVisualTemplate)
+async def update_fan_nft_visual_template(
+    template_id: str,
+    payload: NftVisualTemplateUpdate,
+    identity: AuthenticatedIdentity = Depends(require_official_member),
+    session: AsyncSession = Depends(get_database_session),
+) -> NftVisualTemplate:
+    try:
+        template = await nft_visual_template_service.update(session, identity.user_id, template_id, payload)
+    except ValueError as error:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(error)) from error
+    if template is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Visual template not found")
+    return template
 
 
 @router.post("/creations/agent/chat", response_model=NftAgentChatResponse)
